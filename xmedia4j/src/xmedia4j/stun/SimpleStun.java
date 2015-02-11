@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.Arrays;
 
 import org.apache.log4j.Logger;
 
@@ -16,6 +17,12 @@ public class SimpleStun {
 //	public SimpleStun(int localPort){
 //		this.localPort = localPort;
 //	}
+	
+	public static class StunPacket{
+		public int messgeType;
+		public int messageLength;
+		public byte[] transactionId;
+	}
 	
 	public void bind(String stunHost, int stunPort, int localPort) throws IOException{
 		DatagramSocket udpSocket = new DatagramSocket(localPort);
@@ -62,6 +69,55 @@ public class SimpleStun {
 		udpSocket.receive(pkt);
 		int recvLen = pkt.getLength();
 		logger.info("recv bytes " + recvLen);
+		
+		offset = 0;
+		long respMsgType = StreamUtil.getLong(buf, offset, offset+2);
+		offset += 2;
+		long respMsgLen = StreamUtil.getLong(buf, offset, offset+2);
+		offset += 2;
+		long respMagic = StreamUtil.getLong(buf, offset, offset+4);
+		offset += 4;
+		byte[] respTransactionId = new byte[12];
+		System.arraycopy(buf, offset, respTransactionId, 0, 12);
+		offset += 12;
+		
+		if(respMsgType != BIND_RESPONSE_OK){
+			logger.error("unknown resp msg type " + respMsgType);
+			return;
+		}
+		
+		if(respMagic != magicCookie){
+			logger.error("unknown resp msg magic " + respMagic);
+			return;
+		}
+		
+		if(!Arrays.equals(respTransactionId, transactionId)){
+			logger.error("unexpect resp msg transactionId " + Arrays.toString(respTransactionId));
+			return;
+		}
+		
+		long attrType = StreamUtil.getLong(buf, offset, offset+2);
+		offset += 2;
+		long attrLen = StreamUtil.getLong(buf, offset, offset+2);
+		offset += 2;
+		byte[] attr = new byte[(int) attrLen];
+		System.arraycopy(buf, offset, attr, 0, (int) attrLen);
+		offset += attrLen;
+		
+		logger.info("attrType=" + attrType);
+		logger.info("attrLen=" + attrLen);
+		logger.info("attr=" + bytesToHex(attr));
+	}
+	
+	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+	public static String bytesToHex(byte[] bytes) {
+	    char[] hexChars = new char[bytes.length * 2];
+	    for ( int j = 0; j < bytes.length; j++ ) {
+	        int v = bytes[j] & 0xFF;
+	        hexChars[j * 2] = hexArray[v >>> 4];
+	        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+	    }
+	    return new String(hexChars);
 	}
 	
 	
@@ -70,6 +126,7 @@ public class SimpleStun {
 	    int    STUN_SERVER_PORT = 3488;
 	    SimpleStun stun = new SimpleStun();
 	    try {
+	    	logger.debug("debug simple stun...");
 			stun.bind(STUN_SERVER, STUN_SERVER_PORT, 9898);
 		} catch (IOException e) {
 			e.printStackTrace();
