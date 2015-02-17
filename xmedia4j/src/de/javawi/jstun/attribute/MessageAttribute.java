@@ -101,13 +101,16 @@ public abstract class MessageAttribute implements MessageAttributeInterface {
 			case UNKNOWNATTRIBUTE: ma = UnknownAttribute.parse(valueArray); break;
 			case REFLECTEDFROM: ma = ReflectedFrom.parse(valueArray); break;
 			default:
-				if (type <= 0x7fff) {
-					throw new UnknownMessageAttributeException("Unkown mandatory message attribute", intToType(type));
-				} else {
-					LOGGER.debug("MessageAttribute with type " + type + " unkown.");
-					ma = Dummy.parse(valueArray);
-					break;
-				}
+//				if (type <= 0x7fff) {
+//					throw new UnknownMessageAttributeException("Unkown mandatory message attribute", intToType(type));
+//				} else {
+//					LOGGER.debug("MessageAttribute with type " + type + " unkown.");
+//					ma = Dummy.parse(valueArray);
+//					break;
+//				}
+				LOGGER.debug("MessageAttribute with type " + type + " unkown.");
+				ma = Dummy.parse(valueArray);
+				break;
 			}
 			return ma;
 		} catch (UtilityException ue) {

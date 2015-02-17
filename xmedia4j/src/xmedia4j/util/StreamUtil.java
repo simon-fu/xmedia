@@ -39,4 +39,26 @@ public class StreamUtil {
 		return sb.toString();
 	}
 	
+	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+	public static String bytesToHex(byte[] bytes, int offset, int len) {
+	    char[] hexChars = new char[len * 2];
+	    for ( int j = 0; j < len; j++ ) {
+	    	int off = offset + j;
+	        int v = bytes[off] & 0xFF;
+	        hexChars[j * 2] = hexArray[v >>> 4];
+	        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+	    }
+	    return new String(hexChars);
+	}
+	public static String bytesToHex(byte[] bytes) {
+		return bytesToHex(bytes, 0, bytes.length);
+	}
+	public static String bytesToHex(byte[] bytes, int offset, int len, int maxLen) {
+		if(len <= maxLen) {
+			return bytesToHex(bytes, offset, len);
+		}else{
+			return bytesToHex(bytes, offset, maxLen) + " ...";
+		}
+	}
+	
 }

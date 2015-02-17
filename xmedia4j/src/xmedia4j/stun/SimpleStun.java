@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 
 import org.apache.log4j.Logger;
@@ -60,6 +61,7 @@ public class SimpleStun {
 		
 		int sendLen = offset;
 		logger.info("send bytes " + sendLen);
+		logger.debug(bytesToHex(dataBuffer, 0, sendLen));
 		udpPacket.setLength(sendLen);
 		udpSocket.send(udpPacket);
 		
@@ -69,6 +71,7 @@ public class SimpleStun {
 		udpSocket.receive(pkt);
 		int recvLen = pkt.getLength();
 		logger.info("recv bytes " + recvLen);
+		logger.debug(bytesToHex(buf, 0, recvLen));
 		
 		offset = 0;
 		long respMsgType = StreamUtil.getLong(buf, offset, offset+2);
@@ -96,30 +99,57 @@ public class SimpleStun {
 			return;
 		}
 		
-		long attrType = StreamUtil.getLong(buf, offset, offset+2);
-		offset += 2;
-		long attrLen = StreamUtil.getLong(buf, offset, offset+2);
-		offset += 2;
-		byte[] attr = new byte[(int) attrLen];
-		System.arraycopy(buf, offset, attr, 0, (int) attrLen);
-		offset += attrLen;
+		int length = (int) respMsgLen;
+		int attrOffset = offset;
+		while (length > 0) {
+			
+			long attrType = StreamUtil.getLong(buf, offset, offset+2);
+			offset += 2;
+			long attrLen = StreamUtil.getLong(buf, offset, offset+2);
+			offset += 2;
+			byte[] attr = new byte[(int) attrLen];
+			System.arraycopy(buf, offset, attr, 0, (int) attrLen);
+			offset += attrLen;
+			
+			logger.info("attrType=" + attrType);
+			logger.info("attrLen=" + attrLen);
+			logger.info("attr=" + bytesToHex(attr));
+			
+			int bytes = (offset - attrOffset);
+			length -= bytes;
+		}
 		
-		logger.info("attrType=" + attrType);
-		logger.info("attrLen=" + attrLen);
-		logger.info("attr=" + bytesToHex(attr));
+		
+	}
+	
+	public InetSocketAddress bind(){
+		InetSocketAddress sockAddr = new InetSocketAddress("127.0.0.1", 0);
+		logger.info("addr: " + sockAddr.getAddress().toString() + ":" + sockAddr.getPort());
+		return sockAddr;
 	}
 	
 	final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
 	public static String bytesToHex(byte[] bytes) {
-	    char[] hexChars = new char[bytes.length * 2];
-	    for ( int j = 0; j < bytes.length; j++ ) {
-	        int v = bytes[j] & 0xFF;
+		return bytesToHex(bytes, 0, bytes.length);
+	}
+	public static String bytesToHex(byte[] bytes, int offset, int len) {
+	    char[] hexChars = new char[len * 2];
+	    for ( int j = 0; j < len; j++ ) {
+	    	int off = offset + j;
+	        int v = bytes[off] & 0xFF;
 	        hexChars[j * 2] = hexArray[v >>> 4];
 	        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
 	    }
 	    return new String(hexChars);
 	}
 	
+	/*
+	 * 
+结论1：只要单侧NAT属于Full Cone NAT，即可实现双向通信。 
+结论2：只要两侧NAT都不属于Symmetric NAT，也可双向通信。换种说法，只要两侧NAT都属于Cone NAT，即可双向通信
+结论3：一侧NAT属于Symmetric NAT，另一侧NAT属于Restricted Cone，也可双向通信。
+结论4，两个都是Symmetric NAT或者一个是Symmetric NAT、另一个是Port Restricted Cone，则不能双向通信。
+	 */
 	
 	public static void main(String[] args){
 	    String STUN_SERVER = "203.195.185.236";
@@ -128,6 +158,7 @@ public class SimpleStun {
 	    try {
 	    	logger.debug("debug simple stun...");
 			stun.bind(STUN_SERVER, STUN_SERVER_PORT, 9898);
+			stun.bind();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

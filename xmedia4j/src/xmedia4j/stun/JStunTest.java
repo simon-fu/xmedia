@@ -44,7 +44,7 @@ public class JStunTest {
 		this.port = port;
 	}
 		
-	public DiscoveryInfo test() throws UtilityException, SocketException, UnknownHostException, IOException, MessageAttributeParsingException, MessageAttributeException, MessageHeaderParsingException{
+	public DiscoveryInfo testPublicAddress() throws UtilityException, SocketException, UnknownHostException, IOException, MessageAttributeParsingException, MessageAttributeException, MessageHeaderParsingException{
 		ma = null;
 		ca = null;
 		nodeNatted = true;
@@ -52,13 +52,26 @@ public class JStunTest {
 		di = new DiscoveryInfo(iaddress);
 		
 		test1();
-//		if (test1()) {
-//			if (test2()) {
-//				if (test1Redo()) {
-//					test3();
-//				}
-//			}
-//		}
+		
+		socketTest1.close();
+		
+		return di;
+	}
+	
+	public DiscoveryInfo test() throws UtilityException, SocketException, UnknownHostException, IOException, MessageAttributeParsingException, MessageAttributeException, MessageHeaderParsingException{
+		ma = null;
+		ca = null;
+		nodeNatted = true;
+		socketTest1 = null;
+		di = new DiscoveryInfo(iaddress);
+		
+		if (test1()) {
+			if (test2()) {
+				if (test1Redo()) {
+					test3();
+				}
+			}
+		}
 		
 		socketTest1.close();
 		
@@ -71,7 +84,7 @@ public class JStunTest {
 		while (true) {
 			try {
 				LOGGER.debug("test1...");
-				// Test 1 including response
+				// Test 1 get public address and another IP:port of server
 				socketTest1 = new DatagramSocket(new InetSocketAddress(iaddress, 0));
 				socketTest1.setReuseAddress(true);
 				socketTest1.connect(InetAddress.getByName(stunServer), port);
@@ -81,7 +94,7 @@ public class JStunTest {
 				sendMH.generateTransactionID();
 				
 				ChangeRequest changeRequest = new ChangeRequest();
-				//sendMH.addMessageAttribute(changeRequest);
+				sendMH.addMessageAttribute(changeRequest);
 				
 				byte[] data = sendMH.getBytes();
 				DatagramPacket send = new DatagramPacket(data, data.length);
@@ -145,7 +158,7 @@ public class JStunTest {
 		int timeout = timeoutInitValue;
 		while (true) {
 			try {
-				// Test 2 including response
+				// Test 2 tell server using another IP:port to send data
 				DatagramSocket sendSocket = new DatagramSocket(new InetSocketAddress(iaddress, 0));
 				sendSocket.connect(InetAddress.getByName(stunServer), port);
 				sendSocket.setSoTimeout(timeout);
@@ -365,18 +378,25 @@ public class JStunTest {
 		    int    STUN_SERVER_PORT = 3488;
 		    
 			
-			InetAddress iaddress = InetAddress.getByName("10.0.1.158");
+//			InetAddress iaddress = InetAddress.getByName("10.0.1.163");
+		    InetAddress iaddress = InetAddress.getByName("192.168.1.40");
+			
+			// discover NAT type
+			System.out.println("== jstun.javawi.de ==");
 			JStunTest test = new JStunTest(iaddress, "jstun.javawi.de", 3478);
+			System.out.println(test.test().toString());
 			
-//			System.out.println("== jstun.javawi.de ==");
-//			System.out.println(test.test().toString());
-			
-			System.out.println("== em " + STUN_SERVER +" ==");
-			JStunTest test_em = new JStunTest(iaddress, STUN_SERVER, STUN_SERVER_PORT);
-			System.out.println(test_em.test().toString());
+			// get public address
+//			System.out.println("== turn1 " + STUN_SERVER +" ==");
+//			JStunTest test_em = new JStunTest(iaddress, STUN_SERVER, STUN_SERVER_PORT);
+//			System.out.println(test_em.test().toString());
+//			
+//			System.out.println("== turn3 121.41.75.10 ==");
+//			JStunTest test1 = new JStunTest(iaddress, "121.41.75.10", 3488);
+//			System.out.println(test1.testPublicAddress().toString());
 			
 		} catch (Exception e) {
-			System.out.println(e.getMessage());
+			e.printStackTrace();
 		}
 	}
 }
