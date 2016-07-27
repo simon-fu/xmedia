@@ -27,7 +27,7 @@ typedef struct udp_channel{
 
 }udp_channel;
 
-
+static
 int init_socket_addrin(const char * ip, int port, struct sockaddr_in * addr){
 	memset(addr, 0, sizeof(struct sockaddr_in));
     addr->sin_family = AF_INET;
@@ -246,7 +246,7 @@ int main(int argc, char** argv){
 		fclose(fpin);
 		fpin = NULL;
 	}
-	
+
 	if(sock >= 0){
 		close(sock);
 		sock = -1;
