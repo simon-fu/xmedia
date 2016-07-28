@@ -34,8 +34,9 @@ typedef struct tlv_file_st * tlv_file_t;
 
 typedef struct udp_dumper_st *udp_dumper_t;
 
-#define MEDIA_AUDIO 0
-#define MEDIA_VIDEO 1
+#define MEDIA_UNKNOWN 0
+#define MEDIA_AUDIO 1
+#define MEDIA_VIDEO 2
 
 typedef struct udp_channel{
 	struct udp_channel * next;
@@ -161,7 +162,7 @@ void process_rtp(udp_channel * ch, int udp_len, struct sockaddr_in * from_addr){
 		}
 		ret = sendto(ch->sock, ch->buff, udp_len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
 		ch->packet_count++;
-	}else{
+	}else if(ch->media_type == MEDIA_VIDEO){
 		ret = xrtp_to_nalu_next(&ch->rtp2nalu, ch->buff, udp_len);
 		if(ret <= 0) return;
 		int nalu_len = ret;
@@ -192,7 +193,7 @@ void process_rtp(udp_channel * ch, int udp_len, struct sockaddr_in * from_addr){
 
 		
 		uint32_t timestamp = be_get_u32(ch->buff+4);
-		ret = xnalu_to_rtp_first(&ch->nalu2rtp, timestamp, ch->nalu_buf, nalu_len);
+		ret = xnalu_to_rtp_first(&ch->nalu2rtp, timestamp, ch->nalu_buf, nalu_len, 1);
 		if(ret == 0){
 			int len;
 			while ((len = xnalu_to_rtp_next(&ch->nalu2rtp, ch->buff)) > 0) {
@@ -213,35 +214,39 @@ void on_udp_event(evutil_socket_t fd, short what, void *arg){
     ev_socklen_t len = sizeof(tempadd);
     int bytes_to_recv = sizeof(ch->buff);
     
-    int sock_ret = recvfrom(ch->sock, ch->buff, bytes_to_recv, 0, (struct sockaddr*)&tempadd, &len);
-    if(sock_ret <= 0){
-    	dbge("recvfrom fail with %d", sock_ret);
-    	return;
-    }
-    int udp_len = sock_ret;
-    // dbgv("port %d recv %d bytes", ch->port, udp_len);
+    while(1){
+	    int sock_ret = recvfrom(ch->sock, ch->buff, bytes_to_recv, 0, (struct sockaddr*)&tempadd, &len);
+	    if(sock_ret <= 0){
+	    	// dbge("recvfrom fail with %d", sock_ret);
+	    	return;
+	    }
+	    int udp_len = sock_ret;
+	    // dbgv("port %d recv %d bytes", ch->port, udp_len);
 
-	if(ch->owner->tlvfile){
-		int64_t ts = get_timestamp_ms();
-		tlv_file_write2(ch->owner->tlvfile, ch->index, sizeof(ts), &ts, udp_len, ch->buff);
-		
-	}
-
- //    const char *from_ip = inet_ntoa(tempadd.sin_addr);
-	// int from_port = ntohs(tempadd.sin_port);
- //    dbgv("port %d recv %d bytes from %s:%d", ch->port, udp_len, from_ip, from_port);
-
-	if(ch->is_send_back){
-		// send back
-		if(ch->dst_ssrc > 0){
-			be_set_u32(ch->dst_ssrc, ch->buff+8);
+		if(ch->owner->tlvfile){
+			int64_t ts = get_timestamp_ms();
+			tlv_file_write2(ch->owner->tlvfile, ch->index, sizeof(ts), &ts, udp_len, ch->buff);
+			
 		}
-		sock_ret = sendto(ch->sock, ch->buff, udp_len, 0, (struct sockaddr*)&tempadd, sizeof(tempadd));
-		// dbgi("sendto back ret %d", sock_ret);
-		ch->packet_count++;
-	}else{
-		process_rtp(ch, udp_len, &tempadd);
-	}
+
+	 //    const char *from_ip = inet_ntoa(tempadd.sin_addr);
+		// int from_port = ntohs(tempadd.sin_port);
+	 //    dbgv("port %d recv %d bytes from %s:%d", ch->port, udp_len, from_ip, from_port);
+
+
+		if(ch->is_send_back){
+			// send back
+			if(ch->dst_ssrc > 0){
+				be_set_u32(ch->dst_ssrc, ch->buff+8);
+			}
+			sock_ret = sendto(ch->sock, ch->buff, udp_len, 0, (struct sockaddr*)&tempadd, sizeof(tempadd));
+			// dbgi("sendto back ret %d", sock_ret);
+			ch->packet_count++;
+		}else{
+			process_rtp(ch, udp_len, &tempadd);
+		}
+    }
+
 
 	
 }
@@ -328,20 +333,23 @@ int main(int argc, char** argv){
 	// }
 
 	int src_audio_port = 10000;
-	int src_video_port = 10002;
+	int src_video_port = 0;
 
 	// //const char * dst_ip = "172.17.3.161"; // note3
-	// const char * dst_ip = "172.17.1.247"; // huawei
+	// // const char * dst_ip = "172.17.1.247"; // huawei
+	// const char * dst_ip = "127.0.0.1";
 	// int dst_audio_port = 10000;
 	// int dst_video_port = 10002;
-	//uint32_t dst_video_payloadtype = 96;
+	// uint32_t dst_ssrc = 0x1234;
+	// uint32_t dst_video_payloadtype = 96;
 
 	const char * dst_ip = "172.17.3.7"; // raoshangrong kurento
-	int dst_audio_port = 41944;
-	int dst_video_port = 53994;
-	uint32_t dst_ssrc = 0x1234;
-	uint32_t dst_video_payloadtype = 100;
-	int is_send_back = 1;
+	int dst_audio_port = 35732;
+	int dst_video_port = 0;
+	uint32_t dst_ssrc = 0; //0x1234;
+	uint32_t dst_video_payloadtype = 96;
+
+	int is_send_back = 0;
 
 	udp_dumper_t obj = NULL;
 

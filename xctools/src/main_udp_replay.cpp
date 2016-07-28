@@ -22,6 +22,8 @@ typedef struct udp_channel{
 	int port;
 	int index;
 
+	int sock;
+	int dst_port;
 	struct sockaddr_in  addrto;
 	long long packet_count;
 
@@ -73,7 +75,7 @@ int check_magic(FILE * fpin, unsigned char * buf, int buf_size, const char * mag
 
 int main(int argc, char** argv){
 	if(argc <= 1){
-		dbgi("usage: %s filename [ip]", argv[0]);
+		dbgi("usage: %s filename [ip port1 port2...]", argv[0]);
 		return -1;
 	}
 
@@ -86,12 +88,21 @@ int main(int argc, char** argv){
 	unsigned char * buf = (unsigned char *)malloc(buf_size);
 	int type;
 	int length;
-	int sock = -1;
-	
+	// int sock = -1;
+	int dst_ports[64];
+	int dst_port_count;
+
 	int ret = 0;
 
 	if(argc > 2 ){
 		ip = argv[2];
+	}
+
+	if(argc > 3){
+		dst_port_count = argc - 3; 
+		for(int i = 0; i < dst_port_count; i++){
+			dst_ports[i] = atoi(argv[3+i]);
+		}
 	}
 
 	do{
@@ -153,8 +164,30 @@ int main(int argc, char** argv){
 				ret = -1;
 				break;
 			}
+			channels[index].index = index;
 			channels[index].port = port;
 			dbgi("index %d, port %d", index, port);
+
+			udp_channel * ch = &channels[index];
+			if(ip){
+				if(dst_port_count > 0){
+					if(index < dst_port_count && dst_ports[index] > 0){
+						ch->dst_port = dst_ports[index];
+					}else{
+						ch->dst_port = 0;
+					}
+					
+				}else{
+					ch->dst_port = ch->port;
+				}
+
+				if(ch->dst_port > 0){
+					ch->sock = create_udp_socket(0);
+					init_socket_addrin(ip, ch->dst_port, &ch->addrto);	
+				}
+				
+			}
+
 		}
 
 		if(!ip){
@@ -162,18 +195,25 @@ int main(int argc, char** argv){
 			break;
 		}
 
-		ret = create_udp_socket(0);
-		if(ret < 0){
-			dbge("fail to create udp socket, ret=%d", ret);
-			break;
-		}
-		sock = ret;
-		dbgi("successfully create UDP socket %d", sock); // TODO: print local port
-
 		for(int i = 0; i < portcount; i++){
 			udp_channel * ch = &channels[i];
-			init_socket_addrin(ip, ch->port, &ch->addrto);
+			if(ch->sock > 0){
+				dbgi("replay: %d -> %s:%d", ch->port, ip, ch->dst_port);
+			}
 		}
+
+		// ret = create_udp_socket(0);
+		// if(ret < 0){
+		// 	dbge("fail to create udp socket, ret=%d", ret);
+		// 	break;
+		// }
+		// sock = ret;
+		// dbgi("successfully create UDP socket %d", sock); // TODO: print local port
+
+		// for(int i = 0; i < portcount; i++){
+		// 	udp_channel * ch = &channels[i];
+		// 	init_socket_addrin(ip, ch->port, &ch->addrto);
+		// }
 
 		dbgi("replay to %s ...", ip);
 		int64_t ts_start = -1;
@@ -195,8 +235,8 @@ int main(int argc, char** argv){
 				dbge("expect udp type less than %d, but %d", portcount, type);
 			}
 			int index = type;
-
-			if( length > 8){
+			udp_channel * ch = &channels[index];
+			if( length > 8 && ch->sock > 0){
 				int64_t pts = 0;
 				unsigned int t32;
 
@@ -219,12 +259,17 @@ int main(int argc, char** argv){
 				if(pts > ts_start ){
 					int64_t ts_elapsed = pts - ts_start;
 					if(ts_elapsed > time_elapsed){
-						usleep((ts_elapsed-time_elapsed)*1000);
+						int64_t ms = (ts_elapsed-time_elapsed);
+						if(ms >= 10){
+							dbgi("ch %d sleep %d ms", ch->port, (int)ms);
+							usleep(ms*1000);
+						}
+
 					}
 				}
 
-				udp_channel * ch = &channels[index];
-				ret = sendto(sock, data, datalength, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));
+				
+				ret = sendto(ch->sock, data, datalength, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));
 				ch->packet_count++;
 				// dbgv("elapsed %lld: port %d sends No.%lld packet", get_timestamp_ms()-time_start, ch->port, ch->packet_count);
 			}
@@ -247,12 +292,13 @@ int main(int argc, char** argv){
 		fpin = NULL;
 	}
 
-	if(sock >= 0){
-		close(sock);
-		sock = -1;
-	}
+	// if(sock >= 0){
+	// 	close(sock);
+	// 	sock = -1;
+	// }
 
 	if(channels){
+		// TODO: close ch->sock;
 		free(channels);
 		channels = NULL;
 	}

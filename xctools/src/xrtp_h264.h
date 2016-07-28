@@ -47,16 +47,24 @@ typedef struct xnalu_to_rtp_s{
 	uint32_t nalu_remains;
 	uint32_t nalu_frag_size;
 	int is_fu;
+	int mask;
 
 	uint8_t fu_head[4];
 	uint32_t fu_head_len;
 	uint32_t fu_flag_offset;
 }xnalu_to_rtp_t;
 int xnalu_to_rtp_init(xnalu_to_rtp_t * ctx, uint32_t ssrc, uint32_t payload_type, uint32_t max_rtp_size);
-int xnalu_to_rtp_first(xnalu_to_rtp_t * ctx, uint32_t timestamp, const uint8_t *nalu, uint32_t nalu_len);
+int xnalu_to_rtp_first(xnalu_to_rtp_t * ctx, uint32_t timestamp, const uint8_t *nalu, uint32_t nalu_len, int mask);
 int xnalu_to_rtp_next(xnalu_to_rtp_t * ctx, uint8_t *rtp);
 
 
+typedef struct xtimestamp64{
+  uint32_t last_ts_;
+  int64_t num_wrap_;
+}xtimestamp64;
+
+int xtimestamp64_init(xtimestamp64 * obj);
+int64_t xtimestamp64_unwrap(xtimestamp64 * obj, uint32_t ts);
 
 
 #ifdef __cplusplus

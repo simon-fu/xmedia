@@ -251,12 +251,19 @@ int xnalu_to_rtp_init(xnalu_to_rtp_t * ctx, uint32_t ssrc, uint32_t payload_type
 }
 
 int xnalu_to_rtp_first(xnalu_to_rtp_t * ctx, uint32_t timestamp, const uint8_t *nalu,
-		uint32_t nalu_len)
+		uint32_t nalu_len, int mask)
 {
 	ctx->timestamp = timestamp;
 	ctx->pos = nalu;
 	ctx->nalu_len = nalu_len;
 	ctx->nalu_remains = nalu_len;
+	ctx->mask = mask;
+
+	// fix kurento rtpendpoint
+	int nalu_type = nalu[0] & 0x1F;
+	if(nalu_type == 7 || nalu_type == 8 || nalu_type == 9){
+		ctx->mask = 1;
+	}
 
 
 	if (nalu_len <= (ctx->max_rtp_size - XRTP_HEADER_LEN)) {
@@ -292,7 +299,7 @@ int xnalu_to_rtp_next(xnalu_to_rtp_t * ctx, uint8_t *rtp)
 	int rtp_len;
 	if(!ctx->is_fu){ // single RTP
 		dbgd("n2r: single");
-		build_rtp_head(ctx, rtp, 1);
+		build_rtp_head(ctx, rtp, ctx->mask);
 		memcpy(rtp+XRTP_HEADER_LEN, ctx->pos, ctx->nalu_len);
 		rtp_len = XRTP_HEADER_LEN + ctx->nalu_len;
 		ctx->nalu_remains = 0;
@@ -314,7 +321,8 @@ int xnalu_to_rtp_next(xnalu_to_rtp_t * ctx, uint8_t *rtp)
 
 	}else{
 		dbgd("n2r: fu end, fu[0]=0x%02X, type=%d", ctx->fu_head[0], ctx->fu_head[0]&0x1F);
-		mask = 1;
+		// mask = 1;
+		mask = ctx->mask;
 		ctx->fu_head[ctx->fu_flag_offset] |= 1 << 6;; // set end bit
 		memcpy(rtp+XRTP_HEADER_LEN, ctx->fu_head, ctx->fu_head_len);
 		memcpy(&rtp[XRTP_HEADER_LEN+ctx->fu_head_len], ctx->pos, ctx->nalu_remains);
@@ -393,7 +401,7 @@ int test_rtp_nalu()
 	xnalu_to_rtp_init(&n2r, 1111, 96, 512);
 	xrtp_to_nalu_init(&r2n, out_nalu, 64*1024, 0);
 
-	xnalu_to_rtp_first(&n2r, 1, &nalu[start], nalu_len);
+	xnalu_to_rtp_first(&n2r, 1, &nalu[start], nalu_len, 1);
 	uint32_t len;
 	while((len=xnalu_to_rtp_next(&n2r, rtp)) > 0){
 		int ret = xrtp_to_nalu_next(&r2n, rtp, len);
@@ -416,6 +424,26 @@ int test_rtp_nalu()
 	exit(0);
 	return 0;
 }
+
+
+
+int xtimestamp64_init(xtimestamp64 * obj){
+	memset(obj, 0, sizeof(xtimestamp64));
+	return 0;
+}
+
+int64_t xtimestamp64_unwrap(xtimestamp64 * obj, uint32_t ts){
+  if (ts < obj->last_ts_) {
+    if (obj->last_ts_ > 0xf0000000 && ts < 0x0fffffff) {
+      ++obj->num_wrap_;
+    }
+  }
+  obj->last_ts_ = ts;
+  int64_t unwrapped_ts = ts + (obj->num_wrap_ << 32);
+  return unwrapped_ts;
+}
+
+
 
 #if 0
 

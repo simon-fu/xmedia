@@ -18,8 +18,8 @@ get_files =$(foreach dir,$(subst $(DIR_DIVIDER),$(MK_DIR_DIVIDER),$(1)),$(wildca
 #ALL_CPP_SRC += $(CPP_SRC)
 
 
-COMMON_CPP_SRC += src/util.cpp src/xrtp_h264.cpp src/xutil.cpp
-COMMON_H += src/util.h src/xrtp_defs.h src/xrtp_h264.h src/xutil.h
+COMMON_CPP_SRC += src/util.cpp src/xrtp_h264.cpp src/xutil.cpp src/xtrans_codec.cpp
+COMMON_H += src/util.h src/xrtp_defs.h src/xrtp_h264.h src/xutil.h src/xtrans_codec.h
 COMMON_OBJ += $(foreach src, $(COMMON_CPP_SRC), $(addsuffix .o, $(basename $(src))))
 ALL_CPP_SRC += $(COMMON_CPP_SRC)
 
@@ -50,6 +50,11 @@ TARGET_RTP_RELAY=$(OUTPUT_DIR)/rtp_relay
 TARGETS += $(TARGET_RTP_RELAY)
 RTP_RELAY_OBJ = src/main_rtp_relay.o 
 ALL_CPP_OBJ += $(RTP_RELAY_OBJ)
+
+TARGET_RTP_REPLAY=$(OUTPUT_DIR)/rtp_replay
+TARGETS += $(TARGET_RTP_REPLAY)
+RTP_REPLAY_OBJ = src/main_rtp_replay.o 
+ALL_CPP_OBJ += $(RTP_REPLAY_OBJ)
 
 
 
@@ -117,6 +122,15 @@ CFLAGS += $(shell "pkg-config libevent --cflags")
 CPPFLAGS += $(shell pkg-config libevent --cflags)
 MY_LD_FLAGS += $(shell pkg-config libevent --libs)
 
+CFLAGS += $(shell "pkg-config speex --cflags")
+CPPFLAGS += $(shell pkg-config speex --cflags)
+MY_LD_FLAGS += $(shell pkg-config speex --libs)
+
+CFLAGS += $(shell "pkg-config opus --cflags")
+CPPFLAGS += $(shell pkg-config opus --cflags)
+MY_LD_FLAGS += $(shell pkg-config opus --libs)
+
+
 
 all: $(TARGETS)
 	@echo build success
@@ -135,7 +149,8 @@ $(TARGET_CONVERT_DUMP_H264): $(CONVERT_DUMP_H264_OBJ) $(COMMON_OBJ) $(COMMON_H) 
 $(TARGET_RTP_RELAY): $(RTP_RELAY_OBJ) $(COMMON_OBJ) $(COMMON_H) $(OUTPUT_DIR) 
 	$(CC)  $(RTP_RELAY_OBJ) $(COMMON_OBJ) $(MY_LD_FLAGS) -o $@
 
-
+$(TARGET_RTP_REPLAY): $(RTP_REPLAY_OBJ) $(COMMON_OBJ) $(COMMON_H) $(OUTPUT_DIR) 
+	$(CC)  $(RTP_REPLAY_OBJ) $(COMMON_OBJ) $(MY_LD_FLAGS) -o $@
 
 $(OUTPUT_DIR):
 	mkdir -p $@
