@@ -38,29 +38,47 @@ typedef struct udp_dumper_st *udp_dumper_t;
 #define MEDIA_AUDIO 1
 #define MEDIA_VIDEO 2
 
+#define DIR_SRC_TO_DST 0x1
+#define DIR_DST_TO_SRC 0x2
+#define DIR_BOTH (DIR_SRC_TO_DST | DIR_DST_TO_SRC)
+
+typedef struct peer_channel{
+	char ip[64];
+	int port;
+	struct sockaddr_in addr;
+
+	long long packet_count;
+
+	int nalu_buf_size;
+	unsigned char * nalu_buf;
+	union{
+		xrtp_h264_repacker video_repacker;
+		xrtp_transformer audio_transformer;
+	};
+}peer_channel;
+
 typedef struct udp_channel{
 	struct udp_channel * next;
 	udp_dumper_t owner;
 	int sock;
-	int port;
+	int local_port;
+	// struct sockaddr_in addrto;
 	struct event * ev_udp;
-	long long packet_count;
+	
 	unsigned char buff[2*1024];
 	int index;
 
 	int media_type;
-	struct sockaddr_in addrto;
-	uint32_t dst_ssrc;
-	uint32_t dst_payloadtype;
+	char name[64];
 	int is_send_back;
+	uint32_t local_ssrc;
+	uint32_t direction;
 
-	xrtp_to_nalu_t rtp2nalu;
-	xnalu_to_rtp_t nalu2rtp;
-	int nalu_buf_size;
-	unsigned char * nalu_buf;
-	int got_sps;
-	int got_pps;
-	int got_keyframe;
+	int addr_done;
+	peer_channel src;
+	peer_channel dst;
+
+
 }udp_channel;
 
 struct udp_dumper_st{
@@ -137,7 +155,7 @@ int init_socket_addrin(const char * ip, int port, struct sockaddr_in * addr){
 	memset(addr, 0, sizeof(struct sockaddr_in));
     addr->sin_family = AF_INET;
     addr->sin_port = htons(port);
-    if(ip){
+    if(ip && ip[0] != '\0'){
     	addr->sin_addr.s_addr = inet_addr(ip);
     }else{
     	addr->sin_addr.s_addr = htonl(INADDR_ANY);
@@ -146,62 +164,100 @@ int init_socket_addrin(const char * ip, int port, struct sockaddr_in * addr){
 }
 
 static
-const char * xnalu_type_string(int nalu_type){
-	if(nalu_type == 5) return "(I)";
-	if(nalu_type == 7) return "(SPS)";
-	if(nalu_type == 8) return "(PPS)";
-	return "";
+int sock_addr_is_valid(struct sockaddr_in * src){
+	return (src->sin_family > 0
+		&& src->sin_addr.s_addr > 0
+		&& src->sin_port > 0);
 }
 
 static
-void process_rtp(udp_channel * ch, int udp_len, struct sockaddr_in * from_addr){
-	int ret = 0;
-	if(ch->media_type == MEDIA_AUDIO){
-		if(ch->dst_ssrc > 0){
-			be_set_u32(ch->dst_ssrc, ch->buff+8);
-		}
-		ret = sendto(ch->sock, ch->buff, udp_len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
-		ch->packet_count++;
-	}else if(ch->media_type == MEDIA_VIDEO){
-		ret = xrtp_to_nalu_next(&ch->rtp2nalu, ch->buff, udp_len);
-		if(ret <= 0) return;
-		int nalu_len = ret;
+int sock_addr_is_equ(struct sockaddr_in * src, struct sockaddr_in * dst){
+	return (src->sin_family == dst->sin_family
+		&& src->sin_addr.s_addr == dst->sin_addr.s_addr
+		&& src->sin_port == dst->sin_port);
+}
 
-		int nal_type = ch->nalu_buf[0] & 0x1F;
-		if(nal_type == 5 || nal_type == 7  || nal_type == 8 ){
-			dbgi("nalu: type=%d%s, len=%d", nal_type, xnalu_type_string(nal_type), nalu_len);	
-		}
-		
-		if(nal_type == 9) return;
 
-		// if(nal_type == 7) {// sps
-		// 	if(ch->got_sps) return;
-		// 	ch->got_sps = 1;
-		// }else if(nal_type == 8){ // pps
-		// 	if(ch->got_pps) return;
-		// 	ch->got_pps = 1;
-		// }else if(nal_type == 5){
-		// 	ch->got_keyframe = 1;
-		// 	dbgi("got keyframe");
-		// }else if(nal_type == 9){
-		// 	return;
-		// }else{
-		// 	if(!ch->got_keyframe){
-		// 		return;
-		// 	}
-		// }
 
-		
-		uint32_t timestamp = be_get_u32(ch->buff+4);
-		ret = xnalu_to_rtp_first(&ch->nalu2rtp, timestamp, ch->nalu_buf, nalu_len, 1);
-		if(ret == 0){
-			int len;
-			while ((len = xnalu_to_rtp_next(&ch->nalu2rtp, ch->buff)) > 0) {
-				ret = sendto(ch->sock, ch->buff, len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
-				ch->packet_count++;
-			}
+
+static
+void send_directly(udp_channel * ch, peer_channel * peer, unsigned char * data, int data_len){
+	int ret;
+	ret = sendto(ch->sock, data, data_len, 0, (struct sockaddr*)&peer->addr, sizeof(peer->addr));
+	peer->packet_count++;
+}
+
+static
+void process_audio_rtp(udp_channel * ch, peer_channel * peer_from, peer_channel * peer_to, unsigned char * data, int data_len){
+	xrtp_transformer_process(&peer_from->audio_transformer, data);
+	send_directly(ch, peer_to, data, data_len);
+}
+
+static
+void process_video_rtp(udp_channel * ch, peer_channel * peer_from, peer_channel * peer_to, unsigned char * data, int data_len){
+	int ret = xrtp_h264_repacker_input(&peer_from->video_repacker, data, data_len);
+	if(ret > 0){
+		int len;
+		while ((len = xrtp_h264_repacker_next(&peer_from->video_repacker, data)) > 0) {
+			// dump_rtp("video rtp2", data, len);
+			send_directly(ch, peer_to, data, len);
+			// ret = sendto(ch->sock, data, len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
+			// ch->packet_count++;
 		}
 	}
+}
+
+static
+void process_rtp(udp_channel * ch, unsigned char * data, int data_len, struct sockaddr_in * from_addr){
+
+	peer_channel * peer_from;
+	peer_channel * peer_to;
+	if(sock_addr_is_equ(from_addr, &ch->src.addr)){
+		peer_from = &ch->src;
+		peer_to = &ch->dst;
+		if(!(ch->direction & DIR_SRC_TO_DST)){
+			return;
+		}
+	}else if(sock_addr_is_equ(from_addr, &ch->dst.addr)){
+		peer_from = &ch->dst;
+		peer_to = &ch->src;
+		if(!(ch->direction&DIR_DST_TO_SRC)){
+			return;
+		}
+	}else{
+		return;
+	}
+
+	int ret = 0;
+	if(ch->media_type == MEDIA_AUDIO){
+		process_audio_rtp(ch, peer_from, peer_to, data, data_len);
+	}else if(ch->media_type == MEDIA_VIDEO){
+		process_video_rtp(ch, peer_from, peer_to, data, data_len);
+	}
+}
+
+static 
+bool check_set_peer_addr(udp_channel * ch, peer_channel * peer, struct sockaddr_in * from , const char * direction){
+	if(peer->addr.sin_addr.s_addr > 0){
+		if(peer->addr.sin_addr.s_addr != from->sin_addr.s_addr){
+			return false;
+		}
+	}
+
+	if(peer->addr.sin_port > 0){
+		if(peer->addr.sin_port != from->sin_port){
+			return false;
+		}
+	}
+
+	if(!sock_addr_is_valid(&peer->addr)){
+		peer->addr = *from;
+		const char *from_ip = inet_ntoa(from->sin_addr);
+		int from_port = ntohs(from->sin_port);
+		dbgi("%s got %s %s:%d", ch->name, direction, from_ip, from_port);
+	}
+
+	return true;
 }
 
 static
@@ -231,24 +287,36 @@ void on_udp_event(evutil_socket_t fd, short what, void *arg){
 
 	 //    const char *from_ip = inet_ntoa(tempadd.sin_addr);
 		// int from_port = ntohs(tempadd.sin_port);
-	 //    dbgv("port %d recv %d bytes from %s:%d", ch->port, udp_len, from_ip, from_port);
+	 //    // dbgv("port %d recv %d bytes from %s:%d", ch->port, udp_len, from_ip, from_port);
 
-
+		// send back
 		if(ch->is_send_back){
-			// send back
-			if(ch->dst_ssrc > 0){
-				be_set_u32(ch->dst_ssrc, ch->buff+8);
+			if(ch->local_ssrc > 0){
+				be_set_u32(ch->local_ssrc, ch->buff+8);
 			}
 			sock_ret = sendto(ch->sock, ch->buff, udp_len, 0, (struct sockaddr*)&tempadd, sizeof(tempadd));
 			// dbgi("sendto back ret %d", sock_ret);
-			ch->packet_count++;
-		}else{
-			process_rtp(ch, udp_len, &tempadd);
+			// ch->packet_count++;
+			return;
 		}
-    }
 
+		// check src and dst
+		if(!ch->addr_done){
+			if(!check_set_peer_addr(ch, &ch->src, &tempadd, "src")){
+				check_set_peer_addr(ch, &ch->dst, &tempadd, "dst");
+			}
 
-	
+			if(sock_addr_is_valid(&ch->src.addr) && sock_addr_is_valid(&ch->dst.addr)){
+				dbgi("%s check src and dst done", ch->name);
+				ch->addr_done = 1;
+			}
+		}
+
+		if(ch->addr_done){
+			process_rtp(ch, ch->buff, udp_len, &tempadd);
+		}
+
+	}
 }
 
 static 
@@ -280,7 +348,7 @@ udp_channel * create_and_add_udp_channel(udp_dumper_t obj, int port){
 		}
 
 		ZERO_ALLOC(ch, udp_channel *, sizeof(udp_channel));
-		ch->port = port;
+		ch->local_port = port;
 		ch->sock = create_udp_socket(port);
 		if(ch->sock < 0){
 			dbge("fail to create udp socket at port %d", port);
@@ -332,24 +400,41 @@ int main(int argc, char** argv){
 	// 	return -1;
 	// }
 
+	int is_send_back = 0;
+	int direction = DIR_DST_TO_SRC; // DIR_BOTH  DIR_SRC_TO_DST DIR_DST_TO_SRC
+
+
+	int local_audio_port = 10000;
+	int local_video_port = 10002;
+
+	const char * src_ip = "172.17.3.161"; // note3
 	int src_audio_port = 10000;
-	int src_video_port = 0;
+	int src_video_port = 10002;
 
 	// //const char * dst_ip = "172.17.3.161"; // note3
 	// // const char * dst_ip = "172.17.1.247"; // huawei
+	// const char * dst_ip = "172.17.3.7"; // raoshangrong kurento
 	// const char * dst_ip = "127.0.0.1";
-	// int dst_audio_port = 10000;
-	// int dst_video_port = 10002;
-	// uint32_t dst_ssrc = 0x1234;
-	// uint32_t dst_video_payloadtype = 96;
-
-	const char * dst_ip = "172.17.3.7"; // raoshangrong kurento
-	int dst_audio_port = 35732;
+	const char * dst_ip = "";
+	int dst_audio_port = 0;
 	int dst_video_port = 0;
-	uint32_t dst_ssrc = 0; //0x1234;
-	uint32_t dst_video_payloadtype = 96;
 
-	int is_send_back = 0;
+
+	uint32_t local_ssrc = 0x1234;
+	uint32_t local_audio_payloadtype = 120;
+	uint32_t local_video_payloadtype = 96;
+
+	#if 1
+	// voice -> rtc
+	int src_samplerate = 16000;
+	int dst_samplerate = 48000;
+	#else
+	// rtc -> voice
+	int src_samplerate = 48000;
+	int dst_samplerate = 16000;
+
+	#endif
+
 
 	udp_dumper_t obj = NULL;
 
@@ -363,26 +448,37 @@ int main(int argc, char** argv){
 	udp_channel * video_ch = NULL;
 	udp_channel * audio_ch = NULL;
 
+	const char * dir ;
+	if(direction == DIR_SRC_TO_DST){
+		dir = "->";
+	}else if(direction == DIR_DST_TO_SRC){
+		dir = "<-";
+	}else if(direction == DIR_BOTH){
+		dir = "<->";
+	}else{
+		dbge("unknown direction %02X", direction);
+		return -1;
+	}
+
 	if(!is_send_back){
-		if(src_audio_port > 0){
-			dbgi("audio: %d -> %s:%d", src_audio_port, dst_ip, dst_audio_port);
+		if(local_audio_port > 0){
+			dbgi("audio: src %s:%d %s local %d %s dst %s:%d", src_ip, src_audio_port, dir, local_audio_port, dir, dst_ip, dst_audio_port);
 		}
-		
-		if(src_video_port > 0){
-			dbgi("video: %d -> %s:%d", src_video_port, dst_ip, dst_video_port);
+		if(local_video_port > 0){
+			dbgi("video: src %s:%d %s local %d %s dst %s:%d", src_ip, src_video_port, dir, local_video_port, dir, dst_ip, dst_video_port);
 		}
 	}else{
-		if(src_audio_port > 0){
-			dbgi("audio: %d -> back", src_audio_port);
+		if(local_audio_port > 0){
+			dbgi("audio: %d -> back", local_audio_port);
 		}
 		
-		if(src_video_port > 0){
-			dbgi("video: %d -> back", src_video_port);
+		if(local_video_port > 0){
+			dbgi("video: %d -> back", local_video_port);
 		}
 	}
 
-	if(dst_ssrc > 0){
-		dbgi("dst_ssrc = %d", dst_ssrc);
+	if(local_ssrc > 0){
+		dbgi("local_ssrc = %d", local_ssrc);
 	}
 
 
@@ -404,25 +500,45 @@ int main(int argc, char** argv){
 		obj->ev_signal = evsignal_new(obj->ev_base, SIGINT, ev_signal_cb, (void *)obj);
 		event_add(obj->ev_signal, NULL);
 
-		if(src_audio_port > 0){
-			audio_ch = create_and_add_udp_channel(obj, src_audio_port);
-			init_socket_addrin(dst_ip, dst_audio_port, &audio_ch->addrto);
-			audio_ch->media_type = MEDIA_AUDIO;
-			audio_ch->dst_ssrc = dst_ssrc;
-			audio_ch->is_send_back = is_send_back;
+		if(local_audio_port > 0){
+			audio_ch = create_and_add_udp_channel(obj, local_audio_port);
+			udp_channel * ch = audio_ch;
+			ch->is_send_back = is_send_back;
+			ch->media_type = MEDIA_AUDIO;
+			ch->local_ssrc = local_ssrc;
+			ch->direction = direction;
+			sprintf(ch->name, "audio");
+			init_socket_addrin(src_ip, src_audio_port, &ch->src.addr);
+			init_socket_addrin(dst_ip, dst_audio_port, &ch->dst.addr);
+
+			xrtp_transformer_init(&ch->src.audio_transformer, src_samplerate, dst_samplerate, local_audio_payloadtype, local_ssrc );
+			xrtp_transformer_init(&ch->dst.audio_transformer, dst_samplerate, src_samplerate, local_audio_payloadtype, local_ssrc );
 		}
 		
-		if(src_video_port > 0){
-			video_ch = create_and_add_udp_channel(obj, src_video_port);
-			init_socket_addrin(dst_ip, dst_video_port, &video_ch->addrto);
-			video_ch->media_type = MEDIA_VIDEO;
-			video_ch->dst_ssrc = dst_ssrc;
-			video_ch->is_send_back = is_send_back;
+		if(local_video_port > 0){
+			video_ch = create_and_add_udp_channel(obj, local_video_port);
+			udp_channel * ch = video_ch;
+			ch->is_send_back = is_send_back;
+			ch->media_type = MEDIA_VIDEO;
+			ch->local_ssrc = local_ssrc;
+			ch->direction = direction;
+			sprintf(ch->name, "video");
+			init_socket_addrin(src_ip, src_video_port, &ch->src.addr);
+			init_socket_addrin(dst_ip, dst_video_port, &ch->dst.addr);
 
-			video_ch->nalu_buf_size = 1*1024*1024;
-			video_ch->nalu_buf = (unsigned char *) malloc(video_ch->nalu_buf_size);
-			xrtp_to_nalu_init(&video_ch->rtp2nalu, video_ch->nalu_buf, video_ch->nalu_buf_size, 0);
-			xnalu_to_rtp_init(&video_ch->nalu2rtp, dst_ssrc, dst_video_payloadtype, 512);
+			ch->src.nalu_buf_size = 1*1024*1024;
+			ch->src.nalu_buf = (unsigned char *) malloc(ch->src.nalu_buf_size);
+			xrtp_h264_repacker_init(&ch->src.video_repacker
+					, ch->src.nalu_buf, ch->src.nalu_buf_size, 0
+					, local_ssrc, local_video_payloadtype, 1412
+					, 0, 0);
+
+			ch->dst.nalu_buf_size = 1*1024*1024;
+			ch->dst.nalu_buf = (unsigned char *) malloc(ch->dst.nalu_buf_size);
+			xrtp_h264_repacker_init(&ch->dst.video_repacker
+					, ch->dst.nalu_buf, ch->dst.nalu_buf_size, 0
+					, local_ssrc, local_video_payloadtype, 1412
+					, 0, 0);
 		}
 
 
@@ -439,7 +555,7 @@ int main(int argc, char** argv){
 			udp_channel * ch = obj->channels;
 			while(ch){
 				le_set_u32(ch->index, buf+0);
-				le_set_u32(ch->port,  buf+4);
+				le_set_u32(ch->local_port,  buf+4);
 				tlv_file_write(obj->tlvfile, TLV_TYPE_TYPEINFO, 8, buf);
 				ch = ch->next;
 			}
@@ -454,7 +570,7 @@ int main(int argc, char** argv){
 	if(ret == 0){
 		udp_channel * ch = obj->channels;
 		while(ch){
-			dbgi("port %d relay %lld packets", ch->port, ch->packet_count);
+			dbgi("port %d send: src %lld dst %lld packets", ch->local_port, ch->src.packet_count, ch->dst.packet_count);
 			ch = ch->next;
 		}
 	}
@@ -465,9 +581,14 @@ int main(int argc, char** argv){
 	}
 
 	if(video_ch){
-		if(video_ch->nalu_buf){
-			free(video_ch->nalu_buf);
-			video_ch->nalu_buf = NULL;
+		if(video_ch->src.nalu_buf){
+			free(video_ch->src.nalu_buf);
+			video_ch->src.nalu_buf = NULL;
+		}
+
+		if(video_ch->dst.nalu_buf){
+			free(video_ch->dst.nalu_buf);
+			video_ch->dst.nalu_buf = NULL;
 		}
 	}
 

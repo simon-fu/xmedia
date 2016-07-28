@@ -29,29 +29,36 @@ typedef struct udp_channel{
 	long long packet_count;
 
 	int media_type;
-	uint32_t dst_ssrc;
-	uint32_t dst_payloadtype;
-	uint32_t src_packet_count;
-	int64_t src_first_ts;
-	xtimestamp64 tswrapper;
-	uint32_t dst_seq;
 
-	uint32_t src_samplerate;
-	uint32_t src_channels;
-	uint32_t dst_samplerate;
-	uint32_t dst_channels;
-
-	// audio
-	audio_transcoder_t * audio_transcoder;
-
-	// video
-	xrtp_to_nalu_t rtp2nalu;
-	xnalu_to_rtp_t nalu2rtp;
 	int nalu_buf_size;
 	unsigned char * nalu_buf;
-	int got_sps;
-	int got_pps;
-	int got_keyframe;
+	union{
+		xrtp_h264_repacker video_repacker;
+		xrtp_transformer audio_transformer;
+	};
+
+	// uint32_t dst_ssrc;
+	// uint32_t dst_payloadtype;
+	// uint32_t src_packet_count;
+	// int64_t src_first_ts;
+	// xtimestamp64 tswrapper;
+	// uint32_t dst_seq;
+
+	// uint32_t src_samplerate;
+	// uint32_t src_channels;
+	// uint32_t dst_samplerate;
+	// uint32_t dst_channels;
+
+	// // audio
+	// audio_transcoder_t * audio_transcoder;
+
+	// // video
+	// xrtp_to_nalu_t rtp2nalu;
+	// xnalu_to_rtp_t nalu2rtp;
+
+	// int got_sps;
+	// int got_pps;
+	// int got_keyframe;
 
 }udp_channel;
 
@@ -111,187 +118,211 @@ const char * xnalu_type_string(int nalu_type){
 }
 
 static
-void send_directly(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
+void send_directly(udp_channel * ch, unsigned char * data, int data_len){
 	int ret;
 	ret = sendto(ch->sock, data, data_len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));
 	ch->packet_count++;
 }
 
-static
-uint32_t process_change_timestamp(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
-		if(ch->dst_samplerate > 0 && ch->src_samplerate > 0){
-			// uint32_t timestamp = be_get_u32(data+4);
-			int64_t t64 = timestamp;
-			// dbgi("timestame1 = %u", timestamp);
-			timestamp = (t64 * ch->dst_samplerate/ch->src_samplerate);	
-			be_set_u32(timestamp, data+4);		
-		}
-		return timestamp;
-}
+// static
+// uint32_t process_change_timestamp(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
+// 		if(ch->dst_samplerate > 0 && ch->src_samplerate > 0){
+// 			// uint32_t timestamp = be_get_u32(data+4);
+// 			int64_t t64 = timestamp;
+// 			// dbgi("timestame1 = %u", timestamp);
+// 			timestamp = (t64 * ch->dst_samplerate/ch->src_samplerate);	
+// 			be_set_u32(timestamp, data+4);		
+// 		}
+// 		return timestamp;
+// }
 
-static
-void process_repack_audio(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
-	int ret = 0;
-		if(ch->dst_ssrc > 0){
-			be_set_u32(ch->dst_ssrc, data+8);
-		}
+// static
+// void process_repack_audio(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
+// 	int ret = 0;
+// 		if(ch->dst_ssrc > 0){
+// 			be_set_u32(ch->dst_ssrc, data+8);
+// 		}
 
-		if(ch->dst_payloadtype > 0){
-			data[1] &= 0x80;
-			data[1] |= (uint8_t)( (ch->dst_payloadtype & 0x7f) );
-		}
+// 		if(ch->dst_payloadtype > 0){
+// 			data[1] &= 0x80;
+// 			data[1] |= (uint8_t)( (ch->dst_payloadtype & 0x7f) );
+// 		}
 
-		timestamp = process_change_timestamp(ch, timestamp, data, data_len);
+// 		timestamp = process_change_timestamp(ch, timestamp, data, data_len);
 
-		ret = sendto(ch->sock, data, data_len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
-		ch->packet_count++;
-}
+// 		ret = sendto(ch->sock, data, data_len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
+// 		ch->packet_count++;
+// }
 
-static
-void dump_rtp(const char * prefix, unsigned char * data, int data_len){
-	unsigned char first = data[0];
-	uint32_t mask = (data[1] >> 7) & 0x1;
-	uint32_t pt = (data[1] >> 0) & 0x7F;
-	uint32_t seq = be_get_u16(data+2);
-	uint32_t ts = be_get_u32(data+4);
-	dbgi("%s first=%02X, pt=%u, seq=%u, ts=%u, %s", prefix, first, pt, seq, ts, mask?"Mask":"");
+// static
+// void dump_rtp(const char * prefix, unsigned char * data, int data_len){
+// 	unsigned char first = data[0];
+// 	uint32_t mask = (data[1] >> 7) & 0x1;
+// 	uint32_t pt = (data[1] >> 0) & 0x7F;
+// 	uint32_t seq = be_get_u16(data+2);
+// 	uint32_t ts = be_get_u32(data+4);
+// 	dbgi("%s first=%02X, pt=%u, seq=%u, ts=%u, %s", prefix, first, pt, seq, ts, mask?"Mask":"");
 
-}
+// }
 
-static
-void process_repack_video(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
-	int ret = 0;
+// static
+// void process_repack_video(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
+// 	int ret = 0;
 
-		// dump_rtp("video rtp1", data, data_len);
-		int mask = (data[1] >> 7) & 0x1;
-		ret = xrtp_to_nalu_next(&ch->rtp2nalu, data, data_len);
-		if(ret <= 0) return;
-		int nalu_len = ret;
-		// dbgi("video nalu timestamp %u, len=%d", timestamp, nalu_len);
+// 		// dump_rtp("video rtp1", data, data_len);
+// 		int mask = (data[1] >> 7) & 0x1;
+// 		ret = xrtp_to_nalu_next(&ch->rtp2nalu, data, data_len);
+// 		if(ret <= 0) return;
+// 		int nalu_len = ret;
+// 		// dbgi("video nalu timestamp %u, len=%d", timestamp, nalu_len);
 
-		int nal_type = ch->nalu_buf[0] & 0x1F;
-		if(nal_type == 5 || nal_type == 7  || nal_type == 8 ){
-			dbgi("nalu: type=%d%s, len=%d", nal_type, xnalu_type_string(nal_type), nalu_len);	
-		}
+// 		int nal_type = ch->nalu_buf[0] & 0x1F;
+// 		if(nal_type == 5 || nal_type == 7  || nal_type == 8 ){
+// 			dbgi("nalu: type=%d%s, len=%d", nal_type, xnalu_type_string(nal_type), nalu_len);	
+// 		}
 		
-		if(nal_type == 9) return;
+// 		if(nal_type == 9) return;
 
-		// if(nal_type == 7) {// sps
-		// 	if(ch->got_sps) return;
-		// 	ch->got_sps = 1;
-		// }else if(nal_type == 8){ // pps
-		// 	if(ch->got_pps) return;
-		// 	ch->got_pps = 1;
-		// }else if(nal_type == 5){
-		// 	ch->got_keyframe = 1;
-		// 	dbgi("got keyframe");
-		// }else if(nal_type == 9){
-		// 	return;
-		// }else{
-		// 	if(!ch->got_keyframe){
-		// 		return;
-		// 	}
-		// }
-
-		
-		
-		ret = xnalu_to_rtp_first(&ch->nalu2rtp, timestamp, ch->nalu_buf, nalu_len, mask); 
-		if(ret == 0){
-			int len;
-			while ((len = xnalu_to_rtp_next(&ch->nalu2rtp, data)) > 0) {
-				// dump_rtp("video rtp2", data, len);
-				ret = sendto(ch->sock, data, len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
-				ch->packet_count++;
-			}
-		}
-}
-
-static
-void process_rtp_repack(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
-
-	int ret = 0;
-	if(ch->media_type == MEDIA_AUDIO){
-		// timestamp = process_change_timestamp(ch, timestamp, data, data_len);
-		process_repack_audio(ch, timestamp, data, data_len);
-	}else if(ch->media_type == MEDIA_VIDEO){
-		process_repack_video(ch, timestamp, data, data_len);
-		// send_directly(ch, timestamp, data, data_len);
-	}
-}
-
-
-static
-void process_rtp_transcode_half(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
-	int ret = 0;
-	if(ch->media_type == MEDIA_AUDIO){
-
-		uint32_t timestamp = be_get_u32(data+4);
-		int64_t t64 = timestamp;
-		// dbgi("timestame1 = %u", timestamp);
-		timestamp = (t64 * ch->dst_samplerate/ch->src_samplerate);
-
-
-		// dbgi("timestame2 = %u", timestamp);
-		int ret = audio_transcoder_input(ch->audio_transcoder, (uint32_t)timestamp, data+12, data_len-12);
-		if (ret < 0) {
-			dbge("audio_transcoder_input error %d", ret);
-			return ;
-		}
-
-		int trans_len;
-		
-		while((trans_len = audio_transcoder_next(ch->audio_transcoder, &timestamp, data + 12, 1600-12)) > 0){
-			// t64 = timestamp;
-			// timestamp = (t64 * ch->src_samplerate/ch->dst_samplerate);
-			// dbgi("timestame3 = %u", timestamp);
-			uint8_t mask = 1;
-			uint8_t pt = ch->dst_payloadtype;
-			uint32_t ssrc = ch->dst_ssrc;
-			uint8_t *h = data;
-			h[0] = 0x80;
-			h[1] = (uint8_t)((pt & 0x7f) | ((mask & 0x01) << 7));
-			be_set_u16(ch->dst_seq, h+2);
-			be_set_u32(timestamp, h+4);
-			be_set_u32(ssrc, h+8);
-
-			ch->dst_seq = (ch->dst_seq + 1) & 0xffff;
-			data_len = trans_len + 12;
-
-//			dbgd("on_rtmp_speex: rtp ts=%d, len=%d\n", timestamp, (trans_len+XRTP_HEADER_LEN));
-
-			//process_repack_audio(ch, timestamp, data, data_len);
-			ret = sendto(ch->sock, data, data_len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
-			ch->packet_count++;
-		}
-		// dbgi("timestame done");
+// 		// if(nal_type == 7) {// sps
+// 		// 	if(ch->got_sps) return;
+// 		// 	ch->got_sps = 1;
+// 		// }else if(nal_type == 8){ // pps
+// 		// 	if(ch->got_pps) return;
+// 		// 	ch->got_pps = 1;
+// 		// }else if(nal_type == 5){
+// 		// 	ch->got_keyframe = 1;
+// 		// 	dbgi("got keyframe");
+// 		// }else if(nal_type == 9){
+// 		// 	return;
+// 		// }else{
+// 		// 	if(!ch->got_keyframe){
+// 		// 		return;
+// 		// 	}
+// 		// }
 
 		
-	}else if(ch->media_type == MEDIA_VIDEO){
-		process_repack_video(ch, timestamp, data, data_len);
-	}
-}
+		
+// 		ret = xnalu_to_rtp_first(&ch->nalu2rtp, timestamp, ch->nalu_buf, nalu_len, mask); 
+// 		if(ret == 0){
+// 			int len;
+// 			while ((len = xnalu_to_rtp_next(&ch->nalu2rtp, data)) > 0) {
+// 				// dump_rtp("video rtp2", data, len);
+// 				ret = sendto(ch->sock, data, len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
+// 				ch->packet_count++;
+// 			}
+// 		}
+// }
+// 
+// static
+// void process_rtp_repack(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
+
+// 	int ret = 0;
+// 	if(ch->media_type == MEDIA_AUDIO){
+// 		// timestamp = process_change_timestamp(ch, timestamp, data, data_len);
+// 		process_repack_audio(ch, timestamp, data, data_len);
+// 	}else if(ch->media_type == MEDIA_VIDEO){
+// 		process_repack_video(ch, timestamp, data, data_len);
+// 		// send_directly(ch, timestamp, data, data_len);
+// 	}
+// }
+
+// static
+// void process_rtp_transcode_half(udp_channel * ch, uint32_t timestamp, unsigned char * data, int data_len){
+// 	int ret = 0;
+// 	if(ch->media_type == MEDIA_AUDIO){
+
+// 		uint32_t timestamp = be_get_u32(data+4);
+// 		int64_t t64 = timestamp;
+// 		// dbgi("timestame1 = %u", timestamp);
+// 		timestamp = (t64 * ch->dst_samplerate/ch->src_samplerate);
+
+
+// 		// dbgi("timestame2 = %u", timestamp);
+// 		int ret = audio_transcoder_input(ch->audio_transcoder, (uint32_t)timestamp, data+12, data_len-12);
+// 		if (ret < 0) {
+// 			dbge("audio_transcoder_input error %d", ret);
+// 			return ;
+// 		}
+
+// 		int trans_len;
+		
+// 		while((trans_len = audio_transcoder_next(ch->audio_transcoder, &timestamp, data + 12, 1600-12)) > 0){
+// 			// t64 = timestamp;
+// 			// timestamp = (t64 * ch->src_samplerate/ch->dst_samplerate);
+// 			// dbgi("timestame3 = %u", timestamp);
+// 			uint8_t mask = 1;
+// 			uint8_t pt = ch->dst_payloadtype;
+// 			uint32_t ssrc = ch->dst_ssrc;
+// 			uint8_t *h = data;
+// 			h[0] = 0x80;
+// 			h[1] = (uint8_t)((pt & 0x7f) | ((mask & 0x01) << 7));
+// 			be_set_u16(ch->dst_seq, h+2);
+// 			be_set_u32(timestamp, h+4);
+// 			be_set_u32(ssrc, h+8);
+
+// 			ch->dst_seq = (ch->dst_seq + 1) & 0xffff;
+// 			data_len = trans_len + 12;
+
+// //			dbgd("on_rtmp_speex: rtp ts=%d, len=%d\n", timestamp, (trans_len+XRTP_HEADER_LEN));
+
+// 			//process_repack_audio(ch, timestamp, data, data_len);
+// 			ret = sendto(ch->sock, data, data_len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
+// 			ch->packet_count++;
+// 		}
+// 		// dbgi("timestame done");
+
+		
+// 	}else if(ch->media_type == MEDIA_VIDEO){
+// 		process_repack_video(ch, timestamp, data, data_len);
+// 	}
+// }
+
+// static
+// void process_rtp(udp_channel * ch, unsigned char * data, int data_len){
+// 	unsigned char pkttype = data[0];
+// 	if(pkttype > 0x9F){
+// 		dbgi("drop non-rtp packet");
+// 		return;
+// 	}
+
+// 	int64_t timestamp64 = xtimestamp64_unwrap(&ch->tswrapper, be_get_u32(data+4));
+// 	if(ch->src_packet_count == 0){
+// 		ch->src_first_ts = timestamp64;
+// 		dbgi("src %d first timestamp %lld", ch->port, ch->src_first_ts);
+// 	}
+// 	ch->src_packet_count++;
+	
+// 	uint32_t timestamp = (uint32_t)(timestamp64 - ch->src_first_ts);
+// 	be_set_u32(timestamp, data+4);
+
+// 	process_rtp_repack(ch, timestamp, data, data_len);
+// 	// process_rtp_transcode_half(ch, timestamp, data, data_len);
+// }
 
 static
 void process_rtp(udp_channel * ch, unsigned char * data, int data_len){
-	unsigned char pkttype = data[0];
-	if(pkttype > 0x9F){
-		dbgi("drop non-rtp packet");
-		return;
-	}
 
-	int64_t timestamp64 = xtimestamp64_unwrap(&ch->tswrapper, be_get_u32(data+4));
-	if(ch->src_packet_count == 0){
-		ch->src_first_ts = timestamp64;
-		dbgi("src %d first timestamp %lld", ch->port, ch->src_first_ts);
+	int ret = 0;
+	if(ch->media_type == MEDIA_AUDIO){
+		xrtp_transformer_process(&ch->audio_transformer, data);
+		send_directly(ch, data, data_len);
+	}else if(ch->media_type == MEDIA_VIDEO){
+		// send_directly(ch, data, data_len);
+		ret = xrtp_h264_repacker_input(&ch->video_repacker, data, data_len);
+		if(ret > 0){
+			int len;
+			while ((len = xrtp_h264_repacker_next(&ch->video_repacker, data)) > 0) {
+				// dump_rtp("video rtp2", data, len);
+				send_directly(ch, data, len);
+				// ret = sendto(ch->sock, data, len, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));	
+				// ch->packet_count++;
+			}
+		}
+		
 	}
-	ch->src_packet_count++;
-	
-	uint32_t timestamp = (uint32_t)(timestamp64 - ch->src_first_ts);
-	be_set_u32(timestamp, data+4);
-
-	process_rtp_repack(ch, timestamp, data, data_len);
-	// process_rtp_transcode_half(ch, timestamp, data, data_len);
 }
+
+
 
 int main(int argc, char** argv){
 	// if(argc <= 1){
@@ -302,37 +333,30 @@ int main(int argc, char** argv){
 	int src_audio_port = 10000;
 	int src_video_port = 10002;
 
-	#if 0
-	// voice -> rtc
-	int src_samplerate = 16000;
-	int dst_samplerate = 48000;
-	int src_channels = 1;
-	int dst_channels = 2;
-	#else
-	// rtc -> voice
-	int src_samplerate = 48000;
-	int dst_samplerate = 16000;
-	int src_channels = 2;
-	int dst_channels = 1;
-	#endif
 
+	uint32_t dst_ssrc = 0x1234;
 	uint32_t dst_audio_payloadtype = 120;
 	uint32_t dst_video_payloadtype = 96;
 
 	// const char * dst_ip = "127.0.0.1";
 	const char * dst_ip = "172.17.3.161"; // note3
 	// const char * dst_ip = "172.17.1.247"; // huawei
+	// const char * dst_ip = "172.17.3.7"; // raoshangrong kurento
+	// const char * dst_ip = "192.168.124.206"; // vm kurento
 	int dst_audio_port = 10000;
 	int dst_video_port = 10002;
-	uint32_t dst_ssrc = 0x1234;
 	
+	
+	#if 0
+	// voice -> rtc
+	int src_samplerate = 16000;
+	int dst_samplerate = 48000;
+	#else
+	// rtc -> voice
+	int src_samplerate = 48000;
+	int dst_samplerate = 16000;
 
-	// const char * dst_ip = "172.17.3.7"; // raoshangrong kurento
-	// // const char * dst_ip = "192.168.124.206"; // vm kurento
-	// int dst_audio_port = 31578;
-	// int dst_video_port = 18010;
-	// uint32_t dst_ssrc = 0x1234;
-
+	#endif
 
 
 
@@ -416,32 +440,24 @@ int main(int argc, char** argv){
 			if(port == src_audio_port){
 				ch->sock = create_udp_socket(0);
 				init_socket_addrin(dst_ip, dst_audio_port, &ch->addrto);
-				xtimestamp64_init(&ch->tswrapper);
 				ch->media_type = MEDIA_AUDIO;
-				ch->dst_ssrc = dst_ssrc;
-				ch->dst_payloadtype = dst_audio_payloadtype;
-				ch->src_samplerate = src_samplerate;
-				ch->src_channels = src_channels;
-				ch->dst_samplerate = dst_samplerate;
-				ch->dst_channels = dst_channels;
 
-				audio_codec_param audio_param = audio_codec_param_build(ch->dst_samplerate, ch->dst_channels, 16);
-				ch->audio_transcoder = audio_transcoder_create(&audio_param, XCODEC_OPUS, XCODEC_OPUS, 960*ch->dst_channels);
-
+				xrtp_transformer_init(&ch->audio_transformer, src_samplerate, dst_samplerate, dst_audio_payloadtype, dst_ssrc );
 				audio_ch = ch;
+
 			}else if(port == src_video_port){
 				ch->sock = create_udp_socket(0);
 				init_socket_addrin(dst_ip, dst_video_port, &ch->addrto);
-				xtimestamp64_init(&ch->tswrapper);
 				ch->media_type = MEDIA_VIDEO;
-				ch->dst_ssrc = dst_ssrc;
-				ch->dst_payloadtype = dst_video_payloadtype;
 
 				ch->nalu_buf_size = 1*1024*1024;
 				ch->nalu_buf = (unsigned char *) malloc(ch->nalu_buf_size);
-				xrtp_to_nalu_init(&ch->rtp2nalu, ch->nalu_buf, ch->nalu_buf_size, 0);
-				xnalu_to_rtp_init(&ch->nalu2rtp, dst_ssrc, dst_video_payloadtype, 1412);
+				xrtp_h264_repacker_init(&ch->video_repacker
+						, ch->nalu_buf, ch->nalu_buf_size, 0
+						, dst_ssrc, dst_video_payloadtype, 1412
+						, 0, 0);
 				video_ch = ch;
+
 			}
 
 		}
@@ -453,15 +469,15 @@ int main(int argc, char** argv){
 
 		if(audio_ch){
 			udp_channel * ch = audio_ch;
-			dbgi("audio: %d -> %s:%d, src_ar=%d/%d, dst_ar=%d/%d, dst_ssrc=%d dst_pt=%d"
+			dbgi("audio: %d -> %s:%d, src_ar=%d, dst_ar=%d, dst_ssrc=%d dst_pt=%d"
 				, ch->port, dst_ip, dst_audio_port
-				, ch->src_samplerate, ch->src_channels, ch->dst_samplerate, ch->dst_channels
-				, ch->dst_ssrc, ch->dst_payloadtype);
+				, src_samplerate, dst_samplerate
+				, dst_ssrc, dst_audio_payloadtype);
 		}
 
 		if(video_ch){
 			udp_channel * ch = video_ch;
-			dbgi("video: %d -> %s:%d, dst_ssrc=%d dst_pt=%d", ch->port, dst_ip, dst_video_port, ch->dst_ssrc, ch->dst_payloadtype);
+			dbgi("video: %d -> %s:%d, dst_ssrc=%d dst_pt=%d", ch->port, dst_ip, dst_video_port, dst_ssrc, dst_video_payloadtype);
 		}
 
 		dbgi("replay ...");
@@ -513,12 +529,7 @@ int main(int argc, char** argv){
 					}
 				}
 
-				#if 0
-				ret = sendto(ch->sock, data, datalength, 0, (struct sockaddr*)&ch->addrto, sizeof(ch->addrto));
-				ch->packet_count++;
-				#else
 				process_rtp(ch, data, datalength);
-				#endif
 				// dbgv("elapsed %lld: port %d sends No.%lld packet", get_timestamp_ms()-time_start, ch->port, ch->packet_count);
 			}
 

@@ -62,9 +62,46 @@ typedef struct xtimestamp64{
   uint32_t last_ts_;
   int64_t num_wrap_;
 }xtimestamp64;
-
 int xtimestamp64_init(xtimestamp64 * obj);
 int64_t xtimestamp64_unwrap(xtimestamp64 * obj, uint32_t ts);
+
+
+typedef struct xrtp_transformer{
+  uint32_t src_samplerate;
+  uint32_t dst_samplerate;
+  uint32_t dst_payloadtype;
+  uint32_t dst_ssrc;
+  uint32_t last_seq;
+  xtimestamp64 tswrapper;
+  int64_t src_first_timestamp;
+}xrtp_transformer;
+void xrtp_transformer_init(xrtp_transformer * obj, uint32_t src_samplerate, uint32_t dst_samplerate, uint32_t dst_payloadtype, uint32_t dst_ssrc);
+void xrtp_transformer_process(xrtp_transformer * obj, unsigned char * rtp);
+
+
+typedef struct xrtp_h264_repacker{
+	uint32_t src_samplerate;
+	uint32_t dst_samplerate;
+	uint8_t * nalu_buf;
+	xrtp_to_nalu_t rtp2nalu;
+	xnalu_to_rtp_t nalu2rtp;
+
+	int last_nalu_len;
+	// int last_mask;
+	// int last_timestamp;
+	xtimestamp64 tswrapper;
+	int64_t src_first_timestamp;
+
+	int got_sps;
+	int got_pps;
+	int got_keyframe;
+}xrtp_h264_repacker;
+void xrtp_h264_repacker_init(xrtp_h264_repacker * obj
+		, uint8_t *nalu_buf, uint32_t nalu_buf_size, uint32_t nalu_buf_offset
+		, uint32_t dst_ssrc, uint32_t dst_payloadtype, uint32_t max_rtp_size
+		, uint32_t src_samplerate, uint32_t dst_samplerate);
+int xrtp_h264_repacker_input(xrtp_h264_repacker * obj, unsigned char * rtp, int rtp_len);
+int xrtp_h264_repacker_next(xrtp_h264_repacker * obj, unsigned char * rtp);
 
 
 #ifdef __cplusplus

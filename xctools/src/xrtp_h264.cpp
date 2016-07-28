@@ -4,6 +4,7 @@
 #include <string.h>
 #include <arpa/inet.h>
 
+#include "util.h"
 #include "xutil.h"
 #include "xrtp_h264.h"
 #define LOG_PLAY(...)
@@ -442,6 +443,144 @@ int64_t xtimestamp64_unwrap(xtimestamp64 * obj, uint32_t ts){
   int64_t unwrapped_ts = ts + (obj->num_wrap_ << 32);
   return unwrapped_ts;
 }
+
+
+static
+uint32_t rebase_timestamp(xtimestamp64 * tswrapper, int64_t &src_first_timestamp, unsigned char * rtp){
+	uint32_t timestamp = be_get_u32(rtp+4);
+	int64_t timestamp64 = xtimestamp64_unwrap(tswrapper, timestamp);
+	if(src_first_timestamp < 0){
+		src_first_timestamp = timestamp64;
+		dbgi("first timestamp %lld", src_first_timestamp);
+	}
+	timestamp = (uint32_t)(timestamp64 - src_first_timestamp);
+	be_set_u32(timestamp, rtp+4);
+	return timestamp;
+}
+
+void xrtp_transformer_init(xrtp_transformer * obj, uint32_t src_samplerate, uint32_t dst_samplerate, uint32_t dst_payloadtype, uint32_t dst_ssrc){
+	memset(obj, 0, sizeof(xrtp_transformer));
+	obj->src_samplerate = src_samplerate;
+	obj->dst_samplerate = dst_samplerate;
+	obj->dst_payloadtype = dst_payloadtype;
+	obj->dst_ssrc = dst_ssrc;
+	xtimestamp64_init(&obj->tswrapper);
+	obj->src_first_timestamp = -1;
+}
+
+void xrtp_transformer_process(xrtp_transformer * obj, unsigned char * rtp){
+	if(obj->dst_payloadtype > 0){
+		rtp[1] &= 0x80;
+		rtp[1] |= (uint8_t)( (obj->dst_payloadtype & 0x7f) );
+	}
+
+	// rebase timestamp
+	uint32_t timestamp = rebase_timestamp(&obj->tswrapper, obj->src_first_timestamp, rtp);
+
+	// transform timestamp
+	if(obj->dst_samplerate > 0 && obj->src_samplerate > 0){
+		
+		int64_t t64 = timestamp;
+		// dbgi("timestame1 = %u", timestamp);
+		timestamp = (t64 * obj->dst_samplerate/obj->src_samplerate);	
+		be_set_u32(timestamp, rtp+4);		
+	}
+
+	if(obj->dst_ssrc > 0){
+		be_set_u32(obj->dst_ssrc, rtp+8);
+	}
+
+	be_set_u16(obj->last_seq, rtp+2);
+	obj->last_seq++;
+
+}
+
+
+
+
+
+void xrtp_h264_repacker_init(xrtp_h264_repacker * obj
+		, uint8_t *nalu_buf, uint32_t nalu_buf_size, uint32_t nalu_buf_offset
+		, uint32_t dst_ssrc, uint32_t dst_payloadtype, uint32_t max_rtp_size
+		, uint32_t src_samplerate, uint32_t dst_samplerate){
+
+	memset(obj, 0, sizeof(xrtp_h264_repacker));
+	obj->src_samplerate = src_samplerate;
+	obj->dst_samplerate = dst_samplerate;
+	obj->nalu_buf = nalu_buf;
+	
+	xtimestamp64_init(&obj->tswrapper);
+	obj->src_first_timestamp = -1;
+
+	xrtp_to_nalu_init(&obj->rtp2nalu, nalu_buf, nalu_buf_size, nalu_buf_offset);
+	xnalu_to_rtp_init(&obj->nalu2rtp, dst_ssrc, dst_payloadtype, max_rtp_size);
+}
+
+static
+const char * xnalu_type_string(int nalu_type){
+	if(nalu_type == 5) return "(I)";
+	if(nalu_type == 7) return "(SPS)";
+	if(nalu_type == 8) return "(PPS)";
+	return "";
+}
+
+int xrtp_h264_repacker_input(xrtp_h264_repacker * obj, unsigned char * rtp, int rtp_len){
+	int ret = 0;
+
+	// dump_rtp("video rtp1", data, data_len);
+	obj->last_nalu_len = 0;
+	int mask = (rtp[1] >> 7) & 0x1;
+
+	ret = xrtp_to_nalu_next(&obj->rtp2nalu, rtp, rtp_len);
+	if(ret <= 0) {
+		return ret;
+	}
+	int nalu_len = ret;
+	
+
+	int nal_type = obj->nalu_buf[0] & 0x1F;
+	if(nal_type == 5 || nal_type == 7  || nal_type == 8 ){
+		dbgi("nalu: type=%d%s, len=%d", nal_type, xnalu_type_string(nal_type), nalu_len);	
+	}
+	
+	if(nal_type == 9) {
+		return 0;
+	}
+
+	// if(nal_type == 7) {// sps
+	// 	if(ch->got_sps) return;
+	// 	ch->got_sps = 1;
+	// }else if(nal_type == 8){ // pps
+	// 	if(ch->got_pps) return;
+	// 	ch->got_pps = 1;
+	// }else if(nal_type == 5){
+	// 	ch->got_keyframe = 1;
+	// 	dbgi("got keyframe");
+	// }else if(nal_type == 9){
+	// 	return;
+	// }else{
+	// 	if(!ch->got_keyframe){
+	// 		return;
+	// 	}
+	// }
+
+	// rebase timestamp
+	uint32_t timestamp = rebase_timestamp(&obj->tswrapper, obj->src_first_timestamp, rtp);
+	// dbgi("video nalu timestamp %u, len=%d", timestamp, nalu_len);
+	
+	ret = xnalu_to_rtp_first(&obj->nalu2rtp, timestamp, obj->nalu_buf, nalu_len, mask); 
+	if(ret != 0){
+		return 0;
+	}
+	obj->last_nalu_len = nalu_len;
+	return obj->last_nalu_len;
+}
+
+int xrtp_h264_repacker_next(xrtp_h264_repacker * obj, unsigned char * rtp){
+	if(obj->last_nalu_len ==0) return 0;
+	return xnalu_to_rtp_next(&obj->nalu2rtp, rtp);
+}
+
 
 
 
