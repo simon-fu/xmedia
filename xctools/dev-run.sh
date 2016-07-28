@@ -5,3 +5,4 @@
 
 # ./bin/convert_dump_to_h264 output/dump-video-rtp-only.udp ./output/output.h264 10002
 
+# ffplay -fflags nobuffer sdp_voice2rtc.sdp

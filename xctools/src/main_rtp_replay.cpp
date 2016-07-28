@@ -36,6 +36,7 @@ typedef struct udp_channel{
 		xrtp_h264_repacker video_repacker;
 		xrtp_transformer audio_transformer;
 	};
+	xrtp_transformer video_transformer;
 
 	// uint32_t dst_ssrc;
 	// uint32_t dst_payloadtype;
@@ -307,7 +308,9 @@ void process_rtp(udp_channel * ch, unsigned char * data, int data_len){
 		xrtp_transformer_process(&ch->audio_transformer, data);
 		send_directly(ch, data, data_len);
 	}else if(ch->media_type == MEDIA_VIDEO){
+		// xrtp_transformer_process(&ch->video_transformer, data);
 		// send_directly(ch, data, data_len);
+		
 		ret = xrtp_h264_repacker_input(&ch->video_repacker, data, data_len);
 		if(ret > 0){
 			int len;
@@ -456,6 +459,7 @@ int main(int argc, char** argv){
 						, ch->nalu_buf, ch->nalu_buf_size, 0
 						, dst_ssrc, dst_video_payloadtype, 1412
 						, 0, 0);
+				xrtp_transformer_init(&ch->video_transformer, 0, 0, dst_video_payloadtype, dst_ssrc );
 				video_ch = ch;
 
 			}

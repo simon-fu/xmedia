@@ -287,7 +287,7 @@ void on_udp_event(evutil_socket_t fd, short what, void *arg){
 
 	 //    const char *from_ip = inet_ntoa(tempadd.sin_addr);
 		// int from_port = ntohs(tempadd.sin_port);
-	 //    // dbgv("port %d recv %d bytes from %s:%d", ch->port, udp_len, from_ip, from_port);
+	 //    dbgv("port %d recv %d bytes from %s:%d", ch->local_port, udp_len, from_ip, from_port);
 
 		// send back
 		if(ch->is_send_back){
@@ -401,7 +401,7 @@ int main(int argc, char** argv){
 	// }
 
 	int is_send_back = 0;
-	int direction = DIR_DST_TO_SRC; // DIR_BOTH  DIR_SRC_TO_DST DIR_DST_TO_SRC
+	int direction = DIR_BOTH; // DIR_BOTH  DIR_SRC_TO_DST DIR_DST_TO_SRC
 
 
 	int local_audio_port = 10000;
@@ -461,12 +461,20 @@ int main(int argc, char** argv){
 	}
 
 	if(!is_send_back){
+		dbgi("local_ssrc = %d", local_ssrc);
+		dbgi("local_audio_payloadtype = %d", local_audio_payloadtype);
+		dbgi("local_video_payloadtype = %d", local_video_payloadtype);
+		dbgi("src_samplerate = %d", src_samplerate);
+		dbgi("dst_samplerate = %d", dst_samplerate);
+
+
 		if(local_audio_port > 0){
 			dbgi("audio: src %s:%d %s local %d %s dst %s:%d", src_ip, src_audio_port, dir, local_audio_port, dir, dst_ip, dst_audio_port);
 		}
 		if(local_video_port > 0){
 			dbgi("video: src %s:%d %s local %d %s dst %s:%d", src_ip, src_video_port, dir, local_video_port, dir, dst_ip, dst_video_port);
 		}
+
 	}else{
 		if(local_audio_port > 0){
 			dbgi("audio: %d -> back", local_audio_port);
@@ -475,10 +483,6 @@ int main(int argc, char** argv){
 		if(local_video_port > 0){
 			dbgi("video: %d -> back", local_video_port);
 		}
-	}
-
-	if(local_ssrc > 0){
-		dbgi("local_ssrc = %d", local_ssrc);
 	}
 
 
