@@ -1,0 +1,348 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 46;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		F4133B491D5EED9F007BE9C2 /* main_audio_proc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4133B481D5EED9F007BE9C2 /* main_audio_proc.cpp */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F4133B341D5EEBCF007BE9C2 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		F4133B361D5EEBCF007BE9C2 /* xmedia-aec */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "xmedia-aec"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4133B481D5EED9F007BE9C2 /* main_audio_proc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main_audio_proc.cpp; path = ../../src/main_audio_proc.cpp; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F4133B331D5EEBCF007BE9C2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		F4133B2D1D5EEBCF007BE9C2 = {
+			isa = PBXGroup;
+			children = (
+				F4133B381D5EEBCF007BE9C2 /* xmedia-aec */,
+				F4133B371D5EEBCF007BE9C2 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		F4133B371D5EEBCF007BE9C2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F4133B361D5EEBCF007BE9C2 /* xmedia-aec */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F4133B381D5EEBCF007BE9C2 /* xmedia-aec */ = {
+			isa = PBXGroup;
+			children = (
+				F4133B481D5EED9F007BE9C2 /* main_audio_proc.cpp */,
+			);
+			path = "xmedia-aec";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXLegacyTarget section */
+		F4133B4A1D5EEF08007BE9C2 /* all-main */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "$(ACTION)";
+			buildConfigurationList = F4133B4D1D5EEF08007BE9C2 /* Build configuration list for PBXLegacyTarget "all-main" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/make;
+			buildWorkingDirectory = ../;
+			dependencies = (
+			);
+			name = "all-main";
+			passBuildSettingsInEnvironment = 1;
+			productName = "all-main";
+		};
+		F4133B4E1D5EF273007BE9C2 /* audioproc */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "$(ACTION) audioproc";
+			buildConfigurationList = F4133B4F1D5EF273007BE9C2 /* Build configuration list for PBXLegacyTarget "audioproc" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/make;
+			buildWorkingDirectory = ../;
+			dependencies = (
+			);
+			name = audioproc;
+			passBuildSettingsInEnvironment = 1;
+			productName = audioproc;
+		};
+/* End PBXLegacyTarget section */
+
+/* Begin PBXNativeTarget section */
+		F4133B351D5EEBCF007BE9C2 /* xmedia-aec */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F4133B3D1D5EEBCF007BE9C2 /* Build configuration list for PBXNativeTarget "xmedia-aec" */;
+			buildPhases = (
+				F4133B321D5EEBCF007BE9C2 /* Sources */,
+				F4133B331D5EEBCF007BE9C2 /* Frameworks */,
+				F4133B341D5EEBCF007BE9C2 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "xmedia-aec";
+			productName = "xmedia-aec";
+			productReference = F4133B361D5EEBCF007BE9C2 /* xmedia-aec */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F4133B2E1D5EEBCF007BE9C2 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0730;
+				ORGANIZATIONNAME = easemob;
+				TargetAttributes = {
+					F4133B351D5EEBCF007BE9C2 = {
+						CreatedOnToolsVersion = 7.3;
+					};
+					F4133B4A1D5EEF08007BE9C2 = {
+						CreatedOnToolsVersion = 7.3;
+					};
+					F4133B4E1D5EF273007BE9C2 = {
+						CreatedOnToolsVersion = 7.3;
+					};
+				};
+			};
+			buildConfigurationList = F4133B311D5EEBCF007BE9C2 /* Build configuration list for PBXProject "xmedia-aec" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = F4133B2D1D5EEBCF007BE9C2;
+			productRefGroup = F4133B371D5EEBCF007BE9C2 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F4133B351D5EEBCF007BE9C2 /* xmedia-aec */,
+				F4133B4A1D5EEF08007BE9C2 /* all-main */,
+				F4133B4E1D5EF273007BE9C2 /* audioproc */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F4133B321D5EEBCF007BE9C2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4133B491D5EED9F007BE9C2 /* main_audio_proc.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		F4133B3B1D5EEBCF007BE9C2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		F4133B3C1D5EEBCF007BE9C2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++0x";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		F4133B3E1D5EEBCF007BE9C2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F4133B3F1D5EEBCF007BE9C2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		F4133B4B1D5EEF08007BE9C2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEBUGGING_SYMBOLS = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F4133B4C1D5EEF08007BE9C2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		F4133B501D5EF273007BE9C2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEBUGGING_SYMBOLS = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F4133B511D5EF273007BE9C2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F4133B311D5EEBCF007BE9C2 /* Build configuration list for PBXProject "xmedia-aec" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4133B3B1D5EEBCF007BE9C2 /* Debug */,
+				F4133B3C1D5EEBCF007BE9C2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F4133B3D1D5EEBCF007BE9C2 /* Build configuration list for PBXNativeTarget "xmedia-aec" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4133B3E1D5EEBCF007BE9C2 /* Debug */,
+				F4133B3F1D5EEBCF007BE9C2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F4133B4D1D5EEF08007BE9C2 /* Build configuration list for PBXLegacyTarget "all-main" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4133B4B1D5EEF08007BE9C2 /* Debug */,
+				F4133B4C1D5EEF08007BE9C2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+		};
+		F4133B4F1D5EF273007BE9C2 /* Build configuration list for PBXLegacyTarget "audioproc" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4133B501D5EF273007BE9C2 /* Debug */,
+				F4133B511D5EF273007BE9C2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = F4133B2E1D5EEBCF007BE9C2 /* Project object */;
+}
