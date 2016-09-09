@@ -22,7 +22,7 @@
 #include <event2/keyvalq_struct.h>
 
 
-#include "util.h"
+#include "xcutil.h"
 #include "xrtp_h264.h"
 
 #define dbgv(...) do{  printf("<udp_dump>[D] " __VA_ARGS__); printf("\n"); }while(0)
@@ -47,6 +47,7 @@ typedef struct peer_channel{
 	int port;
 	struct sockaddr_in addr;
 
+	int recv_first;
 	long long packet_count;
 
 	int nalu_buf_size;
@@ -250,7 +251,8 @@ bool check_set_peer_addr(udp_channel * ch, peer_channel * peer, struct sockaddr_
 		}
 	}
 
-	if(!sock_addr_is_valid(&peer->addr)){
+	if(!sock_addr_is_valid(&peer->addr) || !peer->recv_first){
+		peer->recv_first = 1;
 		peer->addr = *from;
 		const char *from_ip = inet_ntoa(from->sin_addr);
 		int from_port = ntohs(from->sin_port);
@@ -277,7 +279,7 @@ void on_udp_event(evutil_socket_t fd, short what, void *arg){
 	    	return;
 	    }
 	    int udp_len = sock_ret;
-	    // dbgv("port %d recv %d bytes", ch->port, udp_len);
+	    // dbgi("port %d recv %d bytes", ch->local_port, udp_len);
 
 		if(ch->owner->tlvfile){
 			int64_t ts = get_timestamp_ms();
@@ -311,7 +313,7 @@ void on_udp_event(evutil_socket_t fd, short what, void *arg){
 				ch->addr_done = 1;
 			}
 		}
-
+		// dbgi("ch->addr_done %d", ch->addr_done);
 		if(ch->addr_done){
 			process_rtp(ch, ch->buff, udp_len, &tempadd);
 		}

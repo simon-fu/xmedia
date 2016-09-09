@@ -18,8 +18,8 @@ get_files =$(foreach dir,$(subst $(DIR_DIVIDER),$(MK_DIR_DIVIDER),$(1)),$(wildca
 #ALL_CPP_SRC += $(CPP_SRC)
 
 
-COMMON_CPP_SRC += src/util.cpp src/xrtp_h264.cpp src/xutil.cpp src/xtrans_codec.cpp
-COMMON_H += src/util.h src/xrtp_defs.h src/xrtp_h264.h src/xutil.h src/xtrans_codec.h
+COMMON_CPP_SRC += src/xcutil.cpp src/xrtp_h264.cpp  src/xtrans_codec.cpp
+COMMON_H += src/xcutil.h src/xrtp_defs.h src/xrtp_h264.h src/xtrans_codec.h
 COMMON_OBJ += $(foreach src, $(COMMON_CPP_SRC), $(addsuffix .o, $(basename $(src))))
 ALL_CPP_SRC += $(COMMON_CPP_SRC)
 

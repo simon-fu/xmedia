@@ -4,7 +4,7 @@
 #include <string.h>
 #include <opus/opus.h>
 #include <speex/speex.h>
-#include "xutil.h"
+#include "xcutil.h"
 #include "xtrans_codec.h"
 
 

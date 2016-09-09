@@ -12,7 +12,7 @@
 #include <netdb.h>
 
 #include <chrono>
-#include "util.h"
+#include "xcutil.h"
 
 #define dbgv(...) do{  printf("<udp_replay>[D] " __VA_ARGS__); printf("\n"); }while(0)
 #define dbgi(...) do{  printf("<udp_replay>[I] " __VA_ARGS__); printf("\n"); }while(0)

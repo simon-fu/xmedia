@@ -22,7 +22,7 @@
 #include <event2/keyvalq_struct.h>
 
 
-#include "util.h"
+#include "xcutil.h"
 
 #define dbgv(...) do{  printf("<udp_dump>[D] " __VA_ARGS__); printf("\n"); }while(0)
 #define dbgi(...) do{  printf("<udp_dump>[I] " __VA_ARGS__); printf("\n"); }while(0)

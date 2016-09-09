@@ -12,7 +12,7 @@
 #include <netdb.h>
 
 #include <chrono>
-#include "util.h"
+#include "xcutil.h"
 #include "xrtp_h264.h"
 
 #define dbgv(...) do{  printf("<d2h264>[D] " __VA_ARGS__); printf("\n"); }while(0)
@@ -49,6 +49,40 @@ int check_magic(FILE * fpin, unsigned char * buf, int buf_size, const char * mag
 	return ret;
 }
 
+static 
+void dump_rtp(int packet_count, const unsigned char * buf, int len ){
+
+	char prefix[16];
+	sprintf(prefix, "No.%d", packet_count);
+	if(len < 12){
+		dbgi("%s rtp len too small %d", prefix, len);
+		return;
+	}
+
+	unsigned char v =  (buf[0]>>6) & 0x3;
+	unsigned char p =  (buf[0]>>5) & 0x1;
+	unsigned char x =  (buf[0]>>4) & 0x1;
+	unsigned char cc = (buf[0]>>0) & 0xF;
+	unsigned char m =  (buf[1]>>7) & 0x1;
+	unsigned char pt = (buf[1]>>0) & 0x7F;
+	unsigned short seq = be_get_u16(buf+2);
+	unsigned int ts = be_get_u32(buf+4);
+	unsigned int ssrc = be_get_u32(buf+8);
+	
+	int header_len = 12 + cc * 4;
+	if(x){
+		int min = header_len + 4;
+		if(min <= len){
+			int ext_len = be_get_u16(buf+header_len+2);
+			header_len += 4+ext_len*4;
+		}else{
+			header_len = -1;
+		}
+	}
+
+	dbgi("%s rtp[v=%d,p=%d,x=%d,cc=%d,m=%d,pt=%d,seq=%d,ts=%d,ssrc=%d,pl=%d]", prefix
+		, v, p, x, cc, m, pt, seq, ts, ssrc, header_len);
+}
 
 
 int main(int argc, char** argv){
@@ -206,6 +240,7 @@ int main(int argc, char** argv){
 
 				unsigned char * data = buf + 8;
 				int datalength = length - 8;
+				dump_rtp(packet_count, data, datalength);
 				ret = xrtp_to_nalu_next(converter, data, datalength);
 				if(ret > 0){
 					int nal_type = nalu_buf[0] & 0x1F;

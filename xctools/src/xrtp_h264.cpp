@@ -4,8 +4,8 @@
 #include <string.h>
 #include <arpa/inet.h>
 
-#include "util.h"
-#include "xutil.h"
+
+#include "xcutil.h"
 #include "xrtp_h264.h"
 #define LOG_PLAY(...)
 #define dbgd(...) //do{printf(__VA_ARGS__); printf("\n");}while(0)
@@ -63,13 +63,43 @@ int xrtp_to_nalu_next(xrtp_to_nalu_t *ctx, const uint8_t *rtp, uint32_t rtp_len)
 	ts = ntohl(ts);
 	unsigned short rtp_seq =  *( (uint16_t*)(pRtpHeader + 2) );
 	rtp_seq = ntohs(rtp_seq);
+	
+	unsigned char x =  (pRtpHeader[0]>>4) & 0x1;
+	unsigned char cc = (pRtpHeader[0]>>0) & 0xF;
+	int header_len = XRTP_HEADER_LEN;
+	if(cc){
+		header_len += cc * 4;
+		if(rtp_len <=header_len)
+		{
+			dbgd("RTP packet (cc) length too short,ignored");
+			ctx->nalu_len = 0;
+			return -1;
+		}
+	}
+	
+	if(x){
+		int min = header_len + 4;
+		if(min <= rtp_len){
+			int ext_len = be_get_u16(pRtpHeader+header_len+2);
+			header_len += 4+ext_len*4;
+		}else{
+			header_len = -1;
+			dbgd("RTP packet (ext) length too short,ignored");
+			ctx->nalu_len = 0;
+			return -1;
+		}
+	}
+
+
+
+
 	unsigned char nal_type = 0;
-	unsigned char   nal_data_offset = XRTP_HEADER_LEN;
+	unsigned char   nal_data_offset = header_len;
 	int ret = rtp_len;
 	unsigned frag_len;
 
 
-	dbgd("new rtp seq:%d, old rtp seq:%d",rtp_seq, ctx->last_seq);
+	dbgd("header_len=%d, new rtp seq:%d, old rtp seq:%d", header_len, rtp_seq, ctx->last_seq);
 
 	if(ctx->last_nalu_done){
 		ctx->last_nalu_done = 0;
@@ -96,7 +126,7 @@ int xrtp_to_nalu_next(xrtp_to_nalu_t *ctx, const uint8_t *rtp, uint32_t rtp_len)
 	ctx->timestamp = ts;
 
 
-	nal_type = pRtpHeader[XRTP_HEADER_LEN]&0x1f;
+	nal_type = pRtpHeader[nal_data_offset]&0x1f;
 	dbgd("rtp2nalu: nal_type %d", nal_type);
 	if (nal_type > 0 && nal_type < 24)
 	{
