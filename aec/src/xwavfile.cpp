@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "util.h"
+#include "xcutil.h"
 #include "xwavfile.h"
 
 
