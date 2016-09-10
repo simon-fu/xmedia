@@ -202,7 +202,7 @@ void xdebug_write_to_file(void ** ctx, const char * file_name, const void * data
 //#define TRIM_SIZE sizeof(size_t)
 #define TRIM_SIZE 8
 
-static int trim_mem_size(int sz){
+inline int trim_mem_size(int sz){
 	int mod = sz%TRIM_SIZE;
 	return sz + (mod > 0 ? TRIM_SIZE-mod : 0);
 }

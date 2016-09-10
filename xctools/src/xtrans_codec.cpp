@@ -193,7 +193,7 @@ int speex_dec_process(void * ctx, const void * in_data, uint32_t in_length, void
 
     speex_bits_read_from(&spx->dbits, (char *)in_data, in_length);
 
-    short int * p = ((short int *)out_data);
+    // short int * p = ((short int *)out_data);
     int pcm_len = 0;
 	while (speex_bits_remaining(&spx->dbits) >= 5
 			&& speex_bits_peek_unsigned(&spx->dbits, 5) != 0xF) {
@@ -502,8 +502,8 @@ int audio_transcoder_next(audio_transcoder_t * obj
 //	dbgi("audio_transcoder_next: => obj=%p, max_out_size=%d\n", obj, max_out_size);
 	int ret;
 	int remains = obj->pcm_len-obj->pcm_offset;
-	uint8_t * enc_data = out_data;
-	uint32_t enc_data_size = max_out_size;
+	// uint8_t * enc_data = out_data;
+	// uint32_t enc_data_size = max_out_size;
 	spx_int16_t * pcm = obj->pcm_data+obj->pcm_offset;
 	uint32_t trans_len = 0;
 	if(remains < obj->dst->frame_min ){
@@ -696,7 +696,7 @@ int test_transcode(const char * in_pcm_file
 		int in_pcm_frame_size = in_pcm_samples*sizeof(int16_t);
 		int enc_frame_size = in_pcm_frame_size*2;
 		int out_pcm_samples = dec->frame_recommend;
-		int out_pcm_frame_size = out_pcm_samples*sizeof(int16_t);
+		// int out_pcm_frame_size = out_pcm_samples*sizeof(int16_t);
 		int pcm_samples = in_pcm_samples > out_pcm_samples ? in_pcm_samples : out_pcm_samples;
 		int pcm_size = pcm_samples * sizeof(int16_t) ;
 		uint32_t timestamp = 0;

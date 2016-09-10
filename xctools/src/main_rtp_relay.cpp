@@ -229,7 +229,7 @@ void process_rtp(udp_channel * ch, unsigned char * data, int data_len, struct so
 		return;
 	}
 
-	int ret = 0;
+	// int ret = 0;
 	if(ch->media_type == MEDIA_AUDIO){
 		process_audio_rtp(ch, peer_from, peer_to, data, data_len);
 	}else if(ch->media_type == MEDIA_VIDEO){

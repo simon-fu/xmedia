@@ -93,7 +93,7 @@ int main(int argc, char** argv){
 
 	const char * filename = argv[1];
 	const char * outfilename = argv[2];
-	const char * ip = NULL;
+	// const char * ip = NULL;
 	int media_port = 0;
 	int portcount = 0;
 	FILE * fpin = NULL;

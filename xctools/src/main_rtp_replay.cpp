@@ -110,13 +110,13 @@ int check_magic(FILE * fpin, unsigned char * buf, int buf_size, const char * mag
 	return ret;
 }
 
-static
-const char * xnalu_type_string(int nalu_type){
-	if(nalu_type == 5) return "(I)";
-	if(nalu_type == 7) return "(SPS)";
-	if(nalu_type == 8) return "(PPS)";
-	return "";
-}
+// static
+// const char * xnalu_type_string(int nalu_type){
+// 	if(nalu_type == 5) return "(I)";
+// 	if(nalu_type == 7) return "(SPS)";
+// 	if(nalu_type == 8) return "(PPS)";
+// 	return "";
+// }
 
 static
 void send_directly(udp_channel * ch, unsigned char * data, int data_len){

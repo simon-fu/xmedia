@@ -59,7 +59,7 @@ ALL_CPP_OBJ += $(RTP_REPLAY_OBJ)
 
 
 
-MY_FLAGS= -g
+MY_FLAGS= -g -Wall
 # for MacOS
 MY_FLAGS += -fno-pie 
 
