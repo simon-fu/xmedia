@@ -66,7 +66,7 @@ int xrtp_to_nalu_next(xrtp_to_nalu_t *ctx, const uint8_t *rtp, uint32_t rtp_len)
 	
 	unsigned char x =  (pRtpHeader[0]>>4) & 0x1;
 	unsigned char cc = (pRtpHeader[0]>>0) & 0xF;
-	int header_len = XRTP_HEADER_LEN;
+	uint32_t header_len = XRTP_HEADER_LEN;
 	if(cc){
 		header_len += cc * 4;
 		if(rtp_len <=header_len)
@@ -78,12 +78,12 @@ int xrtp_to_nalu_next(xrtp_to_nalu_t *ctx, const uint8_t *rtp, uint32_t rtp_len)
 	}
 	
 	if(x){
-		int min = header_len + 4;
+		uint32_t min = header_len + 4;
 		if(min <= rtp_len){
 			int ext_len = be_get_u16(pRtpHeader+header_len+2);
 			header_len += 4+ext_len*4;
 		}else{
-			header_len = -1;
+			header_len = 0;
 			dbgd("RTP packet (ext) length too short,ignored");
 			ctx->nalu_len = 0;
 			return -1;
@@ -251,7 +251,8 @@ int xrtp_to_nalu_next(xrtp_to_nalu_t *ctx, const uint8_t *rtp, uint32_t rtp_len)
 	}
 
 	dbgi("rtp2nalu: unknown nal_type %d", nal_type);
-	return 0;
+	ret = 0;
+	return ret;
 }
 
 #define XRTP_MAX_RTPSIZE 512
@@ -442,7 +443,7 @@ int test_rtp_nalu()
 		}
 		if(ret == 0){
 			dbgd("out nalu done");
-			if((r2n.nalu_len-4) == nalu_len
+			if((int)(r2n.nalu_len-4) == nalu_len
 					&& memcmp(r2n.nalu_buf+4, &nalu[start], nalu_len) == 0){
 				dbgd("nalu equ");
 			}else{
@@ -481,7 +482,7 @@ uint32_t rebase_timestamp(xtimestamp64 * tswrapper, int64_t &src_first_timestamp
 	int64_t timestamp64 = xtimestamp64_unwrap(tswrapper, timestamp);
 	if(src_first_timestamp < 0){
 		src_first_timestamp = timestamp64;
-		dbgi("first timestamp %lld", src_first_timestamp);
+		// dbgi("first timestamp %lld", src_first_timestamp);
 	}
 	timestamp = (uint32_t)(timestamp64 - src_first_timestamp);
 	be_set_u32(timestamp, rtp+4);
