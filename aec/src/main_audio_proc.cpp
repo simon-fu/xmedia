@@ -36,6 +36,12 @@
 #include "webrtc/modules/audio_processing/debug.pb.h"
 #endif
 
+// simon
+#define dbgv(...) do{  printf("<aec>[D] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
+#define dbgi(...) do{  printf("<aec>[I] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
+#define dbge(...) do{  printf("<aec>[E] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
+
+
 namespace webrtc {
 
 using webrtc::audioproc::Event;
@@ -134,6 +140,17 @@ static void SimulateMic(int mic_level, AudioFrame* frame) {
     frame->data_[n] = static_cast<int16_t>(v);
   }
 }
+    
+    static const char * EventTypeToString(audioproc::Event_Type typ){
+        switch(typ){
+            case Event::INIT: return "Event::INIT";
+            case Event::REVERSE_STREAM: return "Event::REVERSE_STREAM";
+            case Event::STREAM: return "Event::STREAM";
+            case Event::CONFIG: return "Event::CONFIG";
+            case Event::UNKNOWN_EVENT: return "Event::UNKNOWN_EVENT";
+            default:  return "Event::Error";
+        }
+    }
 
 // void function for gtest.
 void void_main(int argc, char* argv[]) {
@@ -589,6 +606,10 @@ void void_main(int argc, char* argv[]) {
       trace_stream << "Processed frames: " << reverse_count << " (reverse), "
                    << primary_count << " (primary)";
       SCOPED_TRACE(trace_stream.str());
+//        dbgi("event: %d(%s), frames=(reverse %d, primary %d)"
+//             , event_msg.type(), EventTypeToString(event_msg.type())
+//             , reverse_count, primary_count
+//             );
 
       if (event_msg.type() == Event::INIT) {
         ASSERT_TRUE(event_msg.has_init());
@@ -656,7 +677,7 @@ void void_main(int argc, char* argv[]) {
         ASSERT_TRUE(event_msg.has_reverse_stream());
         ReverseStream msg = event_msg.reverse_stream();
         reverse_count++;
-
+//          dbgi("  reverse stream: msg.has_data()=%d", msg.has_data());
         ASSERT_TRUE(msg.has_data() ^ (msg.channel_size() > 0));
         if (msg.has_data()) {
           ASSERT_EQ(sizeof(int16_t) * far_frame.samples_per_channel_ *
