@@ -12,29 +12,11 @@
 
 // #include "util.h"
 #include "xwavfile.h"
+#include "aec.h"
 
 #define dbgv(...) do{  printf("<aec>[D] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
 #define dbgi(...) do{  printf("<aec>[I] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
 #define dbge(...) do{  printf("<aec>[E] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
-
-
-
-
-// 08-12 12:51:55.198 10459 10683 I alog    : WebRtcAecm_Init: aecmInst=0x610c0a80, sampFreq=8000
-// 08-12 12:51:55.198 10459 10683 I alog    : WebRtcAecm_set_config: aecmInst=0x610c0a80, config.cngMode=1, config.echoMode=3
-// 08-12 12:51:55.198 10459 10683 I alog    : WebRtcAecm_set_config: aecmInst=0x610c0a80, config.cngMode=0, config.echoMode=3
-
-// 08-12 12:42:13.838  9797 10170 I alog    : WebRtcAecm_BufferFarend: aecmInst=0x626f1b18, farend=0x627011b8, nrOfSamples=160
-// 08-12 12:42:13.838  9797 10170 I alog    : WebRtcAecm_GetBufferFarendError: aecmInst=0x626f1b18, farend=0x627011b8, nrOfSamples=160
-// 08-12 12:42:13.838  9797 10170 I alog    : WebRtcAecm_BufferFarend: aecmInst=0x626f1b18, farend=0x62701300, nrOfSamples=160
-// 08-12 12:42:13.838  9797 10170 I alog    : WebRtcAecm_GetBufferFarendError: aecmInst=0x626f1b18, farend=0x62701300, nrOfSamples=160
-// 08-12 12:42:13.838  9797 10170 I alog    : WebRtcAecm_BufferFarend: aecmInst=0x626f1b18, farend=0x62701448, nrOfSamples=160
-// 08-12 12:42:13.838  9797 10170 I alog    : WebRtcAecm_GetBufferFarendError: aecmInst=0x626f1b18, farend=0x62701448, nrOfSamples=160
-
-// 08-12 12:42:13.838  9797 10170 I alog    : WebRtcAecm_Process: aecmInst=0x626f1b18, nearendNoisy=0x65193568, nearendClean=0x626f1368, out=0x626f1368, nrOfSamples=160, msInSndCardBuf=150
-// 08-12 12:42:13.848  9797 10170 I alog    : WebRtcAecm_Process: aecmInst=0x626f1b18, nearendNoisy=0x65193568, nearendClean=0x626f1368, out=0x626f1368, nrOfSamples=160, msInSndCardBuf=150
-// 08-12 12:42:13.858  9797 10170 I alog    : WebRtcAecm_Process: aecmInst=0x626f1b18, nearendNoisy=0x65193568, nearendClean=0x626f1368, out=0x626f1368, nrOfSamples=160, msInSndCardBuf=150
-// 08-12 12:42:13.868  9797 10170 I alog    : WebRtcAecm_Process: aecmInst=0x626f1b18, nearendNoisy=0x65193568, nearendClean=0x626f1368, out=0x626f1368, nrOfSamples=160, msInSndCardBuf=150
 
 
 static 
@@ -379,6 +361,85 @@ int run_speex(wavfile_reader_t readerNear
 	return ret;
 }
 
+static 
+int run_kphone_aec(wavfile_reader_t readerNear
+		, wavfile_reader_t readerFar
+		, wavfile_writer_t writerOut
+		, int32_t sampFreq
+		, int nrOfSamples
+		, int msInSndCardBuf
+		, int16_t near_buf[]
+		, int16_t far_buf[]
+		, int16_t out_buf[] 
+		, int framebytes
+		, int& frameCount){
+
+	int ret = 0;
+
+	AEC aec;
+	// aec.setambient(MAXPCM*dB2q(1.0));    
+
+	int update = 1;
+	nrOfSamples = 2 * sampFreq/100; // 20 ms
+	framebytes = nrOfSamples * 2;
+	// int frame_size = nrOfSamples;
+	// int filter_length =  sampFreq/10/2; // 100 ms
+
+	dbgi("use kphone aec ");
+	// dbgi("frame_size=%d", frame_size);
+	// dbgi("filter_length=%d", filter_length);
+
+
+	do{
+		
+		frameCount = 0;
+		while(1){
+			ret = wavfile_reader_read(readerFar, far_buf, framebytes);
+			if(ret != framebytes){
+				dbgi("reach far-end file end");
+				ret = 0;
+				break;
+			}
+
+			ret = wavfile_reader_read(readerNear, near_buf, framebytes);
+			if(ret != framebytes){
+				dbgi("reach near-end file end");
+				ret = 0;
+				break;
+			}
+
+			
+			// if(update && frameCount > 1000){
+			// 	dbgi("change update to zero when frameCount=%d", frameCount);
+			// 	update = 0;
+			// }
+
+			for(int i = 0; i < nrOfSamples; i++){
+				int s0 = near_buf[i];
+				int s1 = far_buf[i];
+				int y=0;
+				s0 = aec.doAEC(s0, s1, update, &y);
+				out_buf[i] = s0;
+				// out_buf[i] = y;
+			}
+
+			//memcpy(out_buf, near_buf, framebytes);
+			ret = wavfile_writer_write(writerOut, out_buf, framebytes);
+			if(ret < 0){
+				dbge("wavfile_writer_write fail ret=%d", ret);
+				break;
+			}
+
+			ret = 0;
+			frameCount++;
+		}
+
+	}while(0);
+
+	return ret;
+}
+
+
 
 
 int main(int argc, char** argv){
@@ -485,7 +546,8 @@ int main(int argc, char** argv){
 		// run_aecm
 		// run_aec
 		// run_speex
-		ret =  run_aecm( readerNear
+		// run_kphone_aec
+		ret =  run_kphone_aec( readerNear
 		,  readerFar
 		,  writerOut
 		,  sampFreq

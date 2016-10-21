@@ -19,6 +19,7 @@ get_files =$(foreach dir,$(subst $(DIR_DIVIDER),$(MK_DIR_DIVIDER),$(1)),$(wildca
 
 
 COMMON_CPP_SRC += src/xwavfile.cpp 
+COMMON_CPP_SRC += src/kphone_aec/aec.cpp
 COMMON_H += src/xwavfile.h 
 COMMON_OBJ += $(foreach src, $(COMMON_CPP_SRC), $(addsuffix .o, $(basename $(src))))
 ALL_CPP_SRC += $(COMMON_CPP_SRC)
@@ -26,6 +27,11 @@ ALL_CPP_SRC += $(COMMON_CPP_SRC)
 
 HEAD_DIRS += ./src/
 HEAD_DIRS += ../xctools/src/
+HEAD_DIRS += ./src/kphone_aec/
+
+
+HEAD_DIRS += /Users/simon/easemob/src/study/speex/speexdsp-1.2rc3/include
+LIB_PATHS += -L/Users/simon/easemob/src/study/speex/speexdsp-1.2rc3/libspeexdsp/.libs
 
 # !!! there is google/protobuf/stubs/common.h -> /usr/local/include/
 # !!! confict with chromium/src/third_party/protobuf/src/
@@ -53,6 +59,7 @@ MY_LD_FLAGS +=  \
 	# -lisac_fix \
 	# -lwebrtc_test_common \
 
+MY_LD_FLAGS += -lspeexdsp
 MY_LD_FLAGS += -lm -framework AudioToolbox -framework CoreAudio -framework Foundation -framework AVFoundation \
 	-framework Cocoa -framework IOKit
 MY_FLAGS += -DEXPAT_RELATIVE_PATH -DWEBRTC_POSIX -DWEBRTC_MAC
@@ -74,6 +81,12 @@ TARGETS += $(TARGET_AUDIOPROC)
 AUDIOPROC_OBJ = src/main_audio_proc.o
 ALL_CPP_OBJ += $(AUDIOPROC_OBJ)
 
+# ALL_CPP_SRC += src/kphone_aec/aec.cpp
+MY_FLAGS += -DWIDEB=2
+TARGET_KPHONE_AEC=$(OUTPUT_DIR)/kphone_aec
+TARGETS += $(TARGET_KPHONE_AEC)
+KPHONE_AEC_OBJ = src/main_kphone_aec.o 
+ALL_CPP_OBJ += $(KPHONE_AEC_OBJ)
 
 
 
@@ -125,7 +138,7 @@ CPPFLAGS=$(INCLUDE_DIRS) $(MACROS)  $(MY_FLAGS) -std=c++11
 
 
 
-LIB_PATHS+= -L/usr/local/lib 
+# LIB_PATHS+= -L/usr/local/lib 
 MY_LD_FLAGS += $(LIB_PATHS)
 # MY_LD_FLAGS += -levent
 MY_LD_FLAGS += -lstdc++ 
@@ -139,17 +152,17 @@ MY_LD_FLAGS += -lcrypto
 MY_LD_FLAGS += -g -fno-pie
 
 
-CFLAGS += $(shell "pkg-config libevent --cflags")
-CPPFLAGS += $(shell pkg-config libevent --cflags)
-MY_LD_FLAGS += $(shell pkg-config libevent --libs)
+# CFLAGS += $(shell "pkg-config libevent --cflags")
+# CPPFLAGS += $(shell pkg-config libevent --cflags)
+# MY_LD_FLAGS += $(shell pkg-config libevent --libs)
 
-CFLAGS += $(shell "pkg-config speex --cflags")
-CPPFLAGS += $(shell pkg-config speex --cflags)
-MY_LD_FLAGS += $(shell pkg-config speex --libs)
+# CFLAGS += $(shell "pkg-config speex --cflags")
+# CPPFLAGS += $(shell pkg-config speex --cflags)
+# MY_LD_FLAGS += $(shell pkg-config speex --libs)
 
-CFLAGS += $(shell "pkg-config opus --cflags")
-CPPFLAGS += $(shell pkg-config opus --cflags)
-MY_LD_FLAGS += $(shell pkg-config opus --libs)
+# CFLAGS += $(shell "pkg-config opus --cflags")
+# CPPFLAGS += $(shell pkg-config opus --cflags)
+# MY_LD_FLAGS += $(shell pkg-config opus --libs)
 
 
 
@@ -168,6 +181,10 @@ $(AUDIO_PROC): $(TARGET_AUDIOPROC)
 
 $(TARGET_AUDIOPROC): $(AUDIOPROC_OBJ) $(COMMON_OBJ) $(COMMON_H) $(OUTPUT_DIR) 
 	$(CC)  $(AUDIOPROC_OBJ) $(COMMON_OBJ) $(MY_LD_FLAGS) -o $@
+
+$(TARGET_KPHONE_AEC): $(KPHONE_AEC_OBJ) $(COMMON_OBJ) $(COMMON_H) $(OUTPUT_DIR) 
+	$(CC)  $(KPHONE_AEC_OBJ) $(COMMON_OBJ) $(MY_LD_FLAGS) -o $@
+
 
 
 $(OUTPUT_DIR):

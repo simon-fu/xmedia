@@ -5,3 +5,7 @@
 
 
 # ./bin/aec-replay tmp-dspalgorithms/left.wav tmp-dspalgorithms/right.wav tmp-dspalgorithms/out.wav 0 0
+# ./bin/aec-replay tmp-icoolmeida/mic.wav tmp-icoolmeida/ref.wav tmp-icoolmeida/out.wav 0 0
+
+
+
