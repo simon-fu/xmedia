@@ -10,7 +10,7 @@
 #define dbgi(...) do{  printf("<main>[I] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
 #define dbge(...) do{  printf("<main>[E] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
 
-typedef float kalman_data_t;
+
 struct array2d{
     kalman_data_t * d;
     int rows;
@@ -153,7 +153,7 @@ int load_txt(const char * filename, array2d *data){
 
 
 int main(void){
-    const char * filename = "sendside_20171011_172641_0x1014508e8.txt";
+    const char * filename = "in.txt";
     array2d datastor;
     array2d *data = &datastor;
 
@@ -161,7 +161,7 @@ int main(void){
     if(ret < 0){
         return -1;    
     }
-    dbgi("loaded [%s]", filename); 
+    dbgi("loaded input: [%s]", filename); 
     dbgi("rows=%d, cols=%d", data->rows, data->cols); 
 
     const char * out_filename1 = "out.txt";
@@ -182,6 +182,7 @@ int main(void){
             ret = -1;
             break;
         }
+        dbgi("opened output: [%s]", out_filename1); 
 
         int num_measures = (data->cols-1);
         states1 = (kalman1_state *)malloc( num_measures * sizeof(kalman1_state) );
@@ -193,7 +194,7 @@ int main(void){
         kalman_data_t z1 = data->at(1, index);
 
         // kalman1_init(&states1[index], z0, 5e2);
-        kalman1_init(&states1[index], 0, 1);
+        kalman1_init(&states1[index], 0, 1, 1e-8, 1e-6);
 
         kalman_data_t init_x[2] = {z0, z1-z0};
         kalman_data_t init_p[2][2] = {{10e-6,0}, {0,10e-6}};

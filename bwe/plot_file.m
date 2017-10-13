@@ -1,8 +1,8 @@
 % 从txt中读取数据并画图
 
-clear all
-clc;
-close all;
+% clear all
+% clc;
+% close all;
 
 [fname, fpath] = uigetfile(...
     {'*.txt', '*.*'}, ...
@@ -11,6 +11,7 @@ close all;
 x = load(fullfile(fpath, fname));
 m = size(x,2);
 color = char('-', 'k-', 'r-', 'b-', 'g-');
+figure;
 for i=2:m
   % disp(color(i,:));
   out = x(:,i);

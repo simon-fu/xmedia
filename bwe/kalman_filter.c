@@ -27,14 +27,14 @@
  * @outputs 
  * @retval  
  */
-void kalman1_init(kalman1_state *state, float init_x, float init_p)
+void kalman1_init(kalman1_state *state, kalman_data_t init_x, kalman_data_t init_p, kalman_data_t init_q, kalman_data_t init_r)
 {
     state->x = init_x;
     state->p = init_p;
     state->A = 1;
     state->H = 1;
-    state->q = 1e-8; // 2e2;//10e-6;  /* predict noise convariance */
-    state->r = 1e-6; // 5e2;//10e-5;  /* measure error convariance */
+    state->q = init_q; /* 1e-8;  2e2; 10e-6;   predict noise convariance */
+    state->r = init_r; /* 1e-6;  5e2; 10e-5;   measure error convariance */
 }
 
 /*
@@ -47,7 +47,7 @@ void kalman1_init(kalman1_state *state, float init_x, float init_p)
  * @retval  
  *   Estimated result
  */
-float kalman1_filter(kalman1_state *state, float z_measure)
+kalman_data_t kalman1_filter(kalman1_state *state, kalman_data_t z_measure)
 {
     /* Predict */
     state->x = state->A * state->x;
@@ -75,7 +75,7 @@ float kalman1_filter(kalman1_state *state, float z_measure)
  * @outputs 
  * @retval  
  */
-void kalman2_init(kalman2_state *state, float *init_x, float (*init_p)[2])
+void kalman2_init(kalman2_state *state, kalman_data_t *init_x, kalman_data_t (*init_p)[2])
 {
     state->x[0]    = init_x[0];
     state->x[1]    = init_x[1];
@@ -110,11 +110,11 @@ void kalman2_init(kalman2_state *state, float *init_x, float (*init_p)[2])
  * @retval  
  *   Return value is equals to state->x[0], so maybe angle or velocity.
  */
-float kalman2_filter(kalman2_state *state, float z_measure)
+kalman_data_t kalman2_filter(kalman2_state *state, kalman_data_t z_measure)
 {
-    float temp0 = 0.0f;
-    float temp1 = 0.0f;
-    float temp = 0.0f;
+    kalman_data_t temp0 = 0.0f;
+    kalman_data_t temp1 = 0.0f;
+    kalman_data_t temp = 0.0f;
 
     /* Step1: Predict */
     state->x[0] = state->A[0][0] * state->x[0] + state->A[0][1] * state->x[1];
