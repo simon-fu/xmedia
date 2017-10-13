@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <getopt.h>
 #include "kalman_filter.h" 
+#include "xcmdline.h"
 
 #define dbgv(...) do{  printf("<main>[D] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
 #define dbgi(...) do{  printf("<main>[I] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
@@ -151,149 +152,92 @@ int load_txt(const char * filename, array2d *data){
 }
 
 
-typedef struct app_config{
-    const char * input_filename ;
-    const char * output_filename ;
-    int vector_index;
-}app_config;
+// app implementation
 
-enum EXTRA_OPTS {
-    HELP_OPT = 'h',
-    INPUT_OPT = 'i',
-    OUTPUT_OPT = 'o',
-    VECTOR_INDEX_OPT = 'n',
-    EXTRA_OPT_BASE=256,
-    EXTRA_OPT_MAX
+enum XOPTS {
+    XOPT_HELP = 0,
+    XOPT_INPUT ,
+    XOPT_OUTPUT ,
+    XOPT_VECTOR_INDEX ,
+    XOPT_MAX
 };
-
-static const struct option long_options[] = {
-    { "help",   no_argument,        NULL, HELP_OPT },
-    { "input",  required_argument,  NULL, INPUT_OPT },
-    { "output", required_argument,  NULL, OUTPUT_OPT },
-    { "vindex", required_argument,  NULL, VECTOR_INDEX_OPT },
-    { NULL, no_argument, NULL, 0 }
-};
-
-static const char * get_short_options(){
-    static const int size = sizeof(long_options)/sizeof(long_options[0]);
-    static char short_options[size * 3] = {0};
-    if(short_options[0] == '\0'){
-        int len = 0;
-        for(int i = 0; i < size; i++){
-            const struct option * opt = &long_options[i];
-            if(opt->val < EXTRA_OPT_BASE){
-                short_options[len] = opt->val; ++ len;
-                if(opt->has_arg == required_argument){
-                    short_options[len] = ':'; ++len;
-                }else if(opt->has_arg == optional_argument){
-                    short_options[len] = ':'; ++len;
-                    short_options[len] = ':'; ++len;
-                }
-            }
-        }
-        short_options[len] = '\0'; 
-    }
-    return short_options;
-}
-
-static
-void print_usage(int argc, char **argv){
-//    fprintf(stderr, "Usage: %s [-c log_config_file] [-m media_ip] [--min-port port] [--max-port port]\n", argv[0]);
-    fprintf(stderr, "Usage: %s [options]\n", argv[0]);
-    fprintf(stderr, "Options:\n");
-    fprintf(stderr, "  -h,--help\n");
-    fprintf(stderr, "      print this message\n\n");
-    fprintf(stderr, "  -i,--input [path/]<input-data-file>\n");
-    fprintf(stderr, "      default in.txt;\n"); 
-    fprintf(stderr, "      the first column must be timestamp or seq\n\n");
-    fprintf(stderr, "  -o,--output  [path/]<output-data-file>\n");
-    fprintf(stderr, "      default out.txt;\n");
-    fprintf(stderr, "      the first column is same with input-data-file first one, the second is output estimation;\n\n");
-    fprintf(stderr, "  -n --vindex  <vector-index>\n");
-    fprintf(stderr, "      default 1;\n");
-    fprintf(stderr, "      column index for vector in input-data-file, 0 for first column, 1 for second column;\n\n");
-}
-
-static
-void dump_config(app_config * config){
-    fprintf(stderr, "  opt: input-data-file=[%s]\n", config->input_filename);
-    fprintf(stderr, "  opt: output-data-file=[%s]\n", config->output_filename);
-    fprintf(stderr, "  opt: vector-index=[%d]\n", config->vector_index);
-}
-
 
 static 
-app_config * app_config_get(){
-    static app_config g_config;
-    return &g_config;
-}
+const struct xcmd_option * get_app_options(){
 
-static
-int app_config_parse (int argc, char **argv){
-//    print_usage(argc, argv);
-    
-    app_config * config = app_config_get();
-    memset(config, 0, sizeof(app_config));
-    config->input_filename = "in.txt";
-    config->output_filename = "out.txt";
-    config->vector_index = 1;
+    static struct xcmd_option app_options[XOPT_MAX+1] = {0};
 
+    if(!app_options[0].opt.name){
+        xcmdline_init_options(app_options, sizeof(app_options)/sizeof(app_options[0]));
 
-    // parse command line
-    // see https://www.gnu.org/software/libc/manual/html_node/Getopt.html#Getopt
-    // see https://www.gnu.org/software/libc/manual/html_node/Getopt-Long-Option-Example.html
-    
-    int c;
-    opterr = 0;
-    int option_index = 0;
-    
-    //while ((c = getopt (argc, argv, short_options)) != -1){
-    while ((c = getopt_long (argc, argv, get_short_options(), long_options, &option_index)) != -1){
-        switch (c){
-            case HELP_OPT:
-                print_usage(argc, argv);
-                return 1;
-                break;
-            case INPUT_OPT:
-                config->input_filename = optarg;
-                break;
-            case OUTPUT_OPT:
-                config->output_filename = optarg;
-                break;
-            case VECTOR_INDEX_OPT:
-                config->vector_index = atoi(optarg);
-                break;
-            case '?':
-                print_usage(argc, argv);
-                return 1;
-            default:
-                fprintf (stderr, "Unknown option `-%c'.\n", optopt);
-                print_usage(argc, argv);
-                return 1;
-        }
+        app_options[XOPT_HELP] = (struct xcmd_option){
+            .typ = XOPTTYPE_INT,
+            .mandatory = 0,
+            .opt = { "help",   no_argument,  NULL, 'h' },
+            .short_desc = "", 
+            .long_desc = "print this message",
+            .def_val = {.intval = 0, .raw = NULL},
+            };
+
+        app_options[XOPT_INPUT] = (struct xcmd_option){
+            .typ = XOPTTYPE_STR,
+            .mandatory = 0,
+            .opt = { "input",  required_argument,  NULL, 'i' },
+            .short_desc = "<input-data-file>", 
+            .long_desc = "the first column must be timestamp or seq;",
+            .def_val = {.strval = "in.txt", .raw = "in.txt"}
+            };
+
+        app_options[XOPT_OUTPUT] = (struct xcmd_option){
+            .typ = XOPTTYPE_STR,
+            .mandatory = 0,
+            .opt = { "output", required_argument,  NULL, 'o' },
+            .short_desc = "<output-data-file>", 
+            .long_desc = "the first column is same with input-data-file first one, the second is output estimation;",
+            .def_val = {.strval = "out.txt", .raw = "out.txt"}
+            };
+
+        app_options[XOPT_VECTOR_INDEX] = (struct xcmd_option){
+            .typ = XOPTTYPE_INT,
+            .mandatory = 0,
+            .opt = { "vector-col", required_argument,  NULL, 'c' },
+            .short_desc = "<vector-column>", 
+            .long_desc = "column index for vector in input-data-file, 0 for first column, 1 for second column;",
+            .def_val = {.intval = 1, .raw = "1"}
+            };
+
     }
-    
-//    dump_config(config);
-    
-    return 0;
-}
 
-int main(int argc, char **argv){
-    // print_usage(argc, argv);
-    if(app_config_parse(argc, argv)){
-        return 1;
+    return app_options;
+};
+
+
+
+int main(int argc, char ** argv){
+    int ret = 0;
+
+    xoptval configs[XOPT_MAX];
+    ret = xcmdline_parse(argc, argv, get_app_options(), XOPT_MAX, configs, NULL);
+    if(ret){
+        const char * usage = xcmdline_get_usage(argc, argv, get_app_options(), XOPT_MAX);
+        fprintf(stderr, "%s", usage);
+        return ret;
     }
-    app_config * config = app_config_get();
-    dump_config(config);
-    
+    const char * str = xcmdline_get_config_string(get_app_options(), XOPT_MAX, configs);
+    fprintf(stderr, "%s", str);
+
+    const char * input_filename = configs[XOPT_INPUT].strval;
+    const char * output_filename = configs[XOPT_OUTPUT].strval;
+    int vector_index = configs[XOPT_VECTOR_INDEX].intval;
+
 
     array2d datastor;
     array2d *data = &datastor;
-    int ret = load_txt(config->input_filename, data);
+    ret = load_txt(input_filename, data);
     if(ret < 0){
         return -1;    
     }
-    dbgi("loaded input: [%s]", config->input_filename); 
+    dbgi("loaded input: [%s]", input_filename); 
     dbgi("rows=%d, cols=%d", data->rows, data->cols); 
 
 
@@ -307,30 +251,36 @@ int main(int argc, char **argv){
             ret = -1;
             break;
         }
-
-        fp1 = fopen(config->output_filename, "wb");
-        if(!fp1){
-            dbge("fail to write open: [%s]", config->output_filename);
+        if(data->cols <= vector_index){
+            dbge("vector column must < %d", data->cols);
             ret = -1;
             break;
         }
-        dbgi("opened output: [%s]", config->output_filename); 
+
+        fp1 = fopen(output_filename, "wb");
+        if(!fp1){
+            dbge("fail to write open: [%s]", output_filename);
+            ret = -1;
+            break;
+        }
+        dbgi("opened output: [%s]", output_filename); 
 
         int num_measures = data->cols;
         states1 = (kalman1_state *)malloc( num_measures * sizeof(kalman1_state) );
         states2 = (kalman2_state *)malloc( num_measures * sizeof(kalman2_state) );
     
-        int index = config->vector_index;
+        int index = vector_index;
         // init kalman by first 2 rows of data
         kalman_data_t z0 = data->at(0, index);
         kalman_data_t z1 = data->at(1, index);
-
+        
         // kalman1_init(&states1[index], z0, 5e2);
         kalman1_init(&states1[index], 0, 1, 1e-8, 1e-6);
 
         kalman_data_t init_x[2] = {z0, z1-z0};
         kalman_data_t init_p[2][2] = {{10e-6,0}, {0,10e-6}};
         kalman2_init(&states2[index], init_x, init_p);
+
 
         // first 2 rows 
         char dumpbuf[256], dumpbuf2[256];
