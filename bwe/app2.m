@@ -10,6 +10,7 @@
     'Pick a file');
 
 x = load(fullfile(fpath, fname));
+x0 = x(:,1);
 
 m = 1;
 n = 1;
@@ -24,7 +25,7 @@ kfilter.P = eye(n); % nxn
 kfilter.K = zeros(n,m);% nxm
 kfilter.Q = eye(n) * cQ; % nxn
 kfilter.R = eye(m) * cR; % mxm
-kfilter.x = zeros(n,1); % ³õÊ¼×´Ì¬x0
+kfilter.x = zeros(n,1); % ³õÊ¼×´Ì¬
 
 
 figure;
@@ -38,11 +39,11 @@ z = x(:,2)';
 out_kalman = kalman_process(kfilter, z)';
 out_aver=filter(ones(1,10)/10,1,z)';
 subplot(2,1,1);
-H1 = plot(z, 'k-');
+H1 = plot(x0, z, 'k-');
 hold on;
-K1 = plot(out_kalman(:,1), 'r-');
+K1 = plot(x0, out_kalman(:,1), 'r-');
 hold on;
-AVER1 = plot(out_aver(:,1), 'b-');
+AVER1 = plot(x0, out_aver(:,1), 'b-');
 hold on;
 legend([H1,K1, AVER1], name, 'EST-KALMAN', 'EST-AVER');
 str = sprintf('cQ = %e, cR = %e', cQ, cR);
@@ -57,9 +58,9 @@ kfilter.R = eye(m) * cR;
 z = x(:,3)';
 out_kalman = kalman_process(kfilter, z)';
 subplot(2,1,2);
-H1 = plot(z, 'k-');
+H1 = plot(x0, z, 'k-');
 hold on;
-R1 = plot(out_kalman(:,1), 'r-');
+R1 = plot(x0, out_kalman(:,1), 'r-');
 hold on;
 legend([H1,R1], name, 'EST-KALMAN');
 str = sprintf('cQ = %e, cR = %e', cQ, cR);
