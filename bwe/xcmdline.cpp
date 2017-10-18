@@ -48,8 +48,8 @@ int assign_xopt_from_raw(const struct xcmd_option * xopt, xoptval * xval, const 
             xval->strval = str;
         }else if(xopt->typ == XOPTTYPE_INT){
             xval->intval = atoi(str);
-        }else if(xopt->typ == XOPTTYPE_INT){
-            xval->floatval = atof(str);
+        }else if(xopt->typ == XOPTTYPE_DOUBLE){
+            xval->doubleval = atof(str);
         }
     }
 

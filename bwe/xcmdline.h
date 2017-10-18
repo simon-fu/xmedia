@@ -13,7 +13,8 @@ enum XOPTTYPE {
     XOPTTYPE_NONE = 0,
     XOPTTYPE_STR ,
     XOPTTYPE_INT ,
-    XOPTTYPE_FLOAT ,
+    // XOPTTYPE_FLOAT ,
+    XOPTTYPE_DOUBLE ,
 };
 
 #define XOPT_EXT_BASE 256
@@ -23,7 +24,8 @@ typedef struct {
     union{
         const char * strval;
         int intval;
-        float floatval;
+        // float floatval;
+        double doubleval;
     };
 }xoptval;
 

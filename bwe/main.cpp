@@ -159,10 +159,12 @@ enum XOPTS {
     XOPT_INPUT ,
     XOPT_OUTPUT ,
     XOPT_VECTOR_INDEX ,
+    XOPT_CQ ,
+    XOPT_CR ,
     XOPT_MAX
 };
 
-// TODO: add arg of init_q, init_r, skip first column, etc
+// TODO: add arg of skip first column, etc
 static 
 const struct xcmd_option * get_app_options(){
 
@@ -207,6 +209,23 @@ const struct xcmd_option * get_app_options(){
             .def_val = {.intval = 1, .raw = "1"}
             };
 
+        app_options[XOPT_CQ] = (struct xcmd_option){
+            .typ = XOPTTYPE_DOUBLE,
+            .mandatory = 0,
+            .opt = { "noise-covar", required_argument,  NULL, 'q' },
+            .short_desc = "<noise-covariance>", 
+            .long_desc = "",
+            .def_val = {.doubleval = 1e-8, .raw = "1e-8"}
+            };
+
+        app_options[XOPT_CR] = (struct xcmd_option){
+            .typ = XOPTTYPE_DOUBLE,
+            .mandatory = 0,
+            .opt = { "measure-covar", required_argument,  NULL, 'r' },
+            .short_desc = "<measure-covariance>", 
+            .long_desc = "",
+            .def_val = {.doubleval = 1e-6, .raw = "1e-6"}
+            };
     }
 
     return app_options;
@@ -219,7 +238,7 @@ int main(int argc, char ** argv){
 
     xoptval configs[XOPT_MAX];
     ret = xcmdline_parse(argc, argv, get_app_options(), XOPT_MAX, configs, NULL);
-    if(ret){
+    if(ret || configs[XOPT_HELP].intval){
         const char * usage = xcmdline_get_usage(argc, argv, get_app_options(), XOPT_MAX);
         fprintf(stderr, "%s", usage);
         return ret;
@@ -230,6 +249,10 @@ int main(int argc, char ** argv){
     const char * input_filename = configs[XOPT_INPUT].strval;
     const char * output_filename = configs[XOPT_OUTPUT].strval;
     int vector_index = configs[XOPT_VECTOR_INDEX].intval;
+    kalman_data_t cQ = configs[XOPT_CQ].doubleval;
+    kalman_data_t cR = configs[XOPT_CR].doubleval;
+    // kalman_data_t cQ = 1e-8, cR = 1e-6;
+    // kalman_data_t cQ = 1e-4, cR = 8e-4;
 
 
     array2d datastor;
@@ -276,7 +299,7 @@ int main(int argc, char ** argv){
         kalman_data_t z1 = data->at(1, index);
         
         // kalman1_init(&states1[index], z0, 5e2);
-        kalman1_init(&states1[index], 0, 1, 1e-8, 1e-6);
+        kalman1_init(&states1[index], 0, 1, cQ, cR);
 
         kalman_data_t init_x[2] = {z0, z1-z0};
         kalman_data_t init_p[2][2] = {{10e-6,0}, {0,10e-6}};
