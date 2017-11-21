@@ -4,12 +4,138 @@
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
+#include <deque>
+#include <utility>
+#include <vector>
+#include <math.h>
+
 #include "kalman_filter.h" 
 #include "xcmdline.h"
 
 #define dbgv(...) do{  printf("<main>[D] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
 #define dbgi(...) do{  printf("<main>[I] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
 #define dbge(...) do{  printf("<main>[E] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
+
+template<class VAL_TYPE> 
+class IEstimator{
+public:
+    virtual ~IEstimator(){};
+    virtual bool push(int64_t now_ms, VAL_TYPE v) = 0;
+    virtual VAL_TYPE get_aver() = 0;
+    virtual VAL_TYPE get_var() = 0;
+    virtual VAL_TYPE get_sign_var() = 0;
+    virtual VAL_TYPE get_max_diff() = 0;
+    virtual VAL_TYPE get_last_diff() = 0;
+    virtual VAL_TYPE get_last_max_diff() = 0;
+};
+
+template<class VAL_TYPE> 
+class AvrEstimator{
+public:
+    AvrEstimator(size_t n)
+    : n_(n)
+    , valid_(false)
+    , average_(0)
+    , var_(1)
+    , sign_var_(1)
+    , max_diff_(0)
+    , last_diff_(0)
+    , last_max_diff_(0)
+
+    , val_sum_(0)
+    , squ_sum_(0)
+    , min_(0){
+    }
+
+    virtual bool push(int64_t now_ms, VAL_TYPE v){
+        history_.push_back(std::make_pair(now_ms, v));
+        last_diff_ = v - history_.back().second;
+        val_sum_ += v;
+        if(!valid_){
+            if(history_.size() == 1) min_ = v;
+            last_max_diff_ = v - min_;
+
+            if(history_.size() == n_){
+                average_ = val_sum_ / n_;
+                this->make_var();
+                valid_ = true;
+            }
+            
+        }else{
+            VAL_TYPE old = history_.front().second;
+            history_.pop_front();
+            val_sum_ -= old;
+            average_ = val_sum_ / n_;
+            this->make_var();
+            last_max_diff_ = v - min_;
+        }
+        return valid_;
+    }
+
+    virtual VAL_TYPE get_aver(){
+        return average_;
+    }
+    virtual VAL_TYPE get_var(){
+        return var_;
+    }
+    virtual VAL_TYPE get_sign_var(){
+        return sign_var_;
+    }
+    virtual VAL_TYPE get_max_diff(){
+        return max_diff_;
+    }
+    virtual VAL_TYPE get_last_diff(){
+        return last_diff_;
+    }
+    virtual VAL_TYPE get_last_max_diff(){
+        return last_max_diff_;
+    }
+    
+protected:
+    void make_var(){
+        
+        squ_sum_ = 0;
+        sign_var_ = 0;
+        VAL_TYPE  max;
+        int n = 0;
+        for(auto o : history_){
+            VAL_TYPE e = o.second-average_;
+            squ_sum_ += e * e;
+            sign_var_ += fabs(e);
+            if(n == 0){
+                min_ = max = o.second;
+            }else{
+                if(o.second < min_){
+                    min_ = o.second;
+                }
+                if(o.second > max){
+                    max = o.second;
+                }
+            }
+            n++;
+        }
+        var_ = squ_sum_ / n_;
+        // var_ = sqrt(var_);
+        sign_var_ = sign_var_ /n;
+        max_diff_ = max - min_;
+
+    }
+    
+    size_t n_;
+    bool valid_;
+    VAL_TYPE average_;
+    VAL_TYPE var_;
+    VAL_TYPE sign_var_;
+    VAL_TYPE max_diff_;
+    VAL_TYPE last_diff_;
+    VAL_TYPE last_max_diff_;
+
+    VAL_TYPE val_sum_;
+    VAL_TYPE squ_sum_;
+    VAL_TYPE min_;
+    
+    std::deque<std::pair<int64_t, VAL_TYPE> > history_;
+};
 
 
 struct array2d{
@@ -267,6 +393,8 @@ int main(int argc, char ** argv){
 
     kalman1_state * states1 = NULL;
     kalman2_state * states2 = NULL;
+    AvrEstimator<double> * estor1 = new AvrEstimator<double>(5);
+    AvrEstimator<double> * estor2 = new AvrEstimator<double>(5);
     FILE * fp1 = NULL;
     ret = -1;
     do{
@@ -315,7 +443,17 @@ int main(int argc, char ** argv){
             kalman_data_t z = data->at(row, index);
             kalman_data_t out1 = kalman1_filter(&states1[index], z);
             kalman_data_t out2 = z;
-            dumplen = sprintf(dumpbuf+0, "%.2f %.6f %.6f %.6f\n",t, z, out1, out2);
+            estor1->push(0, z);
+            estor2->push(0, z);
+            // dumplen = sprintf(dumpbuf+0, "%.2f %.6f %.6f %.6f\n",t, z, out1, out2);
+            dumplen = sprintf(dumpbuf+0, "%.2f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f\n",t, z, out1
+                , estor1->get_aver()
+                , estor1->get_var()
+                , estor1->get_sign_var()
+                , estor2->get_max_diff()
+                , estor2->get_last_max_diff()
+                , estor2->get_last_max_diff()
+                );
             fwrite(dumpbuf, dumplen, 1, fp1);
         }
 
@@ -326,7 +464,16 @@ int main(int argc, char ** argv){
             kalman_data_t z = data->at(row, index);
             kalman_data_t out1 = kalman1_filter(&states1[index], z);
             kalman_data_t out2 = kalman2_filter(&states2[index], z);
-            dumplen = sprintf(dumpbuf+0, "%.2f %.6f %.6f %.6f\n",t, z, out1, out2);
+            estor1->push(0, z);
+            estor2->push(0, z);
+            dumplen = sprintf(dumpbuf+0, "%.2f %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f\n",t, z, out1
+                , estor1->get_aver()
+                , estor1->get_var()
+                , estor1->get_sign_var()
+                , estor2->get_max_diff()
+                , estor2->get_last_max_diff()
+                , estor2->get_last_max_diff()
+                );
             fwrite(dumpbuf, dumplen, 1, fp1);
         }
 

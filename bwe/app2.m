@@ -31,8 +31,10 @@ kfilter.x = zeros(n,1); % ³õÊ¼×´Ì¬
 figure;
 
 name = 'RTT';
-cQ = 1e-8;
-cR = 1e-6;
+% cQ = 1e-8;
+% cR = 1e-6;
+cQ = 1e-4;
+cR = cQ*8;
 kfilter.Q = eye(n) * cQ; 
 kfilter.R = eye(m) * cR; 
 z = x(:,2)';
