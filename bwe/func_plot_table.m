@@ -1,60 +1,14 @@
-% 从txt中读取数据并画图
-% 数据格式：第一列是横坐标，其他列为曲线数据，曲线数据为‘-’代表这行没有数据
-% 一个文件例子：
-% timestamp rtt loss
-% 100 200 100
-% 200 - 10
-% 300 300 150
+function [ TT ] = func_plot_table(fname, TT, plotIdMap, defaultPlotId )
+%UNTITLED Summary of this function goes here
+%   Detailed explanation goes here
 
-clear all
-% clc;
-% close all;
-
-% 
-% plotId < 0 不画曲线
-% plotId = 0 自动生成递增的 plotId
-% plotId > 0 指定 plotId
-
-defaultPlotId = -1; % 默认值
-
-plotIdMap = containers.Map;
-plotIdMap('LastT')    = 1;
-plotIdMap('Threshold')    = 1;
-plotIdMap('LastT2')    = 2;
-plotIdMap('Threshold2')    = 2;
-plotIdMap('RecvRate')    = 3;
-plotIdMap('RecvBWE')    = 3;
-plotIdMap('RCAvgMax')    = 3;
-
-% plotIdMap('Timestamp')    = -1;
-% plotIdMap('TimeDelta')    = -1;
-% plotIdMap('RtpTimeDelta')    = -1;
-% plotIdMap('SizeDelta')    = -1;
-% plotIdMap('RCState')    = -1;
-% plotIdMap('NumDeltas')    = -1;
-% plotIdMap('BWState')    = -1;
-% plotIdMap('NoiseVar')    = -1;
-% plotIdMap('SSRC')    = -1;
-% plotIdMap('TimeOverUsing')    = -1;
-% plotIdMap('RCRegion')    = -1;
-% plotIdMap('RCVarMax')    = -1;
-% plotIdMap('aaa')    = -1;
-
-    
-[fname, fpath] = uigetfile(...
-    {'*.txt', '*.*'}, ...
-    'Pick a file');
-if(~ischar(fname))
-    disp 'wrong filename';
-    return;
-end
-file4read = fullfile(fpath, fname);
-TT = readtable(fullfile(fpath, fname), 'Delimiter',',', 'FileEncoding', 'UTF-8');
+% file4plot = fullfile(fpath, fname);
+% TT = readtable(file4plot, 'Delimiter',',', 'FileEncoding', 'UTF-8');
 
 % 转换成时间相对值
-starttime = TT.(1)(1);
-TT.(1) = TT.(1)-starttime; % 单位相对毫秒
-TT.(1) = TT.(1)/1000.0; % 单位为秒
+% starttime = TT.(1)(1);
+% TT.(1) = TT.(1)-starttime; % 单位相对毫秒
+% TT.(1) = TT.(1)/1000.0; % 单位为秒
 
 % numVar=曲线个数+1
 numVar = size(TT.Properties.VariableNames,2);
@@ -147,4 +101,5 @@ end
 dcmObj = datacursormode; 
 set(dcmObj,'UpdateFcn',@updateFcn);
 
+end
 

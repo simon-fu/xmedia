@@ -1,1 +1,1 @@
-g++ -Wno-c++11-extensions main.cpp xcmdline.cpp kalman_filter.c && ./a.out $@
+g++ -Wno-c++11-extensions main2.cpp xcmdline.cpp kalman_filter.cpp && ./a.out $@

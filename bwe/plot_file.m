@@ -8,10 +8,10 @@
     {'*.txt', '*.*'}, ...
     'Pick a file');
 
-file4read = fullfile(fpath, fname);
-TT = readtable(fullfile(fpath, fname), 'Delimiter',' ');
-% TT = textread(file4read, '%s', 'delimiter', '\n');
-size(TT.Properties.VariableNames,2)
+% file4read = fullfile(fpath, fname);
+% TT = readtable(fullfile(fpath, fname), 'Delimiter',' ');
+% % TT = textread(file4read, '%s', 'delimiter', '\n');
+% size(TT.Properties.VariableNames,2)
 
 
 x = load(fullfile(fpath, fname));
