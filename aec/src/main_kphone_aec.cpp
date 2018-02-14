@@ -4,8 +4,9 @@
 #include <unistd.h>
 #include <signal.h> // SIGINT
 
-#include "webrtc/modules/audio_processing/aecm/echo_control_mobile.h"
-#include "webrtc/modules/audio_processing/aec/echo_cancellation.h"
+// #include "webrtc/modules/audio_processing/aecm/echo_control_mobile.h"
+// #include "webrtc/modules/audio_processing/aec/echo_cancellation.h"
+#include "echo_control_mobile.h"
 
 #include <speex/speex_echo.h>
 #include <speex/speex_preprocess.h>
@@ -129,119 +130,6 @@ inline void copy_float_to_int16(float src[], int16_t dst[], int num){
 	for(int i = 0; i < num; i++){
 		dst[i] = src[i];
 	}
-}
-
-static 
-int run_aec(wavfile_reader_t readerNear
-		, wavfile_reader_t readerFar
-		, wavfile_writer_t writerOut
-		, int32_t sampFreq
-		, int nrOfSamples
-		, int msInSndCardBuf
-		, int16_t near_buf[]
-		, int16_t far_buf[]
-		, int16_t out_buf[] 
-		, int framebytes
-		, int& frameCount){
-
-	int ret = 0;
-	void* aInst = NULL;
-	// AecConfig aConfig = {.nlpMode=kAecNlpModerate, .skewMode=kAecFalse, .metricsMode=kAecFalse, .delay_logging=kAecFalse};
-	// AecConfig aConfig = {.nlpMode=kAecNlpAggressive, .skewMode=kAecFalse, .metricsMode=kAecFalse, .delay_logging=kAecFalse};
-	AecConfig config = {.nlpMode=kAecNlpConservative, .skewMode=kAecFalse, .metricsMode=kAecFalse, .delay_logging=kAecFalse};
-	AecConfig * aConfig = NULL; // &config;
-	
-	do{
-
-		aInst = WebRtcAec_Create();
-		if(!aInst){
-			dbge("WebRtcAec_Create fail");
-			break;
-		}
-		dbgi("WebRtcAec_Create success, aInst=%p", aInst);
-
-		ret = WebRtcAec_Init(aInst, sampFreq, sampFreq);
-		if(ret != 0){
-			dbge("WebRtcAec_Init fail ret=%d", ret);
-			break;
-		}
-		dbgi("WebRtcAec_Init success");
-
-		if(aConfig){
-			ret = WebRtcAec_set_config(aInst, *aConfig);
-			if(ret != 0){
-				dbge("WebRtcAec_set_config fail ret=%d, config=[%d, %d, %d, %d]", ret, aConfig->nlpMode, aConfig->skewMode, aConfig->metricsMode, aConfig->delay_logging);
-				break;
-			}
-			dbgi("WebRtcAec_set_config success, config=[%d, %d, %d, %d]", aConfig->nlpMode, aConfig->skewMode, aConfig->metricsMode, aConfig->delay_logging);
-		}else{
-			dbgi("skip set config");
-		}
-
-
-
-		float far_data[nrOfSamples] ;
-		float near_data[nrOfSamples] ;
-		float out_data[nrOfSamples] ;
-		
-		frameCount = 0;
-		while(1){
-			ret = wavfile_reader_read(readerFar, far_buf, framebytes);
-			if(ret != framebytes){
-				dbgi("reach far-end file end");
-				ret = 0;
-				break;
-			}
-			copy_int16_to_float(far_buf, far_data, nrOfSamples);
-
-			ret = WebRtcAec_BufferFarend(aInst, far_data, nrOfSamples);
-			if(ret != 0){
-				dbge("WebRtcAecm_BufferFarend fail ret=%d", ret);
-				break;
-			}
-
-			ret = wavfile_reader_read(readerNear, near_buf, framebytes);
-			if(ret != framebytes){
-				dbgi("reach near-end file end");
-				ret = 0;
-				break;
-			}
-			copy_int16_to_float(near_buf, near_data, nrOfSamples);
-			float * nearend[1]  = {near_data};
-			float * out[1]  = {out_data};
-			ret = WebRtcAec_Process(aInst,
-			                           nearend, // nearend,
-			                           1, // ,
-			                           out,
-			                           nrOfSamples,
-			                           msInSndCardBuf,
-			                           0);
-			if(ret != 0){
-				dbge("WebRtcAec_Process fail ret=%d", ret);
-				break;
-			}
-			copy_float_to_int16(out_data, out_buf, nrOfSamples);
-
-			//memcpy(out_buf, near_buf, framebytes);
-			ret = wavfile_writer_write(writerOut, out_buf, framebytes);
-			if(ret < 0){
-				dbge("wavfile_writer_write fail ret=%d", ret);
-				break;
-			}
-
-			ret = 0;
-			frameCount++;
-		}
-
-	}while(0);
-
-	if(aInst){
-		dbgi("WebRtcAec_Free aInst=%p", aInst);
-		WebRtcAec_Free(aInst);
-		aInst = NULL;
-	}
-
-	return ret;
 }
 
 

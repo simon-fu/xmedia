@@ -57,8 +57,12 @@
       </MacroExpansion>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "-aec --delay 290 -pb ../tmp/audio.aecdump -o ../a/out"
+            argument = "-aecm -pb ../tmp/audio.aecdump -o ../tmp/out"
             isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "-aec --delay 290 -pb ../tmp/audio.aecdump -o ../tmp/out"
+            isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>
       <AdditionalOptions>

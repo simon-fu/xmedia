@@ -20,15 +20,39 @@ get_files =$(foreach dir,$(subst $(DIR_DIVIDER),$(MK_DIR_DIVIDER),$(1)),$(wildca
 
 COMMON_CPP_SRC += src/xwavfile.cpp 
 COMMON_CPP_SRC += src/kphone_aec/aec.cpp
+
+COMMON_C_SRC += src/webrtc/aecm/aecm_core.c
+COMMON_C_SRC += src/webrtc/aecm/aecm_core_c.c
+# COMMON_C_SRC += src/webrtc/aecm/aecm_core_mips.c
+# COMMON_C_SRC += src/webrtc/aecm/aecm_core_neon.c
+COMMON_C_SRC += src/webrtc/aecm/echo_control_mobile.c
+
+# COMMON_CC_SRC += src/webrtc/aec/aec_core.cc
+# # COMMON_CC_SRC += src/webrtc/aec/aec_core_mips.cc
+# # COMMON_CC_SRC += src/webrtc/aec/aec_core_neon.cc
+# # COMMON_CC_SRC += src/webrtc/aec/aec_core_sse2.cc
+# COMMON_CC_SRC += src/webrtc/aec/aec_resampler.cc
+# COMMON_CC_SRC += src/webrtc/aec/echo_cancellation.cc
+# COMMON_C_SRC += src/webrtc/aec/aec_rdft.c
+# # COMMON_C_SRC += src/webrtc/aec/aec_rdft_mips.c
+# # COMMON_C_SRC += src/webrtc/aec/aec_rdft_neon.c
+# # COMMON_C_SRC += src/webrtc/aec/aec_rdft_sse2.c
+
+
+
 COMMON_H += src/xwavfile.h 
 COMMON_OBJ += $(foreach src, $(COMMON_CPP_SRC), $(addsuffix .o, $(basename $(src))))
+COMMON_OBJ += $(foreach src, $(COMMON_CC_SRC), $(addsuffix .o, $(basename $(src))))
+COMMON_OBJ += $(foreach src, $(COMMON_C_SRC), $(addsuffix .o, $(basename $(src))))
 ALL_CPP_SRC += $(COMMON_CPP_SRC)
-
+ALL_CC_SRC += $(COMMON_CC_SRC)
+ALL_C_SRC += $(COMMON_C_SRC)
 
 HEAD_DIRS += ./src/
 HEAD_DIRS += ../xctools/src/
 HEAD_DIRS += ./src/kphone_aec/
-
+HEAD_DIRS += ./src/webrtc/aecm/
+HEAD_DIRS += ./src/webrtc/common_audio/
 
 HEAD_DIRS += /Users/simon/easemob/src/study/speex/speexdsp-1.2rc3/include
 LIB_PATHS += -L/Users/simon/easemob/src/study/speex/speexdsp-1.2rc3/libspeexdsp/.libs
@@ -47,7 +71,8 @@ HEAD_DIRS += /Users/simon/Desktop/simon/projects/easemob/src/webrtc/webrtc_ios/w
 HEAD_DIRS += /Users/simon/Desktop/simon/projects/easemob/src/webrtc/webrtc_ios/webrtc2016/src
 LIB_PATHS += -L/Users/simon/Desktop/simon/projects/easemob/src/webrtc/webrtc_ios/webrtc2016/src/out_mac/Release
 # MY_LD_FLAGS += -laudio_processing -lcommon_audio 
-MY_LD_FLAGS +=  \
+
+WEBRTC_LD_FLAGS +=  \
     -laudio_processing -laudioproc_debug_proto \
     -laudioproc_test_utils -laudioproc_protobuf_utils -lgtest \
     -lsystem_wrappers -ltest_support -lrtc_base_approved \
@@ -58,6 +83,8 @@ MY_LD_FLAGS +=  \
 
 	# -lisac_fix \
 	# -lwebrtc_test_common \
+
+# MY_LD_FLAGS += WEBRTC_LD_FLAGS
 
 MY_LD_FLAGS += -lspeexdsp
 MY_LD_FLAGS += -lm -framework AudioToolbox -framework CoreAudio -framework Foundation -framework AVFoundation \
@@ -105,7 +132,7 @@ STRIP = strip
 
 ALL_C_OBJ += $(foreach src, $(ALL_C_SRC), $(addsuffix .o, $(basename $(src))))
 ALL_CPP_OBJ += $(foreach cpp, $(ALL_CPP_SRC), $(addsuffix .o, $(basename $(cpp))))
-
+ALL_CC_OBJ += $(foreach ss, $(ALL_CC_SRC), $(addsuffix .o, $(basename $(ss))))
 
 # -fno-strict-aliasing remove the warning "dereferencing type-punned pointer will break strict-aliasing rules "
 # 
@@ -171,16 +198,16 @@ all: $(TARGETS)
 
 
 $(TARGET_AEC_REPLAY): $(AEC_REPLAY_OBJ) $(COMMON_OBJ) $(COMMON_H) $(OUTPUT_DIR) 
-	$(CC)  $(AEC_REPLAY_OBJ) $(COMMON_OBJ) $(MY_LD_FLAGS) -o $@
+	$(CC)  $(AEC_REPLAY_OBJ) $(COMMON_OBJ) $(WEBRTC_LD_FLAGS) $(MY_LD_FLAGS) -o $@
 	
 $(TARGET_MIXWAVE): $(MIXWAVE_OBJ) $(COMMON_OBJ) $(COMMON_H) $(OUTPUT_DIR) 
-	$(CC)  $(MIXWAVE_OBJ) $(COMMON_OBJ) $(MY_LD_FLAGS) -o $@
+	$(CC)  $(MIXWAVE_OBJ) $(COMMON_OBJ) $(WEBRTC_LD_FLAGS) $(MY_LD_FLAGS) -o $@
 
 $(AUDIO_PROC): $(TARGET_AUDIOPROC)
 	echo build $@ done
 
 $(TARGET_AUDIOPROC): $(AUDIOPROC_OBJ) $(COMMON_OBJ) $(COMMON_H) $(OUTPUT_DIR) 
-	$(CC)  $(AUDIOPROC_OBJ) $(COMMON_OBJ) $(MY_LD_FLAGS) -o $@
+	$(CC)  $(AUDIOPROC_OBJ) $(COMMON_OBJ) $(WEBRTC_LD_FLAGS) $(MY_LD_FLAGS) -o $@
 
 $(TARGET_KPHONE_AEC): $(KPHONE_AEC_OBJ) $(COMMON_OBJ) $(COMMON_H) $(OUTPUT_DIR) 
 	$(CC)  $(KPHONE_AEC_OBJ) $(COMMON_OBJ) $(MY_LD_FLAGS) -o $@
@@ -196,17 +223,22 @@ bd:$(C_OBJ)
 	echo $<
 
 $(ALL_C_OBJ):%.o:%.c
-	$(CC) -c $(CFLAGS) $< -o $@
+	gcc -c $(CFLAGS) $< -o $@
 
 $(ALL_CPP_OBJ):%.o:%.cpp
 	$(CC) -c $(CPPFLAGS) $< -o $@
 
-	
+$(ALL_CC_OBJ):%.o:%.cc
+	$(CC) -c $(CPPFLAGS) $< -o $@
+
+
 .PHONY: clean print_info
 clean:
 	$(RM) $(TARGETS)
 	$(RM) $(ALL_C_OBJ)
 	$(RM) $(ALL_CPP_OBJ)
+	$(RM) $(ALL_CC_OBJ)
+
 #	$(RM) ./bin/mserver.dSYM
 
 print:
