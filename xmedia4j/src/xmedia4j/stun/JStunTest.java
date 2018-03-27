@@ -5,9 +5,13 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
 
 import org.apache.log4j.Logger;
 
@@ -372,24 +376,90 @@ public class JStunTest {
 	    return new String(hexChars);
 	}
 	
+	
+	String[] localAddrPrefix = new String[]{
+//    		"192.168.0.",
+//    		"192.168.1.",
+//    		"10.0.1.",
+    };
+    
+	
+	public static List<InetAddress> getLocalNetAddrList() throws ClassNotFoundException, SocketException{
+		List<InetAddress> addrList = new ArrayList<InetAddress>();
+		Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
+		while (ifaces.hasMoreElements()) {
+			NetworkInterface iface = ifaces.nextElement();
+			Enumeration<InetAddress> iaddresses = iface.getInetAddresses();
+			while (iaddresses.hasMoreElements()) {
+				InetAddress iaddress = iaddresses.nextElement();
+				if (Class.forName("java.net.Inet4Address").isInstance(iaddress)) {
+					if ((!iaddress.isLoopbackAddress()) && (!iaddress.isLinkLocalAddress())) {
+						addrList.add(iaddress);
+					}
+				}
+			}
+		}
+		return addrList;
+	}
+	
+	private static boolean matchLocal(String addr, String[] localAddrPrefix){
+		if(localAddrPrefix == null || localAddrPrefix.length == 0) return true;
+		for(String f : localAddrPrefix){
+    		if(addr.startsWith(f)) return true;
+    	}
+		return false;
+	}
+	
+    public static void discoverNATType() throws ClassNotFoundException, UnknownHostException, MessageAttributeParsingException, MessageHeaderParsingException, UtilityException, IOException, MessageAttributeException{
+    	String[] localAddrPrefix = new String[]{
+	    		"192.168.0.",
+	    		"192.168.1.",
+	    		"10.0.1.",
+	    };
+    	
+    	List<InetAddress> localAddrList = new ArrayList<InetAddress>();
+        
+        for(InetAddress addr : getLocalNetAddrList()){
+        	if(!matchLocal(addr.getHostAddress(), localAddrPrefix)){
+        		continue;
+        	}
+        	localAddrList.add(addr);
+        }
+        
+        InetAddress iaddress = localAddrList.get(0);
+//        InetAddress iaddress = InetAddress.getByName("192.168.1.170");
+        System.out.println("localIp: " + iaddress);
+        
+		// discover NAT type
+		System.out.println("== jstun.javawi.de ==");
+		JStunTest test = new JStunTest(iaddress, "jstun.javawi.de", 3478);
+		System.out.println(test.test().toString());
+     			
+    }
+    
 	public static void main(String args[]) {
 		try {
-		    String STUN_SERVER = "203.195.185.236";
-		    int    STUN_SERVER_PORT = 3488;
+//		    String STUN_SERVER = "203.195.185.236";
+//		    int    STUN_SERVER_PORT = 3488;
+		    String STUN_SERVER = "121.41.87.159";
+		    int    STUN_SERVER_PORT = 3478;
 		    
 			
 //			InetAddress iaddress = InetAddress.getByName("10.0.1.163");
-		    InetAddress iaddress = InetAddress.getByName("192.168.1.40");
+		    InetAddress iaddress = InetAddress.getByName("172.17.3.95");
 			
-			// discover NAT type
-			System.out.println("== jstun.javawi.de ==");
-			JStunTest test = new JStunTest(iaddress, "jstun.javawi.de", 3478);
-			System.out.println(test.test().toString());
+		    
+//			// discover NAT type
+//		    discoverNATType();
+		    
+//			System.out.println("== jstun.javawi.de ==");
+//			JStunTest test = new JStunTest(iaddress, "jstun.javawi.de", 3478);
+//			System.out.println(test.test().toString());
 			
 			// get public address
 //			System.out.println("== turn1 " + STUN_SERVER +" ==");
-//			JStunTest test_em = new JStunTest(iaddress, STUN_SERVER, STUN_SERVER_PORT);
-//			System.out.println(test_em.test().toString());
+			JStunTest test_em = new JStunTest(iaddress, STUN_SERVER, STUN_SERVER_PORT);
+			System.out.println(test_em.test().toString());
 //			
 //			System.out.println("== turn3 121.41.75.10 ==");
 //			JStunTest test1 = new JStunTest(iaddress, "121.41.75.10", 3488);

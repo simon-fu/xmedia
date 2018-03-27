@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.net.MulticastSocket;
+import java.util.Properties;
 
 import xmedia4j.util.StreamUtil;
 
@@ -30,9 +32,21 @@ public class UdpPing {
 		}
 	}
 	
-	public static void ping(String targetIp, int targetPort, int localPort) throws IOException, InterruptedException{
+	public static void ping(String targetIp, int targetPort, int localPort, int ttl) throws IOException, InterruptedException{
 
-		final DatagramSocket udpSocket = new DatagramSocket(localPort);
+//		final DatagramSocket udpSocket = new DatagramSocket(localPort);
+		
+		Properties props = System.getProperties();
+		props.setProperty("java.net.preferIPv4Stack","true");
+		System.setProperties(props);
+		
+		
+//		final DatagramSocket udpSocket = new DatagramSocket(null);
+		final MulticastSocket udpSocket = new MulticastSocket(null);
+		udpSocket.setReuseAddress(true);
+		udpSocket.bind(new InetSocketAddress(localPort));
+		udpSocket.setTimeToLive(ttl);
+		
 		info("ping " + targetIp + ":" + targetPort + " at port " + localPort); 
 		
 		Thread recvThread = new Thread(new Runnable() {
@@ -59,7 +73,8 @@ public class UdpPing {
 				byte[] data = msg.getBytes();
 				pkt.setData(data);
 				pkt.setSocketAddress(new InetSocketAddress(targetIp, targetPort));
-				udpSocket.send(pkt);
+				udpSocket.setTimeToLive(ttl);
+				udpSocket.send(pkt, (byte) ttl);
 				Thread.sleep(1000);
 			}
 		}finally{
@@ -80,7 +95,7 @@ public class UdpPing {
 		if(args.length >= 4){
 			localPort = Integer.valueOf(args[3]);
 		}
-		ping(targetIp, targetPort, localPort);
+		ping(targetIp, targetPort, localPort, 8);
 	}
 	
 	public static void echo(String args[]) throws IOException {
@@ -108,9 +123,11 @@ public class UdpPing {
 	
 	public static void main(String args[]) throws IOException, InterruptedException {
 		if(args.length < 1){
-//			args = new String[]{"ping", "127.0.0.1", "9222", "9222" };
-			printUsage();
-			return;
+			args = new String[]{"ping", "121.41.75.10", "9222", "9222" };
+//			args = new String[]{"ping", "224.0.0.1", "9222", "9222" };
+			
+//			printUsage();
+//			return;
 		}
 		
 		String cmd = args[0];

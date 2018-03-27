@@ -152,11 +152,14 @@ public class SimpleStun {
 	 */
 	
 	public static void main(String[] args){
-	    String STUN_SERVER = "203.195.185.236";
-	    int    STUN_SERVER_PORT = 3488;
+//	    String STUN_SERVER = "203.195.185.236";
+//	    int    STUN_SERVER_PORT = 3488;
+	    String STUN_SERVER = "121.41.87.159";
+	    int    STUN_SERVER_PORT = 3478;
+	    
 	    SimpleStun stun = new SimpleStun();
 	    try {
-	    	logger.debug("debug simple stun...");
+	    	logger.info("debug simple stun...");
 			stun.bind(STUN_SERVER, STUN_SERVER_PORT, 9898);
 			stun.bind();
 		} catch (IOException e) {

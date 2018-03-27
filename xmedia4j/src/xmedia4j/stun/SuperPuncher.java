@@ -80,7 +80,11 @@ public class SuperPuncher {
 	
 	public InetSocketAddress[] findPublicAddress(InetSocketAddress localAddr, InetSocketAddress[] stunAddrs, long timeoutMilli) throws UtilityException, IOException, MessageHeaderParsingException, MessageAttributeParsingException {
 		
-		DatagramSocket udpSocket = new DatagramSocket(localAddr);
+//		DatagramSocket udpSocket = new DatagramSocket(localAddr);
+		final DatagramSocket udpSocket = new DatagramSocket(null);
+		udpSocket.setReuseAddress(true);
+		udpSocket.bind(localAddr);
+		
 		int recvTimeout = 300;
 		try{
 			// configure UDP socket
@@ -219,17 +223,26 @@ public class SuperPuncher {
 		return false;
 	}
 	
+	int selectLocalPort = 0;
+	public int getLocalPort(){
+		return this.selectLocalPort;
+	}
+	
 	public void detectNAT(){
 		try {
 		    InetSocketAddress[] stunAddrs = new InetSocketAddress[]{
-					new InetSocketAddress("203.195.185.236", 3488), // turn1
-					new InetSocketAddress("121.41.75.10", 3488), // turn3
+		    		new InetSocketAddress("121.41.105.183", 3478), // turn1
+//					new InetSocketAddress("203.195.185.236", 3488), // turn1
+//					new InetSocketAddress("121.41.75.10", 3488), // turn3
+//					new InetSocketAddress("127.0.0.1", 3478), // 
 					//new InetSocketAddress("jstun.javawi.de", 3478),
+//		    		new InetSocketAddress("52.8.75.23", 3478), // els
 					};
 		    String[] localAddrPrefix = new String[]{
 //		    		"192.168.0.",
 //		    		"192.168.1.",
 //		    		"10.0.1.",
+//		    		"172.16"
 		    };
 		    
 		    List<InetAddress> localAddrList = new ArrayList<InetAddress>();
@@ -252,6 +265,7 @@ public class SuperPuncher {
 				info("NAT type: " + (natAddr.isCone ? "cone" : "symmetric"));
 				info("<---");
 		    }
+		    this.selectLocalPort = localPort;
 		    
 		    //UdpPing.ping("123.125.162.110", 9111, localPort);
 		    //UdpPing.ping("127.0.0.1", 9111, localPort);

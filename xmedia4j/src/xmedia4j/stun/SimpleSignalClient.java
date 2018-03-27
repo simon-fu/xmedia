@@ -51,6 +51,7 @@ public class SimpleSignalClient {
 	
 	public void start() throws IOException, InterruptedException{
 		if(this.udpSocket == null){
+			logger.info("try create udp socket at port ..." + localPort);
 			MulticastSocket msock = new MulticastSocket(localPort);
 			logger.info("old TTL = " + msock.getTimeToLive());
 			//msock.setTimeToLive(0);
@@ -157,7 +158,10 @@ public class SimpleSignalClient {
 			punReq = buildRequestPun(this.otherSig);
 			punPkt = buildReqPacket(punReq);
 			punPkt.setSocketAddress(new InetSocketAddress(peer.publicIp, peer.publicPort));
-//			Thread.sleep(3000);
+			
+			logger.info("sleep 6000 ms");
+			Thread.sleep(6000);
+			logger.info("sleep done");
 			break;
 		}
 		
@@ -232,6 +236,7 @@ public class SimpleSignalClient {
 				while(rsp.seq != req.seq){
 					rsp = recvResponse();
 				}
+				logger.info( "rsp.param = " + rsp.param );
 				
 				Map<String, BeanPeer> respPeers = objectMapper.readValue(rsp.param, new TypeReference<Map<String, BeanPeer>>() {});
 				for(Entry<String, BeanPeer> entry : respPeers.entrySet()){
@@ -260,7 +265,7 @@ public class SimpleSignalClient {
 	private BeanResponse recvResponse() throws JsonParseException, JsonMappingException, IOException{
 		this.udpSocket.receive(rspPkt);
 		String rspJson = new String(rspPkt.getData(), 0, rspPkt.getLength());
-		logger.debug("rsp json: " + rspJson);
+		logger.info("rsp json: " + rspJson);
 		BeanResponse rsp = objectMapper.readValue(rspJson, BeanResponse.class);
 		return rsp;
 		
@@ -320,7 +325,7 @@ public class SimpleSignalClient {
 		
 		//logger.info("local host " + InetAddress.getLocalHost());
 //		SimpleSignalClient clt = new SimpleSignalClient("127.0.0.1", 7711, 0);
-		SimpleSignalClient clt = new SimpleSignalClient("121.41.75.10", 7711, 0);
+		SimpleSignalClient clt = new SimpleSignalClient("121.41.75.10", 7711, pun.getLocalPort());
 		clt.start();
 		System.in.read();
 	}
