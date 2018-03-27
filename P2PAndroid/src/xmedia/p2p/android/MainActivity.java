@@ -8,7 +8,10 @@ import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
+import java.util.Arrays;
 import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -18,6 +21,7 @@ import android.os.Bundle;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.support.v7.app.ActionBarActivity;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -150,21 +154,36 @@ public class MainActivity extends ActionBarActivity {
 		Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
 		while (ifaces.hasMoreElements()) {
 			NetworkInterface iface = ifaces.nextElement();
+			if(!iface.isUp()) continue;
+			
 			Enumeration<InetAddress> iaddresses = iface.getInetAddresses();
 			while (iaddresses.hasMoreElements()) {
 				InetAddress iaddress = iaddresses.nextElement();
 				if (Class.forName("java.net.Inet4Address").isInstance(iaddress)) {
 					if ((!iaddress.isLoopbackAddress()) && (!iaddress.isLinkLocalAddress())) {
-						logtv.appendln("try net: " + iaddress.getHostAddress());
-						//testNATType(iaddress);
-						testPublicAddress(iaddress);
+						logtv.appendln("try net  : " + iaddress.getHostAddress());
+						
+						try{
+							//testNATType(iaddress);
+							testPublicAddress(iaddress);
+//							testPunchSymmetric(iaddress);
+						}catch(Exception e){
+							e.printStackTrace();
+		        			info(e.getMessage());
+						}
+						
+
 					}
 				}
 			}
 		}
+		info("enumerate interface done");
+		
 	}
 	
+	protected static final String TAG = "myapp";
 	protected void info(String msg){
+		Log.i(TAG, msg);
 		logtv.appendln(msg);
 	}
 	
@@ -278,14 +297,228 @@ public class MainActivity extends ActionBarActivity {
 		
 	}
 	
+	protected static final int trySymmetricAddrCount = 256;
+	protected void testPunchSymmetric(InetAddress localIp)throws Exception{
+		int localPort = 9333;
+//		return peformGetPublicAddress(localIp, localPort);
+		
+		peformGetPublicAddress(localIp, localPort); 
+
+		performAny2Symm(localIp, localPort, "223.104.3.204"); 
+//		performSymm2PortStrict(localIp, localPort, "101.71.28.186:9333"); 
+		info("addr count " + trySymmetricAddrCount);
+		
+//		return true;
+	}
+	
+	protected boolean performSymm2PortStrict(InetAddress localIp, int localPort, String remoteAddrString)throws Exception{
+		info("perform Symm -> Port-strict");
+		String remoteIp = remoteAddrString.split(":")[0];
+		int remotePort = Integer.valueOf(remoteAddrString.split(":")[1]);
+		//final DatagramSocket udpSocket = new DatagramSocket(new InetSocketAddress(localIp, localPort));
+		final DatagramSocket[] udpSockets = new DatagramSocket[trySymmetricAddrCount];
+		
+		info("remoteAddr: " + remoteIp + ":" + remotePort);
+		for(int i = 0; i < udpSockets.length; i++){
+			udpSockets[i] = new DatagramSocket();
+			udpSockets[i].setSoTimeout(1);
+			InetSocketAddress localAddr = new InetSocketAddress(udpSockets[i].getLocalAddress(), udpSockets[i].getLocalPort());
+			Log.i(TAG, "localAddr[" + i + "]: " + localAddr.toString());
+		}
+		
+		final byte[] data = new byte[]{0x07, 0x07, 0x70, 0x70};
+		final DatagramPacket udpPkt = new DatagramPacket(data, data.length);
+		
+		
+		final int[] recvPkts = new int[]{0};
+		final boolean[] stopReq = new boolean[]{false};
+		final Thread thrd = new Thread(new Runnable() {
+			@Override
+			public void run() {
+				try{
+					DatagramPacket recvPkt = new DatagramPacket(new byte[2048], 2048);
+					byte[] compareData = new byte[4];
+					
+					while(true){
+						synchronized (recvPkts) {
+							if(stopReq[0]) break;
+						}
+						
+						for(int i = 0; i < udpSockets.length; i++){
+							try{
+								udpSockets[i].receive(recvPkt);
+								
+								boolean equ = false;
+								if(recvPkt.getLength() == data.length){
+									System.arraycopy(recvPkt.getData(), 0, compareData, 0, recvPkt.getLength());
+									if(Arrays.equals(compareData, data)){
+										equ = true;
+									}
+								}
+								
+								if(equ){
+									info("OK got bytes " + recvPkt.getLength() + " from " + recvPkt.getSocketAddress() + "at port " + udpSockets[i].getLocalPort());
+									recvPkts[0]++;
+								}else{
+									info("unknown got bytes " + recvPkt.getLength() + " from " + recvPkt.getSocketAddress());
+								}
+								
+							}catch(SocketTimeoutException e){
+								// ignore timeout exception
+							}
+							
+						}
+						
+					}
+				}catch(Throwable e){
+					e.printStackTrace();
+				}
+			}
+		});
+		thrd.start();
+		
+		
+		
+		for(int round = 0; round < 5; round++){
+			udpPkt.setSocketAddress(new InetSocketAddress(remoteIp, remotePort));
+			for(int i = 0; i < udpSockets.length; i++){
+				udpSockets[i].send(udpPkt);
+				Thread.sleep(5);
+			}
+			
+			info("round " + round + " sent");
+			Thread.sleep(500);
+		}
+		
+		Thread.sleep(3000);
+		synchronized (recvPkts) {
+			stopReq[0] = true;
+		}
+		thrd.join();
+		
+		
+		for(int i = 0; i < udpSockets.length; i++){
+			udpSockets[i].close();
+		}
+		
+		if(recvPkts[0] > 0){
+			info("punch OK: recv packets " + recvPkts[0]) ;
+		}else{
+			info("punch fail ") ;
+		}
+		
+		return true;
+	
+		
+	}
+	
+	protected int generatePort(HashSet<Integer> s){
+		while(true){
+			int port = Math.abs(new Random().nextInt()) % (65535-1024) + 1;
+			if(!s.contains(port)){
+				s.add(port);
+				return port;
+			}
+		}
+	}
+	
+	
+	
+	protected boolean performAny2Symm(InetAddress localIp, int localPort, String remoteIp)throws Exception{
+		info("perform Any -> Symm");
+		
+//		int localPort = 0;
+		//final DatagramSocket udpSocket = new DatagramSocket(new InetSocketAddress(localIp, localPort));
+		final DatagramSocket udpSocket = new DatagramSocket(new InetSocketAddress( localPort));
+		InetSocketAddress localAddr = new InetSocketAddress(udpSocket.getLocalAddress(), udpSocket.getLocalPort());
+		info("localAddr: " + localAddr.toString());
+		info("remoteIp: " + remoteIp);
+		
+		final byte[] data = new byte[]{0x07, 0x07, 0x70, 0x70};
+		final DatagramPacket udpPkt = new DatagramPacket(data, data.length);
+		
+		final InetSocketAddress[] remoteSocketAddrs = new InetSocketAddress[trySymmetricAddrCount];
+		HashSet<Integer> portSet = new HashSet<Integer>();
+		for(int i = 0; i < remoteSocketAddrs.length; i++){
+			int remotePort = generatePort(portSet);
+			remoteSocketAddrs[i] = new InetSocketAddress(remoteIp, remotePort);
+			Log.i(TAG, "remote addr [" + i + "] = " + remoteSocketAddrs[i]);
+		}
+		
+		final int[] recvPkts = new int[]{0};
+		Thread thrd = new Thread(new Runnable() {
+			@Override
+			public void run() {
+				try{
+					DatagramPacket recvPkt = new DatagramPacket(new byte[2048], 2048);
+					byte[] compareData = new byte[4];
+					
+					udpSocket.setSoTimeout(10*1000);
+					while(true){
+						udpSocket.receive(recvPkt);
+						
+						boolean equ = false;
+						if(recvPkt.getLength() == data.length){
+							System.arraycopy(recvPkt.getData(), 0, compareData, 0, recvPkt.getLength());
+							if(Arrays.equals(compareData, data)){
+								equ = true;
+							}
+						}
+						
+						if(equ){
+							info("OK got bytes " + recvPkt.getLength() + " from " + recvPkt.getSocketAddress());
+							recvPkts[0]++;
+						}else{
+							info("unknown got bytes " + recvPkt.getLength() + " from " + recvPkt.getSocketAddress());
+						}
+					}
+				}catch(Throwable e){
+					e.printStackTrace();
+				}
+			}
+		});
+		thrd.start();
+		
+		for(int round = 0; round < 5; round++){
+			for(int ai = 0; ai < remoteSocketAddrs.length; ai++){
+				udpPkt.setSocketAddress(remoteSocketAddrs[ai]);
+				udpSocket.send(udpPkt);
+				Thread.sleep(5);
+			}
+			info("round " + round + " sent");
+			Thread.sleep(500);
+		}
+		thrd.join();
+		udpSocket.close();
+		
+		if(recvPkts[0] > 0){
+			info("punch OK: recv packets " + recvPkts[0]) ;
+		}else{
+			info("punch fail ") ;
+		}
+		
+		return true;
+	}
+	
+	
 	protected boolean testPublicAddress(InetAddress localIp) throws Exception{
+		return peformGetPublicAddress(localIp, 0);
+	}
+	
+	protected boolean peformGetPublicAddress(InetAddress localIp, int localPort) throws Exception{
 		InetSocketAddress[] stunAddrs = new InetSocketAddress[]{
 				new InetSocketAddress("203.195.185.236", 3488), // turn1
 				new InetSocketAddress("121.41.75.10", 3488), // turn3
 				//new InetSocketAddress("jstun.javawi.de", 3478),
 				};
 		
-		DatagramSocket tempSocket = new DatagramSocket(new InetSocketAddress(localIp, 0));
+		DatagramSocket tempSocket = null;
+		if(localIp != null){
+			tempSocket = new DatagramSocket(new InetSocketAddress(localIp, localPort));
+		}else{
+			tempSocket = new DatagramSocket();
+		}
+		
 		InetSocketAddress localAddr = new InetSocketAddress(tempSocket.getLocalAddress(), tempSocket.getLocalPort());
 		tempSocket.close();
 		InetSocketAddress[] publicAddrs = findPublicAddress(localAddr, stunAddrs, 3000);
@@ -293,15 +526,17 @@ public class MainActivity extends ActionBarActivity {
 			return false;
 		}
 		
-		
 		info("=========>");
 		info("local address :" + localAddr);
 		for(InetSocketAddress addr : publicAddrs){
 			info("public address: " + addr);
 		}
 		info("<=========");
+		
 		return true;
 	}
+	
+	
 	protected boolean testPublicAddress0(InetAddress iaddress) throws Exception{
 		String stunServer = "203.195.185.236";
 	    int    port = 3488;

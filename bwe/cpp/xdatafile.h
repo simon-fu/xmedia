@@ -27,7 +27,7 @@ typedef struct xvector_array{
 
 xvector_array * load_txt(const char * filename);
 void xvector_array_free(xvector_array * arr);
-
+xvector * xvector_array_find(xvector_array * arr, const char * vector_name, int * pindex);
 
 #ifdef __cplusplus
 }

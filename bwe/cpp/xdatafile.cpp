@@ -36,6 +36,22 @@ void xvector_array_free(xvector_array * arr){
     free(arr);
 }
 
+xvector * xvector_array_find(xvector_array * arr, const char * vector_name, int * pindex){
+    xvector * vector = NULL;
+    int vector_index = -1;
+    for(int i = 0; i < arr->num_vectors; i++){
+        // dbgi("vectors[%d]=[%s]", i, arr->vectors[i].name);
+        if(strcmp(arr->vectors[i].name, vector_name) == 0 ){
+            vector_index = i;
+            vector = &arr->vectors[i];
+            break;
+        }
+    }
+    if(pindex){
+        *pindex = vector_index;
+    }
+    return vector;
+}
 
 
 #define is_c_blank(c) ((c) == ' ' || (c) == '\t' || (c) == '\r' || (c) == '\n' || (c) == ',' )

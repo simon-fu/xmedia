@@ -1,73 +1,81 @@
 % 从txt文件中读取数据，用kalman处理myrtc生成的rtt，loss等数据
 % 
 
-% clear all
+clear;
 % clc;
 % close all;
 
+% 读取文件并画图
 [fname, fpath] = uigetfile(...
     {'*.txt', '*.*'}, ...
     'Pick a file');
+if(~ischar(fname))
+    disp 'wrong filename';
+    return;
+end
+file4plot = fullfile(fpath, fname);
+TT = readtable(file4plot, 'Delimiter',',', 'FileEncoding', 'UTF-8');
+% 转换成时间相对值
+starttime = TT.(1)(1);
+TT.(1) = TT.(1)-starttime; % 单位相对毫秒
+TT.(1) = TT.(1)/1000.0; % 单位为秒
 
-x = load(fullfile(fpath, fname));
-x0 = x(:,1);
-
-m = 1;
-n = 1;
-cQ = 1e-8;
-cR = 1e-6;
-
-kfilter.A = eye(n);
-kfilter.H = eye(n);
-kfilter.B = 0;
-kfilter.u = 0;
-kfilter.P = eye(n); % nxn
-kfilter.K = zeros(n,m);% nxm
-kfilter.Q = eye(n) * cQ; % nxn
-kfilter.R = eye(m) * cR; % mxm
-kfilter.x = zeros(n,1); % 初始状态
+% 看 remote_bitrate_estimator_single_stream 的数据
+% LastT = Offset * min(num_deltas, 60
 
 
-figure;
+plotIdMap = containers.Map;
+plotIdMap('LastT')    = 1;
+plotIdMap('LastTEst')    = 1;
+plotIdMap('Threshold')    = 1;
 
-name = 'RTT';
-% cQ = 1e-8;
-% cR = 1e-6;
-cQ = 1e-4;
-cR = cQ*8;
-kfilter.Q = eye(n) * cQ; 
-kfilter.R = eye(m) * cR; 
-z = x(:,2)';
-out_kalman = kalman_process(kfilter, z)';
-out_aver=filter(ones(1,10)/10,1,z)';
-subplot(2,1,1);
-H1 = plot(x0, z, 'k-');
-hold on;
-K1 = plot(x0, out_kalman(:,1), 'r-');
-hold on;
-AVER1 = plot(x0, out_aver(:,1), 'b-');
-hold on;
-legend([H1,K1, AVER1], name, 'EST-KALMAN', 'EST-AVER');
-str = sprintf('cQ = %e, cR = %e', cQ, cR);
-title(str)
-grid on
+plotIdMap('RecvRate')    = 2;
+plotIdMap('RecvBWE')    = 2;
 
-name = 'LOST';
-cQ = 1e-4;
-cR = cQ*8;
-kfilter.Q = eye(n) * cQ; 
-kfilter.R = eye(m) * cR; 
-z = x(:,3)';
-out_kalman = kalman_process(kfilter, z)';
-subplot(2,1,2);
-H1 = plot(x0, z, 'k-');
-hold on;
-R1 = plot(x0, out_kalman(:,1), 'r-');
-hold on;
-legend([H1,R1], name, 'EST-KALMAN');
-str = sprintf('cQ = %e, cR = %e', cQ, cR);
-title(str)
-grid on
+
+% plotIdMap('RecvRateEst')    = 2;
+% plotIdMap('RCVarMax')    = 0;
+% plotIdMap('RCAvgMax')    = 1;
+% plotIdMap('SendTime24')    = 0;
+% plotIdMap('RtpTimeDelta')    = 0;
+% plotIdMap('TimeDelta')    = 0;
+% plotIdMap('TTsDelta')    = 0;
+% plotIdMap('TTSDelta')    = 0;
+% plotIdMap('TTSDeltaEst')    = 0;
+% plotIdMap('TTSIntegral')    = 0;
+
+                                                         
+
+plotIdMap('AvgT')    = 1;
+plotIdMap('RCAvg')    = 2;  
+plotIdMap('VarT')    = 3;
+plotIdMap('RangeT')    = 3; 
+plotIdMap('DiffTIntegral')    = 0; 
+                           
+plotIdMap('VarIntegral')    = 0;
+plotIdMap('OverIntegral')    = 0;
+plotIdMap('Action')    = 0;
+
+
+plotIdMap('TVar')    = 0;
+plotIdMap('TVarIntegral')    = 0;
+
+% plotIdMap('BWState')    = 0;
+% plotIdMap('NoiseVar')    = 0;
+% plotIdMap('LastSlope')    = 0;
+% % plotIdMap('Threshold2')    = 2;
 
 
 
+% plotIdMap('Value')    = 1;
+% plotIdMap('ValueEst')    = -1;
+% plotIdMap('SlopeEst')    = 2;
+% plotIdMap('SlopeRange')    = 0;
+
+% plotIdMap('TTSDelta')    = -1;
+% plotIdMap('TTSDeltaEst')    = 4;
+% plotIdMap('EstT')    = 1;
+% plotIdMap('Hz')    = 0;
+
+func_plot_table(fname, TT, plotIdMap, -1);
+return; 

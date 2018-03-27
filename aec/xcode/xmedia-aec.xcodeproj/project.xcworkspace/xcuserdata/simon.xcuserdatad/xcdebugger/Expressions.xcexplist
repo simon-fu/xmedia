@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VariablesViewState
+   version = "1.0">
+   <ContextStates>
+      <ContextState
+         contextName = "webrtc::AudioBuffer::InterleaveTo(webrtc::AudioFrame*, bool):audio_buffer.cc">
+         <PersistentStrings>
+            <PersistentString
+               value = "output_num_frames_">
+            </PersistentString>
+            <PersistentString
+               value = "proc_num_frames_">
+            </PersistentString>
+         </PersistentStrings>
+      </ContextState>
+      <ContextState
+         contextName = "webrtc::(anonymous namespace)::void_main(int, char**):main_audio_proc.cpp">
+         <PersistentStrings>
+            <PersistentString
+               value = "argv[i]">
+            </PersistentString>
+         </PersistentStrings>
+      </ContextState>
+   </ContextStates>
+</VariablesViewState>

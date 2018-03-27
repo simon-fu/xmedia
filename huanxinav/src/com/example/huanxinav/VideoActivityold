@@ -1,0 +1,584 @@
+package com.example.huanxinav;
+
+import android.hardware.Camera;
+import android.os.Bundle;
+import android.app.Activity;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
+import android.view.ViewGroup.LayoutParams;
+import android.support.v4.app.NavUtils;
+import javax.microedition.khronos.egl.EGL10;
+import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.egl.EGLContext;
+import javax.microedition.khronos.opengles.GL10;
+import javax.microedition.khronos.egl.*;
+
+import android.app.*;
+
+import android.content.*;
+import android.view.*;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
+import android.os.*;
+import android.util.Log;
+import android.graphics.*;
+import android.text.method.*;
+import android.text.*;
+import android.media.*;
+import android.hardware.*;
+import android.hardware.Camera.Parameters;
+import java.io.IOException;
+import java.lang.*;
+import com.example.huanxinav.AVNative;
+
+
+
+
+
+public class VideoActivity extends Activity implements SurfaceHolder.Callback,IGxStatusCallback,Camera.PreviewCallback {
+
+    // Main components
+	static AVNative nativeAgt;
+	int voe_index = -1;
+	static String remote_addr = "10.0.1.58";
+	//static String remote_addr = "10.0.1.3";//红米ip
+
+	static int vplayport = 6000;
+	static int vcaptureport = 8000;
+	int aport = 7000;
+	static int remote_vplayport = 6000;
+	static int remote_vcaptureport = 8000;
+	
+	static String cid = "20130814172059902001ce53c2646851";
+	static String password = "abc";
+	static short channelm = 0;
+	short channelm_a = 3;
+    private static VideoActivity mSingleton;
+    private static SDLSurface mSurface;
+    static int screenWidth = 0; 
+    static int screenHeight = 0;
+    
+    private SurfaceView mSurfaceview = null; // 
+
+    private SurfaceHolder mSurfaceHolder = null;
+    private Camera mCamera = null;
+	private byte yuv_frame[];
+	private Parameters mParameters;
+	 private int yuv_cnt = 0;
+	private int mwidth = 320;
+	private int mheight = 240;
+	private int bitrate = 768;
+	
+	private boolean start_flag = false;
+    // This is what SDL runs in. It invokes SDL_main(), eventually
+    private static Thread mSDLThread;
+    // EGL private objects
+    public static EGLContext  mEGLContext;
+    public static EGLSurface  mEGLSurface;
+    public static EGLDisplay  mEGLDisplay;
+    public static EGLConfig   mEGLConfig;
+    private static int mGLMajor, mGLMinor;
+    static {
+    	Log.d("SDL","to load sdl libs");
+        System.loadLibrary("SDL");
+        System.loadLibrary("main");
+    }
+   
+
+    private static VideoActivity instance = null;
+
+	static VideoActivity getInstance() {
+		return instance;
+	}
+    // Setup
+    protected void onCreate(Bundle savedInstanceState) {
+        Log.v("SDL", "onCreate()");
+        super.onCreate(savedInstanceState);
+      
+        // So we can call stuff from static callbacks
+        Window win = getWindow();
+		win.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+		win.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+				WindowManager.LayoutParams.FLAG_FULLSCREEN);
+		setContentView(R.layout.activity_video_capture);
+        mSingleton = this;
+        nativeAgt = new AVNative();
+        mSurfaceview = (SurfaceView) findViewById(R.id.surface_x264codecview); 
+        mSurfaceHolder = mSurfaceview.getHolder(); 
+        mSurfaceHolder.addCallback(this);
+        
+        mSurface = new SDLSurface(getApplication());
+             
+        screenWidth = getWindowManager().getDefaultDisplay().getWidth();  
+        screenHeight = getWindowManager().getDefaultDisplay().getHeight(); // 屏幕高（像素，如：800p）  
+        //setContentView(mSurface);
+        LayoutParams layoutparam = new LayoutParams(screenWidth, screenHeight);
+        addContentView(mSurface, layoutparam);
+       
+        SurfaceHolder holder = mSurface.getHolder();        	
+        holder.setFixedSize(screenWidth,screenHeight);
+        if((voe_index = nativeAgt.register(this,aport, aport, remote_addr, cid, channelm_a,password)) != -1)
+		{
+			Log.v("VOE", "VOE Register OK");
+		}
+		else{
+			Log.v("VOE", "VOE Register Failed");
+		}
+		if(nativeAgt.setFullDuplexSpeech(cid)==1)
+		{
+			Log.v("VOE", "VOE setFullDuplexSpeech OK");
+		}
+		else{
+			Log.v("VOE", "VOE setFullDuplexSpeech Failed");
+		}
+		instance = this;
+    }
+    
+    @Override
+	public void onPreviewFrame(byte[] data, Camera camera) {
+		 yuv_cnt++;
+		 Log.e("SDL", "pzy data len" + data.length + " yuv_cnt: "+
+		 yuv_cnt);
+
+		if (start_flag == true) {
+			// AVNative.Nativex264_encode264(data, width, height);
+			nativeAgt.Nativex264_encode264(yuv_frame, mwidth, mheight);
+			// avObj.Nativex264_encode264(data, width, height);
+		}
+		// mCamera.addCallbackBuffer(yuv_frame);
+		camera.addCallbackBuffer(yuv_frame);
+	}
+    
+
+    // Events
+    protected void onPause() {
+        Log.v("SDL", "onPause()");
+        super.onPause();
+        //VideoActivity.nativePause();
+    }
+
+    public void onResume() {
+        Log.v("SDL", "onResume()");
+        super.onResume();
+        if(start_flag == false )
+		{	
+			
+        	nativeAgt.Nativex264_getencoder(this,vcaptureport, vplayport, remote_addr, cid, channelm_a,mwidth,mheight,bitrate,"abc");		
+			start_flag = true;
+			surfaceChanged(mSurfaceHolder, 0, mwidth,mheight);
+			
+		}
+    
+    }
+
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.v("SDL", "onDestroy()");
+        // Send a quit message to the application
+        //nativeAgt.stop(cid);
+        //VideoActivity.StopVideoPlay();
+        //VideoActivity.nativeQuit();
+        if(start_flag == true)
+    	{
+    		//nativeAgt.stop(cid);
+        	nativeAgt.unregister(cid);
+    		nativeAgt.Nativex264_releaseencoder();
+    	}
+    	 if (mCamera != null) {
+    		 mCamera.setPreviewCallback(null); //�������������ǰ����Ȼ�˳�����
+     		 mCamera.stopPreview(); 
+             mCamera.release(); 
+             mCamera = null; 
+         } 
+       
+        // Now wait for the SDL thread to quit
+        if (mSDLThread != null) {
+            try {
+                mSDLThread.join();
+            } catch(Exception e) {
+                Log.v("SDL", "Problem stopping thread: " + e);
+            }
+            mSDLThread = null;
+
+            Log.v("SDL", "Finished waiting for SDL thread");
+        }     
+    }
+    
+    @Override 
+    public void surfaceCreated(SurfaceHolder holder) {
+    	Log.e("Video_Capature", "call surfaceCreated " ); 
+    	 
+    } 
+
+    @Override 
+    public void surfaceDestroyed(SurfaceHolder holder) { 
+    	Log.e("Video_Capature", "call surfaceDestroyed " );
+    	 
+    } 
+    
+    @Override 
+    public void surfaceChanged(SurfaceHolder holder, int format, int width_size, 
+
+            int height_size) { 
+    	 Log.e("Video_Capature", "call surfaceChanged " +"width:"+ mwidth +  "height:"+mheight );
+       
+    	 try { 
+    	        if (mCamera == null) {
+    				mCamera = Camera.open();
+    			}
+    			mCamera.stopPreview();
+    			mParameters = mCamera.getParameters();
+
+    			mParameters.setPreviewSize(mwidth, mheight);
+    			mParameters.setPreviewFrameRate(25); // 索尼白色手机不支持帧率25
+
+    			mCamera.setParameters(mParameters);
+    			//mCamera.setPreviewDisplay(holder);
+    			int mformat = mParameters.getPreviewFormat();
+    			int bitsperpixel = ImageFormat.getBitsPerPixel(mformat);
+    			Log.v("huanxin", "pzy bitsperpixel: " + bitsperpixel);
+    			// byte yuv_frame[] = new byte [width*height*3/2];
+    			yuv_frame = new byte[mwidth * mheight * bitsperpixel / 8];
+    			mCamera.addCallbackBuffer(yuv_frame);
+    			mCamera.setPreviewDisplay(holder);
+    			mCamera.setPreviewCallbackWithBuffer(this);
+    			mCamera.startPreview();
+    			Log.v("SDL", "camera start preview");
+    	        //VideoActivity.nativeResume();
+    	        }catch (IOException e) { 
+    	            e.printStackTrace(); 
+    	            } 
+           
+        
+    	 
+    } 
+    
+    
+    public void updateStatus(int status) {
+
+		Log.v("huanxin", "pzy call updateStatus: " + status);
+
+		return;
+	}
+    
+    static int COMMAND_CHANGE_TITLE = 1;
+    // Handler for the messages
+    Handler commandHandler = new Handler() {
+        public void handleMessage(Message msg) {
+            if (msg.arg1 == COMMAND_CHANGE_TITLE) {
+                setTitle((String)msg.obj);
+            }
+        }
+    };
+
+    // Send a message from the SDLMain thread
+    void sendCommand(int command, Object data) {
+        Message msg = commandHandler.obtainMessage();
+        msg.arg1 = command;
+        msg.obj = data;
+        commandHandler.sendMessage(msg);
+    }
+   
+   
+    public static void releaseEGL()
+    {
+    	EGL10 egl = (EGL10)EGLContext.getEGL();
+        
+        if (mEGLSurface != null) 
+        {  
+        	egl.eglMakeCurrent(mEGLDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_CONTEXT);  
+        	egl.eglDestroySurface(mEGLDisplay, mEGLSurface);  
+        	mEGLSurface = null;  
+        }  
+        if (mEGLContext != null) 
+        {
+        	egl.eglDestroyContext(mEGLDisplay, mEGLContext);  
+        	mEGLContext = null;  
+        }  
+        if (mEGLDisplay != null) {  
+        	egl.eglTerminate(mEGLDisplay);  
+        	mEGLDisplay = null;  
+        }  
+    }
+    
+    // Java functions called from C
+
+    public static boolean createGLContext(int majorVersion, int minorVersion) {
+    	Log.d("SDL","to call initEGL");
+    	releaseEGL();
+        return initEGL(majorVersion, minorVersion);
+    }
+
+    public static void flipBuffers() {
+        flipEGL();
+    }
+
+    public static void setActivityTitle(String title) {
+        // Called from SDLMain() thread and can't directly affect the view
+        mSingleton.sendCommand(COMMAND_CHANGE_TITLE, title);
+    }
+
+    public static Context getContext() {
+        return mSingleton;
+    }
+
+    public static void startApp() {
+        // Start up the C app thread
+        if (mSDLThread == null) {
+            mSDLThread = new Thread(new SDLMain(), "SDLThread");
+            mSDLThread.start();
+        }
+        else {
+        	VideoActivity.nativeAgt.nativeResume();
+        }
+    }
+
+    // EGL functions
+    public static boolean initEGL(int majorVersion, int minorVersion) {
+        if (VideoActivity.mEGLDisplay == null) {
+            Log.v("SDL", "initEGL" + majorVersion + "." + minorVersion);
+
+            try {
+                EGL10 egl = (EGL10)EGLContext.getEGL();
+
+                EGLDisplay dpy = egl.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY);
+
+                int[] version = new int[2];
+                egl.eglInitialize(dpy, version);
+
+                int EGL_OPENGL_ES_BIT = 1;
+                int EGL_OPENGL_ES2_BIT = 4;
+                int renderableType = 0;
+                if (majorVersion == 2) {
+                    renderableType = EGL_OPENGL_ES2_BIT;
+                } else if (majorVersion == 1) {
+                    renderableType = EGL_OPENGL_ES_BIT;
+                }
+                int[] configSpec = {
+                    //EGL10.EGL_DEPTH_SIZE,   16,
+                    EGL10.EGL_RENDERABLE_TYPE, renderableType,
+                    EGL10.EGL_NONE
+                };
+                EGLConfig[] configs = new EGLConfig[1];
+                int[] num_config = new int[1];
+                if (!egl.eglChooseConfig(dpy, configSpec, configs, 1, num_config) || num_config[0] == 0) {
+                    Log.e("SDL", "No EGL config available");
+                    return false;
+                }
+                EGLConfig config = configs[0];
+
+                VideoActivity.mEGLDisplay = dpy;
+                VideoActivity.mEGLConfig = config;
+                VideoActivity.mGLMajor = majorVersion;
+                VideoActivity.mGLMinor = minorVersion;
+
+                VideoActivity.createEGLSurface();
+            } catch(Exception e) {
+                Log.v("SDL", e + "");
+                for (StackTraceElement s : e.getStackTrace()) {
+                    Log.v("SDL", s.toString());
+                }
+            }
+        }
+        else VideoActivity.createEGLSurface();
+
+        return true;
+    }
+
+    public static boolean createEGLContext() {
+        EGL10 egl = (EGL10)EGLContext.getEGL();
+        int EGL_CONTEXT_CLIENT_VERSION=0x3098;
+        int contextAttrs[] = new int[] { EGL_CONTEXT_CLIENT_VERSION, VideoActivity.mGLMajor, EGL10.EGL_NONE };
+        VideoActivity.mEGLContext = egl.eglCreateContext(VideoActivity.mEGLDisplay, VideoActivity.mEGLConfig, EGL10.EGL_NO_CONTEXT, contextAttrs);
+        if (VideoActivity.mEGLContext == EGL10.EGL_NO_CONTEXT) {
+            Log.e("SDL", "Couldn't create context");
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean createEGLSurface() {
+        if (VideoActivity.mEGLDisplay != null && VideoActivity.mEGLConfig != null) {
+            EGL10 egl = (EGL10)EGLContext.getEGL();
+            if (VideoActivity.mEGLContext == null) createEGLContext();
+
+            Log.v("SDL", "Creating new EGL Surface");
+            EGLSurface surface = egl.eglCreateWindowSurface(VideoActivity.mEGLDisplay, VideoActivity.mEGLConfig, VideoActivity.mSurface, null);
+            if (surface == EGL10.EGL_NO_SURFACE) {
+                Log.e("SDL", "Couldn't create surface");
+                return false;
+            }
+
+            if (!egl.eglMakeCurrent(VideoActivity.mEGLDisplay, surface, surface, VideoActivity.mEGLContext)) {
+                Log.e("SDL", "Old EGL Context doesnt work, trying with a new one");
+                createEGLContext();
+                if (!egl.eglMakeCurrent(VideoActivity.mEGLDisplay, surface, surface, VideoActivity.mEGLContext)) {
+                    Log.e("SDL", "Failed making EGL Context current");
+                    return false;
+                }
+            }
+            VideoActivity.mEGLSurface = surface;
+            return true;
+        }
+        return false;
+    }
+
+    // EGL buffer flip
+    public static void flipEGL() {
+        try {
+            EGL10 egl = (EGL10)EGLContext.getEGL();
+
+            egl.eglWaitNative(EGL10.EGL_CORE_NATIVE_ENGINE, null);
+
+            // drawing here
+
+            egl.eglWaitGL();
+
+            egl.eglSwapBuffers(VideoActivity.mEGLDisplay, VideoActivity.mEGLSurface);
+
+
+        } catch(Exception e) {
+            Log.v("SDL", "flipEGL(): " + e);
+            for (StackTraceElement s : e.getStackTrace()) {
+                Log.v("SDL", s.toString());
+            }
+        }
+    }
+
+   
+}
+
+/**
+    Simple nativeInit() runnable
+*/
+class SDLMain implements Runnable {
+    public void run() {
+        // Runs SDL_main()
+    	Log.d("SDL","TO CALL NATIVEINIT");
+    	VideoActivity.nativeAgt.nativeInit(VideoActivity.getInstance());
+    	Log.d("SDL","HAVE CALL NATIVEINIT");
+    	VideoActivity.nativeAgt.StartVideoPlay(VideoActivity.vplayport, VideoActivity.vcaptureport, VideoActivity.remote_addr, VideoActivity.cid, VideoActivity.channelm,VideoActivity.password);
+    	VideoActivity.nativeAgt.nativeQuit();
+    	VideoActivity.releaseEGL();
+
+        Log.v("SDL", "SDL thread terminated");
+    }
+}
+
+
+
+// TODO Auto-generated method stub
+
+
+
+
+/**
+    SDLSurface. This is what we draw on, so we need to know when it's created
+    in order to do anything useful. 
+
+    Because of this, that's where we set up the SDL thread
+*/
+class SDLSurface extends SurfaceView implements SurfaceHolder.Callback
+	{
+	String TAG = SDLSurface.class.getSimpleName();
+	
+    // Startup    
+    public SDLSurface(Context context) {
+        super(context);
+        getHolder().addCallback(this); 
+        
+        setFocusable(true);
+        setFocusableInTouchMode(true);
+        requestFocus();
+        
+        //setOnKeyListener(this); 
+       
+    }
+    
+  
+
+	
+
+    // Called when we have a valid drawing surface
+    public void surfaceCreated(SurfaceHolder holder) {
+        Log.v("SDL", "surfaceCreated()");
+       
+        holder.setType(SurfaceHolder.SURFACE_TYPE_GPU);
+      
+		//mCamera.startPreview(); 
+        //VideoActivity.initEGL(2,0);
+       
+    }
+
+    // Called when we lose the surface
+    public void surfaceDestroyed(SurfaceHolder holder) {
+        Log.v("SDL", "surfaceDestroyed()");
+        VideoActivity.nativeAgt.stop(VideoActivity.cid);
+        VideoActivity.nativeAgt.StopVideoPlay();
+        VideoActivity.nativeAgt.nativePause();
+    }
+
+    // Called when the surface is resized
+    public void surfaceChanged(SurfaceHolder holder,
+                               int format, int width, int height) {
+        Log.v("SDL", "surfaceChanged()");
+
+        int sdlFormat = 0x85151002; // SDL_PIXELFORMAT_RGB565 by default
+        switch (format) {
+        case PixelFormat.A_8:
+            Log.v("SDL", "pixel format A_8");
+            break;
+        case PixelFormat.LA_88:
+            Log.v("SDL", "pixel format LA_88");
+            break;
+        case PixelFormat.L_8:
+            Log.v("SDL", "pixel format L_8");
+            break;
+        case PixelFormat.RGBA_4444:
+            Log.v("SDL", "pixel format RGBA_4444");
+            sdlFormat = 0x85421002; // SDL_PIXELFORMAT_RGBA4444
+            break;
+        case PixelFormat.RGBA_5551:
+            Log.v("SDL", "pixel format RGBA_5551");
+            sdlFormat = 0x85441002; // SDL_PIXELFORMAT_RGBA5551
+            break;
+        case PixelFormat.RGBA_8888:
+            Log.v("SDL", "pixel format RGBA_8888");
+            sdlFormat = 0x86462004; // SDL_PIXELFORMAT_RGBA8888
+            break;
+        case PixelFormat.RGBX_8888:
+            Log.v("SDL", "pixel format RGBX_8888");
+            sdlFormat = 0x86262004; // SDL_PIXELFORMAT_RGBX8888
+            break;
+        case PixelFormat.RGB_332:
+            Log.v("SDL", "pixel format RGB_332");
+            sdlFormat = 0x84110801; // SDL_PIXELFORMAT_RGB332
+            break;
+        case PixelFormat.RGB_565:
+            Log.v("SDL", "pixel format RGB_565");
+            sdlFormat = 0x85151002; // SDL_PIXELFORMAT_RGB565
+            break;
+        case PixelFormat.RGB_888:
+            Log.v("SDL", "pixel format RGB_888");
+            // Not sure this is right, maybe SDL_PIXELFORMAT_RGB24 instead?
+            sdlFormat = 0x86161804; // SDL_PIXELFORMAT_RGB888
+            break;
+        default:
+            Log.v("SDL", "pixel format unknown " + format);
+            break;
+        }
+        VideoActivity.nativeAgt.onNativeResize(width, height, sdlFormat);
+      
+
+        //VideoActivity.onNativeResize(640, 480, sdlFormat);
+        Log.v("SDL", "Window size:" + width + "x"+height);
+        Log.v("SDL", "Window size:" + VideoActivity.screenWidth + "X" +VideoActivity.screenHeight);
+
+        VideoActivity.startApp();
+            
+    }
+
+
+}

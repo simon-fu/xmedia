@@ -1,0 +1,49 @@
+APM re-config at frame: 0
+  aec_enabled: 0
+  aec_delay_agnostic_enabled: 0
+  aec_drift_compensation_enabled: 0
+  aec_extended_filter_enabled: 0
+  aec_suppression_level: 1
+  aecm_enabled: 1
+  aecm_comfort_noise_enabled: 0
+  aecm_routing_mode: 3
+  agc_enabled: 1
+  agc_mode: 2
+  agc_limiter_enabled: 1
+  noise_robust_agc_enabled: 0
+  hpf_enabled: 1
+  ns_enabled: 1
+  ns_level: 2
+  transient_suppression_enabled: 0
+Init at frame: 0
+  Input sample rate: 8000
+  Output sample rate: 8000
+  Reverse sample rate: 16000
+  Input channels: 1
+  Output channels: 1
+  Reverse channels: 1
+
+Init at frame: 0
+  Input sample rate: 8000
+  Output sample rate: 8000
+  Reverse sample rate: 8000
+  Input channels: 1
+  Output channels: 1
+  Reverse channels: 1
+
+Init at frame: 0
+  Input sample rate: 16000
+  Output sample rate: 16000
+  Reverse sample rate: 8000
+  Input channels: 1
+  Output channels: 1
+  Reverse channels: 1
+
+Init at frame: 4
+  Input sample rate: 16000
+  Output sample rate: 16000
+  Reverse sample rate: 16000
+  Input channels: 1
+  Output channels: 1
+  Reverse channels: 1
+
