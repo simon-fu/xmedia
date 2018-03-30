@@ -9,8 +9,8 @@
 // mac
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
-
+#include <netinet/tcp.h>     // for TCP_NODELAY
+#include <arpa/inet.h>       // for IPPROTO_TCP
 
 #define dbgv(...) do{  printf("<xsock>[D] " __VA_ARGS__); printf("\n"); }while(0)
 #define dbgi(...) do{  printf("<xsock>[I] " __VA_ARGS__); printf("\n"); }while(0)
@@ -115,10 +115,12 @@ public:
     
     void setAddress(const std::string& ip, int port){
         socket_addrin_init(ip.c_str(), port, &this->nativeAddr.addr_in);
+        string_.clear();
     }
     
     void setAddress(const sockaddr_in* addrIn){
         this->nativeAddr.addr_in = *addrIn;
+        string_.clear();
     }
     
     bool isValid(){
@@ -178,7 +180,7 @@ const std::string XSocket::makeUrl(XSockProto proto,const std::string& ip, int p
 /*
  *  proto: SOCK_DGRAM ,  SOCK_STREAM
  */
-static evutil_socket_t bind_socket(const struct sockaddr_in * my_addr, int proto){
+static evutil_socket_t bind_socket(const struct sockaddr_in * my_addr, int proto, int reuseable){
     evutil_socket_t sock;
     sock = ::socket(PF_INET, proto, 0);
     if (sock < 0) {
@@ -187,6 +189,14 @@ static evutil_socket_t bind_socket(const struct sockaddr_in * my_addr, int proto
         return -1;
     }
     
+    if(reuseable){
+        int on=1;
+        if((setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&on,sizeof(on)))<0){
+            set_last_error(errno, strerror(errno));
+//            perror("setsockopt SO_REUSEADDR");
+        }
+    }
+
     if (::bind(sock, (struct sockaddr*)my_addr, sizeof(struct sockaddr))<0) {
         set_last_error(errno, strerror(errno));
 //        perror("bind");
@@ -222,6 +232,8 @@ class XSocketImpl : public XSocket {
     struct bufferevent *        ev_tcp_ = NULL;
     struct event *              ev_udp_ = NULL;
     bool                        connecting_ = false;
+    bool                        isBound_ = false;
+    bool                        naglesEnable_ = false;
     
 
     
@@ -310,6 +322,7 @@ class XSocketImpl : public XSocket {
         
         this->ev_base_ = ev_base;
         this->extractAddress();
+        this->checkNagles();
         return 0;
     }
     
@@ -330,7 +343,7 @@ class XSocketImpl : public XSocket {
         int ret = -1;
         do{
             this->ev_base_ = ev_base;
-            this->fd_ = bind_socket(addr, proto);
+            this->fd_ = bind_socket(addr, proto, proto==XSOCK_TCP&&isListen);
             if(this->fd_ < 0){
                 this->localUrl_ = XSockMakeUrl(addr, proto, isListen);
                 // dbge("fail to bind [%s]", this->localUrl_.c_str());
@@ -351,6 +364,7 @@ class XSocketImpl : public XSocket {
             
             this->ev_base_ = ev_base;
             this->extractAddress();
+            this->checkNagles();
             
             ret = 0;
         }while(0);
@@ -358,6 +372,7 @@ class XSocketImpl : public XSocket {
     }
     
     int checkBind(){
+        if(isBound_) return 0;
         int ret = -1;
         do {
             if(fd_ < 0){
@@ -366,8 +381,19 @@ class XSocketImpl : public XSocket {
             }else{
                 ret = this->bind(ev_base_, fd_);
             }
+            isBound_ = (ret==0);
         } while (0);
         return ret;
+    }
+    
+    void checkNagles(){
+        if(fd_ >= 0 && proto_ == XSOCK_TCP){
+            int kOne = naglesEnable_?0:1;
+            int err = setsockopt(fd_, SOL_SOCKET, TCP_NODELAY, &kOne, sizeof(kOne));
+//            int err = setsockopt(fd_, IPPROTO_TCP, TCP_NODELAY, &kOne, sizeof(kOne));
+//            dbgi("[%s] TCP_NODELAY=%d, err=[%d-%s]", this->getLocalUrl().c_str(), kOne, err, (err < 0 ? strerror(err) : ""));
+            (void) err;
+        }
     }
     
 public:
@@ -386,6 +412,7 @@ public:
         this->localAddr_.setAddress(localIp, localPort);
         this->remoteAddr_.setAddress(remoteIp, remotePort);
         this->localUrl_ = XSockMakeUrl(this->localAddr_.getNativeAddrIn(), proto, isListen_);
+//        checkBind();
     }
     
     XSocketImpl(XSocketFactory * factory
@@ -394,6 +421,9 @@ public:
     : factory_(factory)
     , ev_base_(ev_base)
     , fd_(fd){
+        if(fd_ >= 0){
+            this->extractAddress();
+        }
     }
     
     virtual ~XSocketImpl(){
@@ -435,6 +465,10 @@ public:
     
     virtual const std::string& getLocalUrl() override{
         return this->localUrl_;
+    }
+    
+    virtual int bind() override{
+        return checkBind();
     }
     
     virtual int kickIO() override{
@@ -498,6 +532,11 @@ public:
         return -1;
     }
     
+    virtual void enableNagles(bool enabled) override{
+        naglesEnable_ = enabled;
+        checkNagles();
+    }
+    
     static void on_accept_socket_event(struct evconnlistener *listener, evutil_socket_t nfd, struct sockaddr *peer_sa, int peer_socklen, void *arg);
     static void on_udp_event(evutil_socket_t fd, short what, void *arg);
     static void on_tcp_read_cb(struct bufferevent *bev, void * user_data);
@@ -511,6 +550,7 @@ void XSocketImpl::on_accept_socket_event(struct evconnlistener *listener, evutil
 //    dbgi("on_accept_socket_event: xsock=%p, nfd=%d", impl, nfd);
     if(impl->callback_){
         XSocket * newsock = impl->factory_->newSocket(nfd);
+        newsock->enableNagles(impl->naglesEnable_);
         impl->callback_->onAccept(impl, newsock);
     }else{
         ::close(nfd);

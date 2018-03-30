@@ -26,686 +26,306 @@
 
 #include "XSocket.h"
 
-#define dbgv(...) do{  printf("<tunnel>[D] " __VA_ARGS__); printf("\n"); }while(0)
+#define DUMP_DATA 0
+#define dbgd(...) // do{  printf("<tunnel>[D] " __VA_ARGS__); printf("\n"); }while(0)
 #define dbgi(...) do{  printf("<tunnel>[I] " __VA_ARGS__); printf("\n"); }while(0)
 #define dbge(...) do{  printf("<tunnel>[E] " __VA_ARGS__); printf("\n"); }while(0)
 
 #define ZERO_ALLOC(o, type, sz) do{o=(type)malloc(sz); memset(o, 0, sz);}while(0)
 
-
-
-
-
-
-
-static inline
-const std::string socket_addrin_to_string (struct sockaddr_in * addr){
-    char dst[64];
-    sprintf(dst, "%s:%d", inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
-    return std::string(dst);
+#if DUMP_DATA
+static char * bytesToAsciiString(const uint8_t * data, int dataLength, char * strBuf, int strBufSize){
+    for(int i = 0; i < dataLength; i++){
+        uint8_t b = data[i];
+        if(b >= 32 && b <= 126){
+            strBuf[i] = b;
+        }else{
+            strBuf[i] = '.';
+        }
+    }
+    strBuf[dataLength] = '\0';
+    return strBuf;
 }
 
-
-
-// header ==>
-
-
-struct XAddrDesc{
-    XSockProto          proto = XSOCK_NONE;
-    std::string         ip;
-    int                 minPort = 0;
-    int                 maxPort = 0;
-    XAddrDesc(){}
-    XAddrDesc(XSockProto proto_, const std::string& ip_, int port_)
-    :proto(proto_), ip(ip_), minPort(port_), maxPort(port_){
+static void dispData(const std::string& name, const uint8_t * buf, int bytesRecv){
+    dbgi("[%s] got %d bytes -----------------------", name.c_str(), bytesRecv);
+    static char strBuf[4096+2];
+    int dispMaxLen = 64;
+    for(int offset = 0; offset < bytesRecv;){
+        int remains = bytesRecv - offset;
+        int dispLen  = remains < dispMaxLen ? remains : dispMaxLen;
+        dbgi("[%s] %04X: |%s|", name.c_str(), offset, bytesToAsciiString(buf+offset, dispLen, strBuf, sizeof(strBuf)));
+        offset += dispLen;
     }
-};
+}
+#else
+#define dispData(x, y, z)
+#endif
 
-struct XAgentDesc{
-    XAddrDesc           localAgentAddrd;
-    XAddrDesc           localForwardAddrd;
-    XAddrDesc           remoteCustomerAddrd;
-};
+static inline
+int64_t getNextIdNum(){
+    static int64_t num = 0;
+    return ++num;
+}
 
-struct XSockRule{
-    XSockProto          proto;
-    std::string         localIp;
-    int                 localPort = 0;
-    std::string         srcIp;
-    int                 srcPort = 0;
-    std::string         dstIp;
-    int                 dstPort = 0;
-    int                 index = -1;
-};
+static
+std::string makeNextId(const char * className){
+    char buf[64];
+    sprintf(buf, "%s-%lld", className, getNextIdNum());
+    return buf;
+}
 
-struct TunnelConfig{
-    XAddrDesc                tunnelAddr;
-    std::vector<XAgentDesc>  agentDescs;
-};
-
-// header <==
-
-
-#define is_xsockdesc_valid(x) ((x)->proto != XSOCK_NONE && (x)->minPort >= 0 && (x)->maxPort >= (x)->minPort)
-
-
-class XTransport;
-class XTransportRaw;
-struct TunnelEntity;
-struct XSockConnection;
-struct XForwardRule;
-struct XTunnel;
-struct XForward;
-typedef std::list<XSockConnection> ConnectionList;
-typedef std::list<XTunnel> TunnelList;
-typedef std::list<XForward> ForwardList;
-typedef std::map <struct sockaddr_in, XSockConnection*, addr_less_fun> Addr2ConnMap;
-typedef std::map <struct sockaddr_in, const XSockRule*, addr_less_fun> Addr2RuleMap;
-typedef std::map <struct sockaddr_in, XForward, addr_less_fun> ForwardMap;
-
-
-struct XStatistics{
-    uint64_t bytes;
-    uint64_t packets;
-};
-
-class XTransport{
+class XIdObj{
+protected:
+    std::string id_;
 public:
-    virtual ~XTransport(){}
-    virtual int sendData(uint8_t * data, int length) = 0;
+    XIdObj():id_(makeNextId("obj")){}
+    XIdObj(const std::string& id):id_(id){}
+    virtual ~XIdObj(){}
+    virtual const std::string& id(){return id_;}
 };
 
-class XTransportRaw{
-    XSocket * xsock_;
-    XSockAddress * remoteAddress_;
+class BridgeManager;
+class BridgeBase : public XIdObj {
+protected:
+    BridgeManager * mgr_ = NULL;
 public:
-    XTransportRaw(XSocket * xsock, XSockAddress * remoteAddress) : xsock_(xsock), remoteAddress_(remoteAddress) {
+    BridgeBase():XIdObj(makeNextId("bridge")){
     }
-    virtual ~XTransportRaw(){}
-    int sendData(uint8_t * data, int length){
-        return xsock_->send(data, length, remoteAddress_);
+    BridgeBase(const std::string& id):XIdObj(id){
     }
+    
+    virtual ~BridgeBase(){}
+    virtual void setManager(BridgeManager * mgr){
+        mgr_ = mgr;
+    }
+    virtual bool timeToCheck(int64_t nowMS) = 0;
+    virtual void close() =0 ;
 };
 
-class XTransportTunnel{
-    XSocket * xsock_;
-    XSockAddress * remoteAddress_;
+class BridgeManager{
+    XSocketFactory * factory_;
+    std::map<std::string, BridgeBase *> bridges_;
+    std::map<std::string, BridgeBase *> timeCheckBridges_;
 public:
-    XTransportTunnel(XSocket * xsock, XSockAddress * remoteAddress)
-        : xsock_(xsock), remoteAddress_(remoteAddress) {
+    BridgeManager(XSocketFactory * factory):factory_(factory){
+        
     }
-    virtual ~XTransportTunnel(){}
-    int sendData(uint8_t * data, int length){
-        // TODO: wrap data in tunnel packet
-        return 0;
+    
+    virtual ~BridgeManager(){
+        for(auto& o : bridges_){
+            BridgeBase * bridge = o.second;
+            delete bridge;
+        }
+    }
+    
+    XSocketFactory * getFactory(){
+        return factory_;
+    }
+    
+    void timeToCheck(){
+        int64_t now = time(NULL)*1000;
+        std::list<BridgeBase *> list4Remove;
+        for(auto& o : timeCheckBridges_){
+            BridgeBase * bridge = o.second;
+            if(!bridge->timeToCheck(now)){
+                list4Remove.push_back(bridge);
+            }
+        }
+        for(auto& b : list4Remove){
+            dbgd("remove from check [%s]", b->id().c_str());
+            timeCheckBridges_.erase(b->id());
+        }
+    }
+    
+    void add(BridgeBase *bridge){
+        auto it = bridges_.find(bridge->id());
+        if(it == bridges_.end()){
+            bridge->setManager(this);
+            bridges_[bridge->id()] = bridge;
+        }
+
+    }
+    
+    void addToCheck(BridgeBase *bridge){
+        auto it = timeCheckBridges_.find(bridge->id());
+        if(it == timeCheckBridges_.end()){
+            dbgd("add to check [%s]", bridge->id().c_str());
+            timeCheckBridges_[bridge->id()] = bridge;
+        }
     }
 };
 
-//struct XSockConnection{
-//    XSocket *                   xsock;
-//    XStatistics                 sentStati;
-//    XStatistics                 recvStati;
-//    unsigned char sendBuf[2*1024];
-//    unsigned char recvBuf[2*1024];
-//};
-//
-//struct XForwardRule{
-//    int forwardIndex = -1;
-//    XSockProto  proto = XSOCK_NONE;
-//    XSockAddress agentAddr;
-//    XSockAddress forwardAddr;
-//    XSockAddress customerAddr;
-//};
-//
-//struct XTunnel{
-//    TunnelList::iterator        link;
-//    TunnelEntity *              owner = NULL;
-//    XSockConnection             conn;
-//};
-//
-//struct XAgent{
-//    TunnelEntity *              owner = NULL;
-//    XForwardRule *              forwardRule = NULL;
-//    XSockConnection             conn;
-//};
-//
-//struct XForward{
-//    TunnelEntity *              owner = NULL;
-//    XSockConnection             conn;
-//    XSockAddress                srcAddr;
-//    XSockConnection   *         uplinkConn = NULL;
-//    bool                        uplinkInTunnel = false;
-//};
-//
-//
-//struct TunnelEntity{
-//    TunnelConfig                    config;
-//    Addr2ConnMap                    src2ConnMap;
-//    Addr2RuleMap                    src2RuleMap;
-//    std::vector<const XSockRule*>   dstRules;
-//
-//    TunnelList                      tunnels;
-//    std::vector<XSockConnection>    fowardConns;
-//
-//    TunnelList                      listenTunnels;
-//    std::vector<XForwardRule>       forwardRules;
-//    std::vector<XAgent>             agents;
-//    ForwardMap                      forwardMap;
-//
-//    struct event_base *         ev_base = NULL;
-//    struct event *              ev_signal = NULL;
-//    struct evconnlistener *     ev_listener = NULL;
-//
-//    TunnelEntity(){
-//
-//    }
-//};
-//
-//
-//static
-//void on_forward_udp_event(evutil_socket_t fd, short what, void *arg){
-//    if(!(what&EV_READ)) return ;
-//    XForward * forward = (XForward*)arg;
-//    XSockConnection * conn = &forward->conn;
-//    dbgi("on_forward_udp_event %p, %d", forward, fd);
-//    struct sockaddr_in tempadd;
-//    socklen_t len = sizeof(tempadd);
-//    int bytes_to_recv = sizeof(conn->recvBuf);
-//    while(1){
-//        ssize_t sock_ret = recvfrom(conn->fd, conn->recvBuf, bytes_to_recv, 0, (struct sockaddr*)&tempadd, &len);
-//        if(sock_ret <= 0){
-//            break;
-//        }
-//        int udp_len = (int)sock_ret;
-//        dbgi("got forward udp, len=%d", udp_len);
-//        if(forward->uplinkConn){
-//            XSockConnection * toConn = forward->uplinkConn;
-//            memcpy(toConn->sendBuf, conn->recvBuf, udp_len);
-//            tempadd = forward->srcAddr.nativeAddr.addr_in;
-//            sock_ret = sendto(toConn->fd, toConn->sendBuf, udp_len, 0, (struct sockaddr*)&tempadd, sizeof(tempadd));
-//            std::string toUrl = XSockMakeUrl(&tempadd, XSOCK_UDP, false);
-//            dbgi("back to [%s]", toUrl.c_str());
-//        }
-//    }
-//}
-//
-//
-//static
-//void on_agent_udp_event(evutil_socket_t fd, short what, void *arg){
-//    if(!(what&EV_READ)) return ;
-//    XAgent * agent = (XAgent*)arg;
-//    XSockConnection * conn = &agent->conn;
-//    dbgi("on_agent_udp_event %p", agent);
-//
-//
-//    struct sockaddr_in tempadd;
-//    socklen_t len = sizeof(tempadd);
-//    int bytes_to_recv = sizeof(conn->recvBuf);
-//    while(1){
-//        ssize_t sock_ret = recvfrom(conn->fd, conn->recvBuf, bytes_to_recv, 0, (struct sockaddr*)&tempadd, &len);
-//        if(sock_ret <= 0){
-//            break;
-//        }
-//        int udp_len = (int)sock_ret;
-//        dbgi("got agent udp, len=%d", udp_len);
-//
-//        XForward * forward= NULL;
-//        auto it = agent->owner->forwardMap.find(tempadd);
-//        if(it == agent->owner->forwardMap.end()) {
-//            agent->owner->forwardMap[tempadd] =  XForward();
-//            forward = &agent->owner->forwardMap[tempadd];
-//            forward->owner = agent->owner;
-//            forward->srcAddr.proto = conn->proto;
-//            forward->srcAddr.nativeAddr.addr_in = tempadd;
-//            forward->uplinkConn = conn;
-//            forward->uplinkInTunnel = false;
-//            sockaddr_in * addr = &(agent->forwardRule->forwardAddr.nativeAddr.addr_in);
-//            XSockConnectionBind(forward->owner->ev_base,
-//                                &forward->conn,
-//                                addr,
-//                                agent->forwardRule->forwardAddr.proto,
-//                                false);
-//            if(agent->forwardRule->forwardAddr.proto == XSOCK_TCP){
-//                // TODO: connect to tunnel server
-//            }else if(agent->forwardRule->forwardAddr.proto == XSOCK_UDP){
-//                forward->conn.ev = event_new(forward->owner->ev_base, forward->conn.fd, EV_READ|EV_PERSIST, on_forward_udp_event, forward);
-//                event_add(forward->conn.ev, NULL);
-//                dbgi("new forward at [%s]", forward->conn.localUrl.c_str());
-//            }
-//        }else{
-//            forward = &it->second;
-//        }
-//        if(forward){
-//            // TODO: send tcp case
-//            memcpy(forward->conn.sendBuf, conn->recvBuf, udp_len);
-//            tempadd = agent->forwardRule->customerAddr.nativeAddr.addr_in;
-//
-//            sock_ret = sendto(forward->conn.fd, forward->conn.sendBuf, udp_len, 0, (struct sockaddr*)&tempadd, sizeof(tempadd));
-//            std::string toUrl = XSockMakeUrl(&tempadd, XSOCK_UDP, false);
-//            dbgi("forward to [%s]", toUrl.c_str());
-//        }
-//
-//    }
-//
-//}
-//
-//
-//
-//static inline
-//void XSockConnectionFree(XSockConnection * conn){
-//    // TODO:
-//}
-//
-//static inline
-//void XSockAddressInit(XSockAddress * xaddr, XSockProto proto, const char * ip, int port){
-//    xaddr->proto = proto;
-//    socket_addrin_init(ip, port, &xaddr->nativeAddr.addr_in);
-//}
-//
-//TunnelEntity * tunserver_create(const TunnelConfig * config)
-//{
-//    int                 ret = 0;
-//    TunnelEntity *      obj = 0;
-//    XTunnel *           tunnel = NULL;
-//    XAgent *            agent = NULL;
-//    do{
-//        obj = new TunnelEntity();
-//        obj->config = *config;
-//
-//        obj->ev_base = event_base_new();
-//
-//
-//        if(is_xsockdesc_valid(&obj->config.tunnelAddr)){
-//            XAddrDesc * addrd = &obj->config.tunnelAddr;
-//            for(int port = addrd->minPort; port <= addrd->maxPort; port++){
-//                XTunnel newTunnel;
-//                newTunnel.link = obj->listenTunnels.insert(obj->listenTunnels.end(), newTunnel);
-//                tunnel = &obj->listenTunnels.back();
-//                tunnel->owner = obj;
-//                ret = XSockConnectionBind(obj->ev_base, &tunnel->conn, addrd->ip.c_str(), port, addrd->proto, true);
-//                if(ret){
-//                    dbge("bind tunnel fail, addr=[%s]", tunnel->conn.localUrl.c_str());
-//                    break;
-//                }
-//
-//                if(addrd->proto == XSOCK_TCP && !tunnel->conn.ev_listener){
-//                    // TODO: connect to tunnel server
-//                }else{
-//                    if(tunnel->conn.ev_listener){
-//                        evconnlistener_set_cb(tunnel->conn.ev_listener, on_tunnel_accept_socket_event, tunnel);
-//                    }else if(addrd->proto == XSOCK_UDP){
-//                        tunnel->conn.ev = event_new(obj->ev_base, tunnel->conn.fd, EV_READ|EV_PERSIST, on_tunnel_udp_event, tunnel);
-//                        event_add(tunnel->conn.ev, NULL);
-//                    }
-//                    dbgi("listen tunnel at [%s]", tunnel->conn.localUrl.c_str());
-//                }
-//                tunnel = NULL;
-//            }
-//        }
-//
-//        for(auto &o : obj->config.agentDescs){
-//            // TODO: check port range consistency of agent, forward, cumstomer
-//
-//            bool isAgent = false;
-//            int minPort = o.agentAddrd.minPort;
-//            int maxPort = o.agentAddrd.maxPort;
-//            for(int port = minPort; port <= maxPort; port++){
-//                obj->forwardRules.push_back(XForwardRule());
-//                XForwardRule * rule = &obj->forwardRules.back();
-//                XSockAddressInit(&rule->customerAddr, o.customerAddrd.proto, o.customerAddrd.ip.c_str(), port);
-//                XSockAddressInit(&rule->agentAddr, o.agentAddrd.proto, o.agentAddrd.ip.c_str(), port);
-//                XSockAddressInit(&rule->forwardAddr, o.forwardAddrd.proto, o.forwardAddrd.ip.c_str(), 0); // TODO: specific forward port
-//
-//                XAddrDesc * addrd = &o.agentAddrd;
-//                XAgent newAgent;
-//                obj->agents.push_back(newAgent);
-//                agent = &obj->agents.back();
-//                agent->owner = obj;
-//                agent->forwardRule = rule;
-//                if(is_xsockdesc_valid(&o.agentAddrd)){
-//                    isAgent = true;
-//                    ret = XSockConnectionBind(obj->ev_base, &agent->conn, addrd->ip.c_str(), port, addrd->proto, true);
-//                    if(ret){
-//                        dbge("bind agent fail, addr=[%s]", agent->conn.localUrl.c_str());
-//                        break;
-//                    }
-//                    if(agent->conn.ev_listener){
-//                        // TODO:
-//                        //evconnlistener_set_cb(agent->conn.ev_listener, , agent);
-//                    }else if(addrd->proto == XSOCK_UDP){
-//                        agent->conn.ev = event_new(obj->ev_base, agent->conn.fd, EV_READ|EV_PERSIST, on_agent_udp_event, agent);
-//                        event_add(agent->conn.ev, NULL);
-//                    }
-//                    dbgi("agent at [%s]", agent->conn.localUrl.c_str());
-//                    agent = NULL;
-//                }
-//                dbgi("forward rule [%s:%d-%d] -> [%s:%d-%d]", o.agentAddrd.ip.c_str(), o.agentAddrd.minPort, o.agentAddrd.maxPort
-//                     , o.customerAddrd.ip.c_str(), o.customerAddrd.minPort, o.customerAddrd.maxPort);
-//
-//            }
-//
-//        }
-//
-//
-////        plw_u32 try_ports = 1;
-////
-////
-////        plw_port_t port = config->udp_port;
-////        uret = 0;
-////        for(plw_u32 ui = 0; ui < try_ports;ui++)
-////        {
-////            port = config->udp_port + ui;
-////            uret = plw_udp_create(0, &port, config->sender_buf_size_mb*1024*1024, config->recver_buf_size_mb*1024*1024, &obj->udp);
-////            if(uret)
-////            {
-////                dbge("fail to try bind udp at port %d\n", port);
-////                obj->udp = 0;
-////                //break;
-////            }
-////            else
-////            {
-////                obj->actual_udp_port = port;
-////                dbgi("udp send buf size %d MB\n", config->sender_buf_size_mb);
-////                dbgi("udp recv buf size %d MB\n", config->recver_buf_size_mb);
-////                dbgi("bind udp port at %d\n", port);
-////                break;
-////            }
-////        }
-////
-////        if(uret) break;
-////
-////        if(config->udp_port != port)
-////        {
-////            config->udp_port = port;
-////        }
-////
-////        obj->udp_sock_pool = new udp_socket_pool;
-////
-////#if STRESS_TEST == 0
-////        plw_u32 udp_start_port = 6000;
-////        plw_u32 udp_port_count = 1;
-////        dbgi("pre-alloc udp ports start=%d, count=%d ...\n", udp_start_port, udp_port_count);
-////        uret = obj->udp_sock_pool->pre_alloc(udp_start_port, udp_port_count);
-////        if (uret)
-////        {
-////            dbge("fail to pre-alloc udp ports start=%d, count=%d\n", udp_start_port, udp_port_count);
-////            break;
-////        }
-////        dbgi("successfully pre-alloc udp ports start=%d, count=%d\n", udp_start_port, udp_port_count);
-////
-////#endif
-////
-////
-////
-////        obj->ev_base = event_base_new();
-////        obj->ev_signal = evsignal_new(obj->ev_base, SIGINT, ev_signal_cb, (void *)obj);
-////        event_add(obj->ev_signal, NULL);
-////
-////
-////        plw_str_copy(obj->server_id, config->server_id.c_str());
-////        //if (!config->server_id.empty())
-////        //{
-////        //    plw_str_copy(obj->server_id, config->server_id.c_str());
-////        //}
-////        //else
-////        //{
-////        //    plw_sprintf(obj->server_id, "serv_%s_%d", config->public_ip.c_str(), config->server_port);
-////        //}
-////
-////        dbgi("server_id %s\n", obj->server_id);
-////        obj->sender = new mdata_sender_impl(obj, obj->udp);
-////        mconf_mgr_create(obj->sender, obj->server_id, obj->config, &obj->conf_mgr);
-////        mconf_mgr_set_udp_pool(obj->conf_mgr, obj->udp_sock_pool);
-////        mconf_mgr_set_key(obj->conf_mgr, config->secret_key);
-////        mconf_mgr_set_evbase(obj->conf_mgr, obj->ev_base);
-////
-////        uret = 0;
-////        for(plw_u32 ui = 0; ui < try_ports;ui++)
-////        {
-////            plw_u32 port = config->server_port+ui;
-////            memset(&sin, 0, sizeof(sin));
-////            sin.sin_family = AF_INET;
-////            sin.sin_port = htons(port);
-////
-////            obj->ev_listener = evconnlistener_new_bind(obj->ev_base, listener_cb, (void *)obj,
-////                                                       LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, -1,
-////                                                       (struct sockaddr*)&sin,
-////                                                       sizeof(sin));
-////
-////            if (!obj->ev_listener)
-////            {
-////                dbge("can't bind at port %d !!!\n", port);
-////                uret = PLWS_ERROR;
-////                //break;
-////            }
-////            else
-////            {
-////                obj->server_port = port;
-////                uret = 0;
-////                break;
-////            }
-////        }
-////        if(uret) break;
-////
-////        if (config->server_port != obj->server_port)
-////        {
-////            config->server_port = obj->server_port;
-////
-////            char buf[128];
-////            plw_sprintf(buf, "serv_%s_%d", config->public_ip.c_str(), config->server_port);
-////            config->server_id = buf;
-////        }
-////
-////
-////        if(config->separate_udp_task)
-////        {
-////            uret = plw_mutex_create(&obj->lock);
-////            if(uret) break;
-////
-////            uret = plw_task_create(udp_task, obj, 0, PLW_PRIOR_NORMAL, &obj->task);
-////            if(uret) break;
-////
-////        }
-////        else
-////        {
-////            evutil_socket_t * psock = (evutil_socket_t *)plw_udp_socket(obj->udp);
-////            evutil_socket_t fd = *psock;
-////            evutil_make_socket_nonblocking(fd);
-////            obj->ev_udp = event_new(obj->ev_base, fd, EV_READ|EV_PERSIST, on_udp_event, obj);
-////            event_add(obj->ev_udp, NULL);
-////        }
-////
-////        obj->ev_timer = event_new(obj->ev_base, -1, EV_PERSIST, timer_event_handler, obj);
-////        struct timeval tv;
-////        tv.tv_sec = 1;
-////        tv.tv_usec = 0;
-////        evtimer_add(obj->ev_timer, &tv);
-////
-////        obj->ev_http = evhttp_new(obj->ev_base);
-////        if (!obj->ev_http) {
-////            dbge("can't create ev_http !!!\n");
-////            uret = PLWS_ERROR;
-////            break;
-////        }
-////
-////        evhttp_set_cb(obj->ev_http, "/status", on_http_get_status, obj);
-////        evhttp_set_cb(obj->ev_http, "/on_push", on_http_push_cb, obj);
-////        evhttp_set_cb(obj->ev_http, "/on_push_done", on_http_push_done_cb, obj);
-////
-////        //        evhttp_set_cb(obj->ev_http, "/dump", on_http_push_cb, obj);
-////        evhttp_set_gencb(obj->ev_http, on_http_gen_cb, obj);
-////
-////        int http_port = 8800;
-////        //        evhttp_bind_socket_with_handle(obj->ev_http, "0.0.0.0", http_port);
-////        int ret = evhttp_bind_socket(obj->ev_http, "0.0.0.0", http_port);
-////        if (ret != 0) {
-////            dbge("can't bind http at port %d !!!\n", http_port);
-////            uret = PLWS_ERROR;
-////            return 1;
-////        }
-////        dbgi("http port %d\n", http_port);
-////
-////        *pobj = obj;
-//    } while (0);
-//    if(ret){
-//        if(tunnel){
-//            XSockConnectionFree(&tunnel->conn);
-//            obj->listenTunnels.erase(tunnel->link);
-//            tunnel = NULL;
-//        }
-//        if(agent){
-//            // TODO:
-//        }
-//        if(obj){
-//            delete obj;
-//            obj = NULL;
-//        }
-//    }
-//    return obj;
-//}
-//
-//void run_tunnel_server(){
-//    TunnelConfig config;
-//    config.tunnelAddr.proto = XSOCK_TCP;
-//    config.tunnelAddr.minPort = config.tunnelAddr.maxPort = 8722;
-//
-//    XAgentDesc agentDesc;
-//    agentDesc.agentAddrd.proto = XSOCK_UDP;
-//    agentDesc.agentAddrd.minPort = agentDesc.agentAddrd.maxPort = 20000;
-//
-//    agentDesc.forwardAddrd.proto = XSOCK_UDP;
-//
-//    agentDesc.customerAddrd.proto = XSOCK_UDP;
-//    agentDesc.customerAddrd.minPort = agentDesc.customerAddrd.maxPort = 20000;
-//    agentDesc.customerAddrd.ip = "121.41.87.159";
-//    config.agentDescs.push_back(agentDesc);
-//
-//    TunnelEntity * server = tunserver_create(&config);
-//    if(!server) return;
-//    event_base_dispatch(server->ev_base);
-//
-//}
 
-class TCPForwardPair{
-    class Leg : public XSocketCallback{
+
+class ForwardListener{
+public:
+    virtual ~ForwardListener(){}
+    virtual void onForwardClose(XIdObj * obj, const std::string& reason) = 0;
+};
+
+class TCPForwardPair : public XIdObj{
+    class Leg : public XSocketCallback, public XIdObj{
         uint8_t buf_[2*1024];
-        int bufSize_ = sizeof(this->buf_);
+        int bufSize_ = sizeof(this->buf_)-1;
         
     public:
         TCPForwardPair * owner_;
         XSocket *xsock_;
         XSocket *xother_;
-        std::string name_;
-        std::string infoStr_;
+        int64_t recvBytes_ = 0;
+        
         Leg(TCPForwardPair * owner, XSocket *xsock, const std::string&  name, XSocket *other)
-        :owner_(owner), xsock_(xsock), name_(name), xother_(other){
+        : XIdObj(owner->id()+"-"+name), owner_(owner), xsock_(xsock), xother_(other){
             xsock_->registerCallback(this);
-            char buf[1024];
-            sprintf(buf, "[%s]-[%p], local=[%s], remote=[%s]", name_.c_str(),  xsock_
-                 , xsock->getLocalAddress()->getString().c_str()
-                 , xsock->getRemoteAddress()->getString().c_str());
-            infoStr_ = buf;
         }
         virtual ~Leg(){
-            if(xsock_){
-//                dbgi("close tcp leg %s", infoStr_.c_str());
-                delete xsock_;
-                xsock_ = NULL;
-            }
+            close();
         }
         virtual void onConnected(XSocket *xsock) override {
-            dbgi("connected, tcp leg %s", infoStr_.c_str());
+            dbgd("[%s] connected, local=[%s], remote=[%s]"
+                 , id().c_str()
+                 , xsock->getLocalAddress()->getString().c_str()
+                 , xsock->getRemoteAddress()->getString().c_str());
         }
         
         virtual void onDisconnect(XSocket *xsock, bool isConnecting) override {
             if(isConnecting){
-                dbge("fail to connect, tcp leg %s, reason=[%s]", infoStr_.c_str(), XSocketFactory::getLastError(NULL).c_str());
+                dbge("[%s] fail to connect, local=[%s], remote=[%s], reason=[%s]"
+                     , id().c_str()
+                     , xsock->getLocalAddress()->getString().c_str()
+                     , xsock->getRemoteAddress()->getString().c_str()
+                     , XSocketFactory::getLastError(NULL).c_str());
+                owner_->checkOnDisconn(id()+" conn");
             }else{
-                dbgi("disconnected, tcp leg %s, reason=[%s]", infoStr_.c_str(), XSocketFactory::getLastError(NULL).c_str());
+                dbgd("[%s] disconnected, reason=[%s]", id().c_str(), XSocketFactory::getLastError(NULL).c_str());
+                owner_->checkOnDisconn(id()+" disconn");
             }
-            owner_->checkOnDisconn();
         }
         
+        
         virtual void onSocketRecvDataReady(XSocket *xsock) override {
-//            dbgi("data ready, tcp leg %s ", infoStr_.c_str());
             int bytesRecv = xsock->recv(buf_, bufSize_);
-            if( bytesRecv > 0){
+            while( bytesRecv > 0){
+                dispData(id(), buf_, bytesRecv);
+
+                recvBytes_ += bytesRecv;
                 XSocket * other = xother_;
                 int bytesSent = 0;
+                int ret = 0;
                 while(bytesSent < bytesRecv){
-                    int n = other->send(buf_+bytesSent, bytesRecv-bytesSent, NULL);
-                    if( n <= 0) break;
-                    bytesSent += n;
+                    ret = other->send(buf_+bytesSent, bytesRecv-bytesSent, NULL);
+                    if( ret <= 0) break;
+                    bytesSent += ret;
                 }
+                if(ret <= 0)break;
+                bytesRecv = xsock->recv(buf_, bufSize_);
             }
         }
-    };
+        
+        int start(){
+//            dbgi("[%s] start, local=[%s], remote=[%s]"
+//                 , id().c_str()
+//                 , xsock_->getLocalAddress()->getString().c_str()
+//                 , xsock_->getRemoteAddress()->getString().c_str());
+            int ret = xsock_->kickIO();
+            if(ret){
+                dbge("[%s] fail to start, reason=[%s]"
+                     , id().c_str()
+                     , XSocketFactory::getLastError(NULL).c_str());
+            }
+            return ret;
+        }
+        
+        void close(){
+            if(xsock_){
+                delete xsock_;
+                xsock_ = NULL;
+                dbgd("[%s] closed", id().c_str());
+            }
+        }
+    }; // class Leg
     
     Leg leg1_;
     Leg leg2_;
-    bool freeOnDisconn_;
+    ForwardListener * listener_;
+    bool closed_ = false;
     
-    void checkOnDisconn(){
-        if(this->freeOnDisconn_){
-            delete this;
+    void checkOnDisconn(const std::string& reason){
+        if(listener_){
+            listener_->onForwardClose(this, reason);
         }
     }
     
 public:
-    TCPForwardPair(XSocket *xsock1, XSocket *xsock2, bool freeOnDisconn = true)
-    : leg1_(this, xsock1, "sock1", xsock2)
-    , leg2_(this, xsock2, "sock2", xsock1)
-    , freeOnDisconn_(freeOnDisconn){
+    TCPForwardPair(XSocket *xsock1, XSocket *xsock2, ForwardListener * listener = NULL)
+    : XIdObj(makeNextId("TCPFwd"))
+    , leg1_(this, xsock1, "leg1", xsock2)
+    , leg2_(this, xsock2, "leg2", xsock1)
+    , listener_(listener){
     }
     
     virtual ~TCPForwardPair(){
-        dbgi("close tcp pair %p", this);
+        close("");
     }
     
     int start(){
-        dbgi("start tcp pair leg1 %p, %s", this, leg1_.infoStr_.c_str());
-        dbgi("start tcp pair leg2 %p, %s", this, leg2_.infoStr_.c_str());
         int ret = 0;
         do{
-            ret = leg1_.xsock_->kickIO();
+            ret = leg1_.start();
             if(ret) break;
-            ret = leg2_.xsock_->kickIO();
+            ret = leg2_.start();
             if(ret) break;
             ret = 0;
         }while (0);
-        if(ret){
-            checkOnDisconn();
-        }
         return ret;
+    }
+    
+    void close(const std::string& reason){
+        if(!closed_){
+            leg1_.close();
+            leg2_.close();
+            closed_ = true;
+            dbgi("[%s] closed, reason=[%s], fwd/back=%lld/%lld(bytes)", id().c_str(), reason.c_str(), leg1_.recvBytes_, leg2_.recvBytes_);
+        }
     }
 };
 
 
-class TCPBridge : public XSocketCallback{
+class TCPBridge : public ForwardListener, public XSocketCallback, public BridgeBase{
     XSocketFactory * factory_;
     std::string ip1_;
     int port1_ = -1;
     std::string ip2_;
     int port2_ = -1;
     XSocket * agentSock_ = NULL;
+    std::map<std::string, TCPForwardPair * > forwards;
+    bool closed_ = false;
+    bool naglesEnable_ = false;
+    virtual void onForwardClose(XIdObj * obj, const std::string& reason) override{
+        TCPForwardPair * forward = (TCPForwardPair *) obj;
+        forwards.erase(forward->id());
+        forward->close(reason);
+        delete forward;
+    }
+
+    
 public:
-    TCPBridge(XSocketFactory * factory, const std::string& ip1, int port1,  const std::string& ip2, int port2)
-    :factory_(factory), ip1_(ip1), port1_(port1), ip2_(ip2), port2_(port2){
+    TCPBridge(XSocketFactory * factory, const std::string& ip1, int port1,  const std::string& ip2, int port2, bool naglesEnable)
+    : BridgeBase(makeNextId("TCPBridge")), factory_(factory), ip1_(ip1), port1_(port1), ip2_(ip2), port2_(port2), naglesEnable_(naglesEnable){
     }
     virtual ~TCPBridge(){
-        if(agentSock_){
-            delete agentSock_;
-            agentSock_ = NULL;
-        }
+        close();
     }
     int startServer2Client(){
         int ret = -1;
         do {
             agentSock_ = factory_->newListenTCPSocket(ip1_, port1_);
+            agentSock_->enableNagles(naglesEnable_);
             agentSock_->registerCallback(this);
             ret = agentSock_->kickIO();
             if(ret == 0){
-                dbgi("bridge listen at [%s] -> [%s]", agentSock_->getLocalUrl().c_str(), XSocket::makeUrl(XSOCK_TCP, ip2_, port2_, false).c_str());
+                //dbgi("bridge listen at [%s] -> [%s]", agentSock_->getLocalUrl().c_str(), XSocket::makeUrl(XSOCK_TCP, ip2_, port2_, false).c_str());
             }else{
                 dbge("bridge faid to listen at [%s], reason=[%s]", agentSock_->getLocalUrl().c_str(), XSocketFactory::getLastError(NULL).c_str());
             }
@@ -715,27 +335,68 @@ public:
     
     virtual void onAccept(XSocket *xsock, XSocket *newxsock) override {
         XSocket *xsock2 = factory_->newTCPSocket("", 0, ip2_, port2_);
-        TCPForwardPair * pair = new TCPForwardPair(newxsock, xsock2);
-        pair->start();
+        xsock2->enableNagles(naglesEnable_);
+        TCPForwardPair * forward = new TCPForwardPair(newxsock, xsock2, this);
+//        dbgi("new tcp forward [%s]", forward->id().c_str());
+
+        
+        int ret = forward->start();
+        if(ret){
+            delete forward;
+        }else{
+            dbgi("new tcp forward [%s]: [%s] <-> [%s]-[%s] <-> [%s]"
+                 , forward->id().c_str()
+                 , newxsock->getRemoteAddress()->getString().c_str()
+                 , newxsock->getLocalAddress()->getString().c_str()
+                 , xsock2->getLocalAddress()->getString().c_str()
+                 , xsock2->getRemoteAddress()->getString().c_str());
+            forwards[forward->id()] = forward;
+        }
+    }
+    
+    virtual bool timeToCheck(int64_t nowMS) override{
+        return false;
+    }
+    
+    virtual void close() override{
+        while( !forwards.empty() ) {
+            TCPForwardPair * forward = forwards.begin()->second;
+            forwards.erase(forwards.begin());
+            forward->close("shutdown");
+            delete forward;
+        }
+        if(agentSock_){
+            delete agentSock_;
+            agentSock_ = NULL;
+        }
+        if(!closed_){
+            dbgd("[%s] closed", id().c_str());
+            closed_ = true;
+        }
     }
 };
 
 
-#define FORWARD_MAX_SLOTS 8
-class UDPBridge : public XSocketCallback{
+#define FORWARD_MAX_SLOTS 2
+class UDPBridge : public XSocketCallback, public BridgeBase{
     
     struct Forwarder : public XSocketCallback{
+        std::string id_ = makeNextId("UDPFwd");
         UDPBridge * owner_ = NULL;
         uint8_t buf_[2*1024];
         int bufSize_ = sizeof(this->buf_);
         int64_t time_ = 0;
+        int64_t forwardBytes_ = 0;
+        int64_t forwardPackets_ = 0;
+        int64_t backBytes_ = 0;
+        int64_t backPackets_ = 0;
     public:
         XSockAddress * from_ = NULL;
         XSockAddress * to_ = NULL;
-        XSocket * other_ = NULL;
+        XSocket * otherSock_ = NULL;
         int slot_ = -1;
         Forwarder(){}
-        Forwarder(UDPBridge * owner, XSocket * other) : owner_(owner) , other_(other){
+        Forwarder(UDPBridge * owner, XSocket * other) : owner_(owner) , otherSock_(other){
         }
         virtual void onSocketRecvDataReady(XSocket *xsock) override {
             while(1) {
@@ -745,6 +406,8 @@ class UDPBridge : public XSocketCallback{
                     // dbgi("udp forwarder got from [%s], %d byes", xsock->getRemoteAddress()->getString().c_str(), bytesRecv);
                     owner_->agentSock_->send(buf_, bytesRecv, from_);
                     time_ = 0;
+                    backBytes_ += bytesRecv;
+                    ++backPackets_;
                 }
             }
         }
@@ -759,41 +422,37 @@ class UDPBridge : public XSocketCallback{
     XSocket * agentSock_ = NULL;
     uint8_t buf_[2*1024];
     int bufSize_ = sizeof(this->buf_);
-    ForwarderMap  forwardMap_ ;
+    ForwarderPtrMap  forwardMap_ ;
     ForwarderPtrMap forwardSlots_[FORWARD_MAX_SLOTS];
     int slotCounter_ = 0;
     int checkCounter_ = 0;
+    XSocket * preferSock_ = NULL;
+    int preferSockRef_ = 0;
 public:
-    UDPBridge(XSocketFactory * factory, const std::string& ip1, int port1,  const std::string& ip2, int port2)
-    :factory_(factory), ip1_(ip1), port1_(port1), ip2_(ip2), port2_(port2){
+    UDPBridge(XSocketFactory * factory, const std::string& ip1, int port1,  const std::string& ip2, int port2, XSocket * preferSock = NULL)
+    : BridgeBase(makeNextId("UDPBridge")), factory_(factory), ip1_(ip1), port1_(port1), ip2_(ip2), port2_(port2), preferSock_(preferSock){
     }
     virtual ~UDPBridge(){
-        while( !forwardMap_.empty() ) {
-            this->freeFoward(forwardMap_.begin()->second, "BridgeFree");
-        }
-        
-        if(agentSock_){
-            delete agentSock_;
-            agentSock_ = NULL;
-        }
+        close();
     }
     
     void freeFoward(Forwarder& o, const std::string& reason){
-        if(o.other_ && o.from_){
-            dbgi("free udp forward [%s] <-> [%s]-[%s] <-> [%s], reason[%s]"
-                 , o.from_->getString().c_str()
-                 , agentSock_->getLocalAddress()->getString().c_str()
-                 , o.other_->getLocalAddress()->getString().c_str()
-                 , o.other_->getRemoteAddress()->getString().c_str()
-                 , reason.c_str());
+        if(o.otherSock_ && o.from_){
+            dbgi("[%s] closed, reason=[%s], fwd/back=[%lld/%lld(bytes), %lld/%lld(packets)]", o.id_.c_str(), reason.c_str()
+                 , o.forwardBytes_, o.backBytes_
+                 , o.forwardPackets_, o.backPackets_);
         }
         
-        if(o.other_ && o.other_ != agentSock_){
-            delete o.other_;
-            o.other_ = NULL;
+        if(o.otherSock_ && o.otherSock_ != agentSock_){
+            if(o.otherSock_ != preferSock_){
+                delete o.otherSock_;
+            }else{
+                dbgd("[%s] return prefer sock [%s]", o.id_.c_str(), preferSock_->getLocalUrl().c_str());
+                --preferSockRef_;
+            }
+            o.otherSock_ = NULL;
         }
-        if(o.from_)
-        {
+        if(o.from_){
             const sockaddr_in& key = *o.from_->getNativeAddrIn();
             if(o.slot_ >= 0){
                 ForwarderPtrMap &m = forwardSlots_[o.slot_];
@@ -803,17 +462,28 @@ public:
             delete o.from_;
             o.from_ = NULL;
         }
-        
-        if(o.to_)
-        {
+        if(o.to_){
             delete o.to_;
             o.to_ = NULL;
         }
     }
     
-    void timeToCheck(){
-        const int64_t timeout = 90;
-        int64_t nowSecond = time(NULL);
+    virtual void close() override{
+        while( !forwardMap_.empty() ) {
+            Forwarder * forward = forwardMap_.begin()->second;
+            this->freeFoward(*forward, "shutdown");
+            delete forward;
+        }
+        
+        if(agentSock_){
+            delete agentSock_;
+            agentSock_ = NULL;
+        }
+    }
+    
+    virtual bool timeToCheck(int64_t nowMS) override{
+        const int64_t timeout = 90*1000;
+        
         int slot = checkCounter_%FORWARD_MAX_SLOTS;
         ++checkCounter_;
         ForwarderPtrMap &m = forwardSlots_[slot];
@@ -821,16 +491,18 @@ public:
         for(auto& it : m){
             Forwarder * forward = it.second;
             if(forward->time_ > 0){
-                if((nowSecond - forward->time_) > timeout){
+                if((nowMS - forward->time_) > timeout){
                     timeoutList.push_back(forward);
                 }
             }else{
-                forward->time_ = nowSecond;
+                forward->time_ = nowMS;
             }
         }
         for(auto& f : timeoutList){
             this->freeFoward(*f, "timeout");
+            delete f;
         }
+        return forwardMap_.size() > 0;
     }
     
     int start(){
@@ -840,9 +512,9 @@ public:
             agentSock_->registerCallback(this);
             ret = agentSock_->kickIO();
             if(ret == 0){
-                dbgi("bridge listen at [%s] -> [%s]", agentSock_->getLocalUrl().c_str(), XSocket::makeUrl(XSOCK_UDP, ip2_, port2_, false).c_str());
+//                dbgi("[%s] listen at [%s] -> [%s]", id_.c_str(), agentSock_->getLocalUrl().c_str(), XSocket::makeUrl(XSOCK_UDP, ip2_, port2_, false).c_str());
             }else{
-                dbge("bridge faid to listen at [%s], reason=[%s]", agentSock_->getLocalUrl().c_str(), XSocketFactory::getLastError(NULL).c_str());
+                dbge("[%s] faid to listen at [%s], reason=[%s]", id_.c_str(), agentSock_->getLocalUrl().c_str(), XSocketFactory::getLastError(NULL).c_str());
             }
         } while (0);
         return ret;
@@ -855,54 +527,147 @@ public:
             if(bytesRecv <= 0) break;
             // dbgi("udp bridge got from [%s], %d byes", xsock->getRemoteAddress()->getString().c_str(), bytesRecv);
             Forwarder * forward = NULL;
-            const sockaddr_in& key = *xsock->getRemoteAddress()->getNativeAddrIn();
+            const sockaddr_in key = *xsock->getRemoteAddress()->getNativeAddrIn();
             auto it = forwardMap_.find(key);
             if(it == forwardMap_.end()) {
-                XSocket * other = factory_->newUDPSocket("", 0, ip2_, port2_);
-                forwardMap_[key] = Forwarder(this, other);
-                forward = &forwardMap_[key];
+                XSocket * other = NULL;
+                if(preferSock_ && preferSockRef_ == 0){
+                    ++preferSockRef_;
+                    other = preferSock_;
+                }else{
+                    other = factory_->newUDPSocket("", 0, ip2_, port2_);
+                    ret = other->bind();
+                    if(ret){
+                        dbge("[%s] bind forward udp fail, reason=[%s]", id().c_str(), XSocketFactory::getLastError(NULL).c_str());
+                        delete other;
+                        break;
+                    }
+                }
+                
+                forwardMap_[key] = new Forwarder(this, other);
+                forward = forwardMap_[key];
                 forward->from_ = XSockAddress::newAddress(xsock->getRemoteAddress());
                 forward->to_ = XSockAddress::newAddress(other->getRemoteAddress());
-                forward->other_->registerCallback(forward);
-                ret = forward->other_->kickIO();
-                
+                forward->otherSock_->registerCallback(forward);
+                forward->slot_ = slotCounter_%FORWARD_MAX_SLOTS;
+                ForwarderPtrMap& m = forwardSlots_[forward->slot_];
+                m[key] = forward;
+                ++slotCounter_;
+                ret = forward->otherSock_->kickIO();
                 if(ret){
-                    dbge("bind forward udp fail, reason=[%s]", XSocketFactory::getLastError(NULL).c_str());
+                    dbge("[%s] kick forward udp fail, reason=[%s]", id().c_str(), XSocketFactory::getLastError(NULL).c_str());
                     this->freeFoward(*forward,XSocketFactory::getLastError(NULL));
+                    delete forward;
                     forward = NULL;
                     break;
                 }
-                forward->slot_ = slotCounter_%FORWARD_MAX_SLOTS;
-                ForwarderPtrMap &m = forwardSlots_[forward->slot_];
-                m[key] = forward;
-                ++slotCounter_;
-                dbgi("new udp forward [%s] <-> [%s]-[%s] <-> [%s]"
+                if(forwardMap_.size() == 1){
+                    mgr_->addToCheck(this);
+                }
+                dbgi("new udp forward [%s]: [%s] <-> [%s]-[%s] <-> [%s]"
+                     , forward->id_.c_str()
                      , agentSock_->getRemoteAddress()->getString().c_str()
                      , agentSock_->getLocalAddress()->getString().c_str()
                      , other->getLocalAddress()->getString().c_str()
                      , other->getRemoteAddress()->getString().c_str());
+                if(other == preferSock_){
+                    dbgd("[%s] use prefer sock [%s]", forward->id_.c_str(), other->getLocalUrl().c_str());
+                }
             }else{
-                forward = &it->second;
+                forward = it->second;
             }
-            forward->other_->send(buf_, bytesRecv, forward->other_->getRemoteAddress());
+            forward->otherSock_->send(buf_, bytesRecv, forward->otherSock_->getRemoteAddress());
             forward->time_ = 0;
+            forward->forwardBytes_ += bytesRecv;
+            ++forward->forwardPackets_;
         }
     }
 };
 
 static
-void ev_signal_cb(evutil_socket_t sig, short events, void *user_data)
-{
+void ev_signal_cb(evutil_socket_t sig, short events, void *user_data){
     struct event_base * ev_base = (struct event_base *) user_data;
     long seconds = 0;
     struct timeval delay = { seconds, 1 };
-    dbgi("*** caught signal (0x%08X) ***, stop after %ld seconds...", events, seconds);
+    dbgi("caught signal %d, gracefully exit...", events);
     event_base_loopexit(ev_base, &delay);
 }
 
 static void timer_event_handler(evutil_socket_t fd, short what, void* arg){
-    UDPBridge * udpBridge = (UDPBridge *) arg;
-    udpBridge->timeToCheck();
+    BridgeManager * mgr = (BridgeManager *) arg;
+    mgr->timeToCheck();
+}
+
+int addTCPServer2Client(BridgeManager * mgr
+                        , const std::string& ip1, int beginPort1
+                        , const std::string& ip2, int beginPort2
+                        , int numPorts){
+    int ret = 0;
+    for(int i = 0; i < numPorts; i++){
+        int port1 = beginPort1 + i;
+        int port2 = beginPort2 + i;
+        TCPBridge * bridge = new TCPBridge(mgr->getFactory(), ip1, port1, ip2, port2, false);
+        ret = bridge->startServer2Client();
+        if(ret) {
+            delete bridge;
+            break;
+        }
+        mgr->add(bridge);
+    }
+    if(ret == 0){
+        if(numPorts > 1){
+            dbgi("TCP bridge at [%s:%d~%d] -> [%s:%d~%d]", ip1.c_str(), beginPort1, beginPort1+numPorts-1
+                 , ip2.c_str(), beginPort2, beginPort2+numPorts-1 );
+        }else{
+            dbgi("TCP bridge at [%s:%d] -> [%s:%d]", ip1.c_str(), beginPort1, ip2.c_str(), beginPort2 );
+        }
+        
+    }
+    return ret;
+}
+
+static int getNextPreferUdpPort(){
+    static int port = 11000;
+    return ++port;
+}
+
+int addUDPBridge(BridgeManager * mgr
+                 , const std::string& ip1, int beginPort1
+                 , const std::string& ip2, int beginPort2
+                 , int numPorts){
+    int ret = 0;
+    for(int i = 0; i < numPorts; i++){
+        int port1 = beginPort1 + i;
+        int port2 = beginPort2 + i;
+        int preferPort = 0;  // -1=disable , 0=enable;
+        XSocket * preferSock = NULL;
+        while(preferSock == NULL && preferPort >= 0 && preferPort < 65536){
+            preferPort = getNextPreferUdpPort();
+            preferSock = mgr->getFactory()->newUDPSocket("", preferPort, ip2, port2);
+            ret = preferSock->bind();
+            if(ret){
+                delete preferSock;
+                preferSock = NULL;
+            }
+        }
+        UDPBridge * bridge = new UDPBridge(mgr->getFactory(), ip1, port1, ip2, port2, preferSock);
+        ret = bridge->start();
+        if(ret) {
+            delete bridge;
+            break;
+        }
+        mgr->add(bridge);
+    }
+    if(ret == 0){
+        if(numPorts > 1){
+            dbgi("UDP bridge at [%s:%d~%d] -> [%s:%d~%d]", ip1.c_str(), beginPort1, beginPort1+numPorts-1
+                 , ip2.c_str(), beginPort2, beginPort2+numPorts-1 );
+        }else{
+            dbgi("UDP bridge at [%s:%d] -> [%s:%d]", ip1.c_str(), beginPort1, ip2.c_str(), beginPort2 );
+        }
+
+    }
+    return ret;
 }
 
 void run_tunnel_tcppair(){
@@ -912,19 +677,23 @@ void run_tunnel_tcppair(){
     
     int ret = 0;
     XSocketFactory * factory = XSocketFactory::newFactory(ev_base);
-    TCPBridge * tcpBridge = new TCPBridge(factory, "", 8711, "121.41.87.159", 8799);
-    UDPBridge * udpBridge = new UDPBridge(factory, "", 8711, "121.41.87.159", 8799);
+    BridgeManager * manager = new BridgeManager(factory);
     do{
-        ret = tcpBridge->startServer2Client();
+        ret = addTCPServer2Client(manager, "", 9092, "121.41.87.159", 9092, 1);
         if(ret) break;
         
-        ret = udpBridge->start();
+        ret = addUDPBridge(manager, "", 2000, "121.41.87.159", 2000, 1);
+        if(ret) break;
+        
+        int udpBeginPort = 30100;
+        int udpEndPort = 31999;
+        ret = addUDPBridge(manager, "", udpBeginPort, "121.41.87.159", udpBeginPort, udpEndPort-udpBeginPort+1);
         if(ret) break;
         
         ev_signal = evsignal_new(ev_base, SIGINT|SIGALRM, ev_signal_cb, (void *)ev_base);
         event_add(ev_signal, NULL);
         
-        ev_timer = event_new(ev_base, -1, EV_PERSIST, timer_event_handler, udpBridge);
+        ev_timer = event_new(ev_base, -1, EV_PERSIST, timer_event_handler, manager);
         struct timeval tv;
         tv.tv_sec = 1;
         tv.tv_usec = 0;
@@ -942,14 +711,12 @@ void run_tunnel_tcppair(){
         event_free(ev_signal);
         ev_signal = 0;
     }
-    if(tcpBridge){
-        delete tcpBridge;
-        tcpBridge = NULL;
+
+    if(manager){
+        delete manager;
+        manager = NULL;
     }
-    if(udpBridge){
-        delete udpBridge;
-        udpBridge = NULL;
-    }
+    
     if(factory){
         delete factory;
         factory  =NULL;
@@ -960,8 +727,12 @@ void run_tunnel_tcppair(){
     }
 }
 
+//
+// pgrep socktunnel | xargs kill -SIGALRM
+//
 int main(int argc, const char * argv[]) {
 //    run_tunnel_server();
     run_tunnel_tcppair();
+    dbgi("bye");
     return 0;
 }

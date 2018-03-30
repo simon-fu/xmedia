@@ -48,10 +48,12 @@ public:
     virtual XSockAddress * getLocalAddress() = 0;
     virtual XSockAddress * getRemoteAddress() = 0;
     virtual const std::string& getLocalUrl() = 0;
+    virtual int bind() = 0;
     virtual int kickIO() = 0;
     virtual int recv(void * buf, int bufSize) = 0;
     virtual int send(const void * data, int length, const XSockAddress * remoteAddress) = 0;
     virtual void close() = 0;
+    virtual void enableNagles(bool enabled) = 0;
 
     static const std::string makeUrl(XSockProto proto,const std::string& ip, int port, bool isServer);
 };
