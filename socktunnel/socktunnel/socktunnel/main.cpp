@@ -720,7 +720,6 @@ int addTurn2(BridgeManager * manager){
 
 void run_tunnel_tcppair(){
     struct event_base * ev_base = event_base_new();
-//    struct event *            ev_signal = NULL;
     struct event *            ev_timer = NULL;
     std::vector<struct event *> ev_signals;
     int signal_numbers[] = {SIGINT, SIGALRM};
@@ -760,11 +759,6 @@ void run_tunnel_tcppair(){
         event_free(o);
     }
     ev_signals.clear();
-    
-//    if(ev_signal){
-//        event_free(ev_signal);
-//        ev_signal = 0;
-//    }
 
     if(manager){
         delete manager;
