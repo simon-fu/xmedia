@@ -18,6 +18,7 @@
 #include <event2/http.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <signal.h>
 
 // mac
 #include <sys/types.h>
@@ -586,10 +587,11 @@ public:
 
 static
 void ev_signal_cb(evutil_socket_t sig, short events, void *user_data){
-    struct event_base * ev_base = (struct event_base *) user_data;
+    struct event * ev = (struct event *) user_data;
+    struct event_base * ev_base = event_get_base(ev);
     long seconds = 0;
     struct timeval delay = { seconds, 1 };
-    dbgi("caught signal %d, gracefully exit...", events);
+    dbgi("caught signal %d, gracefully exit...", event_get_signal(ev));
     event_base_loopexit(ev_base, &delay);
 }
 
@@ -670,14 +672,37 @@ int addUDPBridge(BridgeManager * mgr
     return ret;
 }
 
-void run_tunnel_tcppair(){
-    struct event_base * ev_base = event_base_new();
-    struct event *            ev_signal = NULL;
-    struct event *            ev_timer = NULL;
-    
+static
+int addWangza(BridgeManager * manager){
     int ret = 0;
-    XSocketFactory * factory = XSocketFactory::newFactory(ev_base);
-    BridgeManager * manager = new BridgeManager(factory);
+    do{
+//        ssh -L0.0.0.0:8443:101.37.228.109:443 -p3299 easemob@121.41.87.159
+//        ssh -L0.0.0.0:8780:121.196.228.24:80 -p3299 easemob@121.41.87.159
+//        ssh -L0.0.0.0:8980:101.37.182.240:80 -p3299 easemob@121.41.87.159
+//        ssh -L0.0.0.0:9081:121.196.226.37:9081 -p3299 easemob@121.41.87.159
+//        UDP:  30000 ~ 30099 -> 121.196.226.37:30000~30099
+        
+        ret = addTCPServer2Client(manager, "", 8443, "101.37.228.109", 443, 1);
+        if(ret) break;
+        ret = addTCPServer2Client(manager, "", 8780, "121.196.228.24", 80, 1);
+        if(ret) break;
+        ret = addTCPServer2Client(manager, "", 8980, "101.37.182.240", 80, 1);
+        if(ret) break;
+        ret = addTCPServer2Client(manager, "", 9081, "121.196.226.37", 9081, 1);
+        if(ret) break;
+        
+        int udpBeginPort = 30000;
+        int udpEndPort = 30099;
+        ret = addUDPBridge(manager, "", udpBeginPort, "121.196.226.37", udpBeginPort, udpEndPort-udpBeginPort+1);
+        if(ret) break;
+        
+    }while(0);
+    return ret;
+}
+
+static
+int addTurn2(BridgeManager * manager){
+    int ret = 0;
     do{
         ret = addTCPServer2Client(manager, "", 9092, "121.41.87.159", 9092, 1);
         if(ret) break;
@@ -689,10 +714,34 @@ void run_tunnel_tcppair(){
         int udpEndPort = 31999;
         ret = addUDPBridge(manager, "", udpBeginPort, "121.41.87.159", udpBeginPort, udpEndPort-udpBeginPort+1);
         if(ret) break;
+    }while(0);
+    return ret;
+}
+
+void run_tunnel_tcppair(){
+    struct event_base * ev_base = event_base_new();
+//    struct event *            ev_signal = NULL;
+    struct event *            ev_timer = NULL;
+    std::vector<struct event *> ev_signals;
+    int signal_numbers[] = {SIGINT, SIGALRM};
+    
+    int ret = 0;
+    XSocketFactory * factory = XSocketFactory::newFactory(ev_base);
+    BridgeManager * manager = new BridgeManager(factory);
+    do{
+        ret = addTurn2(manager);
+        if(ret) break;
         
-        ev_signal = evsignal_new(ev_base, SIGINT|SIGALRM, ev_signal_cb, (void *)ev_base);
-        event_add(ev_signal, NULL);
+//        ret = addWangza(manager);
+//        if(ret) break;
         
+        for(int i = 0; i < sizeof(signal_numbers)/sizeof(signal_numbers[0]); i++){
+            struct event * ev_signal = evsignal_new(ev_base, signal_numbers[i], ev_signal_cb, (void *)ev_base);
+            evsignal_assign(ev_signal, ev_base, signal_numbers[i], ev_signal_cb, ev_signal);
+            event_add(ev_signal, NULL);
+            ev_signals.push_back(ev_signal);
+        }
+
         ev_timer = event_new(ev_base, -1, EV_PERSIST, timer_event_handler, manager);
         struct timeval tv;
         tv.tv_sec = 1;
@@ -707,10 +756,15 @@ void run_tunnel_tcppair(){
         ev_timer = 0;
     }
     
-    if(ev_signal){
-        event_free(ev_signal);
-        ev_signal = 0;
+    for(auto& o : ev_signals){
+        event_free(o);
     }
+    ev_signals.clear();
+    
+//    if(ev_signal){
+//        event_free(ev_signal);
+//        ev_signal = 0;
+//    }
 
     if(manager){
         delete manager;

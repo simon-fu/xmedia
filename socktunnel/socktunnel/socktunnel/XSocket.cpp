@@ -6,6 +6,8 @@
 #include <event2/util.h>
 #include <event2/event.h>
 #include <event2/http.h>
+#include <string.h>
+#include <errno.h>
 // mac
 #include <sys/types.h>
 #include <sys/socket.h>
