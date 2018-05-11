@@ -7,7 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F4133B491D5EED9F007BE9C2 /* main_audio_proc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4133B481D5EED9F007BE9C2 /* main_audio_proc.cpp */; };
+		F4E8486120A2B4220016B4ED /* main_aec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4E8486020A2B4220016B4ED /* main_aec.cpp */; };
+		F4E8486720A2B67D0016B4ED /* xwavfile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4E8486620A2B67D0016B4ED /* xwavfile.cpp */; };
+		F4E8486920A2BB760016B4ED /* libaudio_processing_all.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4E8486820A2BB760016B4ED /* libaudio_processing_all.a */; };
+		F4E8486B20A2BB890016B4ED /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F4E8486A20A2BB890016B4ED /* CoreServices.framework */; };
+		F4E8486E20A2F3D90016B4ED /* xtlv_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4E8486D20A2F3D80016B4ED /* xtlv_file.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,7 +28,14 @@
 
 /* Begin PBXFileReference section */
 		F4133B361D5EEBCF007BE9C2 /* xmedia-aec */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "xmedia-aec"; sourceTree = BUILT_PRODUCTS_DIR; };
-		F4133B481D5EED9F007BE9C2 /* main_audio_proc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main_audio_proc.cpp; path = ../../src/main_audio_proc.cpp; sourceTree = "<group>"; };
+		F4E8486020A2B4220016B4ED /* main_aec.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main_aec.cpp; path = ../../src/main_aec.cpp; sourceTree = "<group>"; };
+		F4E8486320A2B6630016B4ED /* libaudio_processing.so */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libaudio_processing.so; path = ../../../rtc/rtccore/mediacore/out_so/mac/libaudio_processing.so; sourceTree = "<group>"; };
+		F4E8486520A2B67C0016B4ED /* xwavfile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = xwavfile.h; path = ../../src/xwavfile.h; sourceTree = "<group>"; };
+		F4E8486620A2B67D0016B4ED /* xwavfile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = xwavfile.cpp; path = ../../src/xwavfile.cpp; sourceTree = "<group>"; };
+		F4E8486820A2BB760016B4ED /* libaudio_processing_all.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libaudio_processing_all.a; path = ../../../rtc/rtccore/mediacore/out_so/mac/libaudio_processing_all.a; sourceTree = "<group>"; };
+		F4E8486A20A2BB890016B4ED /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
+		F4E8486C20A2F3D80016B4ED /* xtlv_file.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = xtlv_file.h; path = ../../src/xtlv_file.h; sourceTree = "<group>"; };
+		F4E8486D20A2F3D80016B4ED /* xtlv_file.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = xtlv_file.cpp; path = ../../src/xtlv_file.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +43,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F4E8486B20A2BB890016B4ED /* CoreServices.framework in Frameworks */,
+				F4E8486920A2BB760016B4ED /* libaudio_processing_all.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -43,6 +56,7 @@
 			children = (
 				F4133B381D5EEBCF007BE9C2 /* xmedia-aec */,
 				F4133B371D5EEBCF007BE9C2 /* Products */,
+				F4E8486220A2B6630016B4ED /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -57,9 +71,23 @@
 		F4133B381D5EEBCF007BE9C2 /* xmedia-aec */ = {
 			isa = PBXGroup;
 			children = (
-				F4133B481D5EED9F007BE9C2 /* main_audio_proc.cpp */,
+				F4E8486D20A2F3D80016B4ED /* xtlv_file.cpp */,
+				F4E8486C20A2F3D80016B4ED /* xtlv_file.h */,
+				F4E8486620A2B67D0016B4ED /* xwavfile.cpp */,
+				F4E8486520A2B67C0016B4ED /* xwavfile.h */,
+				F4E8486020A2B4220016B4ED /* main_aec.cpp */,
 			);
 			path = "xmedia-aec";
+			sourceTree = "<group>";
+		};
+		F4E8486220A2B6630016B4ED /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F4E8486A20A2BB890016B4ED /* CoreServices.framework */,
+				F4E8486820A2BB760016B4ED /* libaudio_processing_all.a */,
+				F4E8486320A2B6630016B4ED /* libaudio_processing.so */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -157,7 +185,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F4133B491D5EED9F007BE9C2 /* main_audio_proc.cpp in Sources */,
+				F4E8486120A2B4220016B4ED /* main_aec.cpp in Sources */,
+				F4E8486E20A2F3D90016B4ED /* xtlv_file.cpp in Sources */,
+				F4E8486720A2B67D0016B4ED /* xwavfile.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -248,6 +278,18 @@
 		F4133B3E1D5EEBCF007BE9C2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				HEADER_SEARCH_PATHS = (
+					/Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore,
+					"/usr/local//Cellar/speex/1.2rc1/include",
+					"$(PROJECT_DIR)/../../../../xctools/src",
+					/Users/simon/Desktop/simon/projects/easemob/src/xmedia/xctools/src,
+				);
+				LD_RUNPATH_SEARCH_PATHS = /Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore/out_so/mac/;
+				LIBRARY_SEARCH_PATHS = /Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore/out_so/mac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -255,6 +297,15 @@
 		F4133B3F1D5EEBCF007BE9C2 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				GCC_PREPROCESSOR_DEFINITIONS = "";
+				HEADER_SEARCH_PATHS = (
+					/Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore,
+					"/usr/local//Cellar/speex/1.2rc1/include",
+					"$(PROJECT_DIR)/../../../../xctools/src",
+					/Users/simon/Desktop/simon/projects/easemob/src/xmedia/xctools/src,
+				);
+				LD_RUNPATH_SEARCH_PATHS = /Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore/out_so/mac/;
+				LIBRARY_SEARCH_PATHS = /Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore/out_so/mac;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
@@ -333,6 +384,7 @@
 				F4133B4C1D5EEF08007BE9C2 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 		F4133B4F1D5EF273007BE9C2 /* Build configuration list for PBXLegacyTarget "audioproc" */ = {
 			isa = XCConfigurationList;
@@ -341,6 +393,7 @@
 				F4133B511D5EF273007BE9C2 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

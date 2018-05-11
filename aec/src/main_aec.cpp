@@ -3,6 +3,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h> // SIGINT
+#include <list>
+#include <string>
 
 #include "webrtc/modules/audio_processing/aecm/echo_control_mobile.h"
 #include "webrtc/modules/audio_processing/aec/echo_cancellation.h"
@@ -10,7 +12,7 @@
 #include <speex/speex_echo.h>
 #include <speex/speex_preprocess.h>
 
-// #include "util.h"
+#include "xcutil.h"
 #include "xwavfile.h"
 
 #define dbgv(...) do{  printf("<aec>[D] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
@@ -18,7 +20,7 @@
 #define dbge(...) do{  printf("<aec>[E] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
 
 
-
+using namespace webrtc;
 
 // 08-12 12:51:55.198 10459 10683 I alog    : WebRtcAecm_Init: aecmInst=0x610c0a80, sampFreq=8000
 // 08-12 12:51:55.198 10459 10683 I alog    : WebRtcAecm_set_config: aecmInst=0x610c0a80, config.cngMode=1, config.echoMode=3
@@ -381,7 +383,7 @@ int run_speex(wavfile_reader_t readerNear
 
 
 
-int main(int argc, char** argv){
+int aec_wave_main(int argc, char** argv){
 
 	// const char * fileNear = "tmp/input.wav"; // "tmp/input.wav"; "tmp/mix.wav";
 	// const char * fileFar = "tmp/reverse.wav";
@@ -526,6 +528,576 @@ int main(int argc, char** argv){
 	}
 
 	dbgi("bye!");
-
+    return 0;
 }
 
+struct XAudioConfig{
+    int samplerate = 16000;
+    int numChannels = 1;
+};
+
+struct XAudioFrame{
+    int type = -1;
+    int16_t * samples = NULL;
+    int sampleBufferSize = 0;
+    int samplesPerChannel = 0;
+    int numChannels;
+    int samplerate;
+    int64_t timestamp = -1;
+    virtual ~XAudioFrame(){}
+};
+
+struct XAudioFrameFixed : public XAudioFrame{
+private:
+    int16_t sampleBuffer[48000];
+public:
+    XAudioFrameFixed(){
+        this->samples = sampleBuffer;
+        this->sampleBufferSize = sizeof(sampleBuffer)/sizeof(sampleBuffer[0]);
+    }
+};
+
+class XAudioFrameFactory{
+protected:
+    int frameSize_;
+    std::list<XAudioFrame *> frames_;
+    XAudioFrame * allocFrame(int bufferSize){
+        XAudioFrame * frame = new XAudioFrame();
+        if(bufferSize > 0){
+            frame->samples = new int16_t[bufferSize];
+        }
+        frame->sampleBufferSize = bufferSize;
+        return frame;
+    }
+    void freeFrame(XAudioFrame * frame){
+        if(frame->samples){
+            delete []frame->samples;
+            frame->samples = NULL;
+        }
+        delete frame;
+    }
+public:
+    XAudioFrameFactory(int frameSize=160, int numPreAlloc = 0):frameSize_(frameSize){
+        for(int i = 0; i < numPreAlloc; ++i){
+            frames_.push_back(allocFrame(frameSize));
+        }
+    }
+    virtual ~XAudioFrameFactory(){
+        for(auto frame : frames_){
+            freeFrame(frame);
+        }
+        frames_.clear();
+    }
+    
+    XAudioFrame * attainFrame(int bufferSize){
+        if(frames_.size() > 0){
+            XAudioFrame * frame = frames_.front();
+            if(frame->sampleBufferSize >= bufferSize){
+                frames_.pop_front();
+                return frame;
+            }else{
+                // free it
+                frames_.pop_front();
+                freeFrame(frame);
+            }
+        }
+        return allocFrame(bufferSize);
+    }
+    void returnFrame(XAudioFrame * frame){
+        frames_.push_back(frame);
+    }
+    
+};
+
+class  XAudioReader{
+public:
+    virtual const XAudioConfig* getConfig() = 0;
+    virtual XAudioFrame * read() = 0;
+    virtual void close() = 0;
+};
+
+
+static const int BYTES_PER_SAMPLE = sizeof(int16_t);
+static const int TYPE_DATA_BASE = 1000;
+static const int TYPE_MAGIC = 501;
+static const int TYPE_SAMPLERATE = 502;
+static const int TYPE_CHANNELS = 503;
+static const int minTlvHeaderSize = 4 + 4 + 8;
+
+enum XAudioType {
+    ANY = 0,
+    PLAYING = 1010,
+    MIC = 1011,
+    AEC = 1012,
+};
+
+
+class XAudioTLVReader : public XAudioReader{
+protected:
+    
+    XAudioFrameFactory * factory_;
+    XAudioConfig config_;
+    FILE * fp_ = NULL;
+    int needType_ = 0;
+    XAudioFrame * lastFrame_ = NULL;
+
+    int readNext(XAudioFrame * &frame) {
+        int ret = -1;
+        XAudioFrame * next = NULL;
+        do{
+            frame = NULL;
+            uint8_t header[minTlvHeaderSize];
+            size_t bytes = fread(header, sizeof(char), minTlvHeaderSize, fp_);
+            if(bytes != minTlvHeaderSize){
+                ret = -1;
+                break;
+            }
+            
+            int type =  be_get_u32(header+0);
+            int length = be_get_u32(header+4);
+            int timestampH32 = be_get_u32(header+8);
+            int timestampL32 = be_get_u32(header+12);
+            int dataLength = length - sizeof(int64_t);
+            int numSamples = (dataLength+BYTES_PER_SAMPLE-1)/BYTES_PER_SAMPLE;
+            next = factory_->attainFrame(numSamples);
+            if(dataLength > 0){
+                bytes = fread(next->samples, sizeof(char), dataLength, fp_);
+                if(bytes != dataLength){
+                    ret = -1;
+                    break;
+                }
+            }
+            
+            next->type = type;
+            next->timestamp = ((int64_t)timestampH32 << 32) | timestampL32;
+            next->samplesPerChannel = dataLength/BYTES_PER_SAMPLE/config_.numChannels;
+            next->numChannels = config_.numChannels;
+            next->samplerate = config_.samplerate;
+            
+            frame = next;
+            next = NULL;
+            ret = 0;
+        }while(0);
+        if(next){
+            factory_->returnFrame(next);
+            next = NULL;
+        }
+        return ret;
+    }
+    
+    void readConfig(){
+        XAudioFrame * frame = NULL;
+        int samplerate = -1;
+        int numChannels = -1;
+        int ret = -1;
+        while ((ret = readNext(frame)) == 0 ) {
+            if(frame->type == TYPE_SAMPLERATE){
+                samplerate = (int) frame->timestamp;
+            }else if(frame->type == TYPE_CHANNELS){
+                numChannels =(int) frame->timestamp;
+            }else if(frame->type >= TYPE_DATA_BASE){
+                lastFrame_ = frame;
+                break;
+            }
+            factory_->returnFrame(frame);
+            if(samplerate >= 0 && numChannels >= 0){
+                config_.samplerate = samplerate;
+                config_.numChannels = numChannels;
+                return;
+            }
+        }
+    }
+    
+public:
+    XAudioTLVReader(XAudioFrameFactory * factory):factory_(factory){
+    }
+    
+    virtual ~XAudioTLVReader(){
+        close();
+        if(lastFrame_){
+            factory_->returnFrame(lastFrame_);
+            lastFrame_ = NULL;
+        }
+    }
+    
+    int open(const std::string& filename, int needType = XAudioType::ANY){
+        FILE * fp = NULL;
+        int ret = -1;
+        do{
+            fp = fopen(filename.c_str(), "rb");
+            if (!fp) {
+                ret = -1;
+                break;
+            }
+            fp_ = fp;
+            fp = NULL;
+            needType_ = needType;
+            readConfig();
+            ret = 0;
+        }while(0);
+        
+        if(fp){
+            fclose(fp);
+            fp = NULL;
+        }
+        return ret;
+    }
+    
+    virtual const XAudioConfig* getConfig() override{
+        return &config_;
+    }
+    
+    virtual XAudioFrame * read() override{
+        XAudioFrame * frame = NULL;
+        if(lastFrame_ != NULL){
+            frame = lastFrame_;
+            lastFrame_ = NULL;
+        }else{
+            readNext(frame);
+        }
+        while(frame != NULL){
+            if(frame->type >= TYPE_DATA_BASE){
+                if(needType_ == XAudioType::ANY){
+                    return frame;
+                }
+                if(needType_ == frame->type){
+                    return frame;
+                }
+            }
+            factory_->returnFrame(frame);
+            frame = NULL;
+            readNext(frame);
+        }
+        return NULL;
+    }
+    
+    virtual void close() override {
+        if(fp_){
+            fclose(fp_);
+            fp_ = NULL;
+        }
+    }
+};
+
+
+int tlv_2_wav(const char * tlvFilename, const char * outWaveFilename, XAudioType typ=XAudioType::PLAYING){
+    XAudioFrameFactory * factory = new XAudioFrameFactory();
+    XAudioTLVReader * reader = new XAudioTLVReader(factory);
+    wavfile_writer_t wavwriter = NULL;
+    int ret = -1;
+    do{
+        dbgi("tlv -> wav");
+        ret = reader->open(tlvFilename, typ);
+        if(ret){
+            dbge("fail to open [%s], ret=%d", tlvFilename, ret);
+            break;
+        }
+        dbgi("opened tlv [%s]", tlvFilename);
+        dbgi("numChannels=%d", reader->getConfig()->numChannels);
+        dbgi("samplerate=%d", reader->getConfig()->samplerate);
+        
+        wavwriter = wavfile_writer_open(outWaveFilename, reader->getConfig()->numChannels, reader->getConfig()->samplerate);
+        if(!wavwriter){
+            ret = -1;
+            dbge("fail to open wave [%s]", outWaveFilename);
+            break;
+        }
+        dbgi("opened wave [%s]", outWaveFilename);
+        
+        int numFrames = 0;
+        XAudioFrame * frame = reader->read();
+        while(frame){
+            ret = wavfile_writer_write_short(wavwriter, frame->samples, frame->samplesPerChannel*frame->numChannels);
+            factory->returnFrame(frame);
+            frame = NULL;
+            if(ret<=0){
+                ret = -1;
+                break;
+            }
+            ++numFrames;
+            frame = reader->read();
+        }
+        if(numFrames == 0){
+            dbge("fail to convert!");
+            ret = -1;
+            break;
+        }
+        dbgi("write frames %d", numFrames);
+        ret = numFrames;
+    }while(0);
+    
+    if(wavwriter){
+        wavfile_writer_close(wavwriter);
+        wavwriter = NULL;
+    }
+    
+    if(reader){
+        delete reader;
+        reader = NULL;
+    }
+    
+    if(factory){
+        delete factory;
+        factory = NULL;
+    }
+    return ret;
+}
+
+
+class XAudioEchoCanceller {
+protected:
+    std::string name_;
+public:
+    XAudioEchoCanceller(const char * preName){
+        static int instSeq = 0;
+        char buf[64];
+        sprintf(buf, "%s-%d", preName, ++instSeq);
+        name_ = buf;
+    }
+    virtual ~XAudioEchoCanceller(){}
+    virtual const std::string& name(){
+        return name_;
+    }
+    virtual int open(int delay, int sampleRate, int channels, int maxSamplesPerChannel) = 0;
+    virtual void close() = 0 ;
+    virtual int processFar(short * farBuffer, int numSamples) = 0;
+    virtual int processNear(short * nearBuffer, int numSamples, short * outBuffer) = 0;
+};
+
+class XAudioWebrtcAEC : public XAudioEchoCanceller{
+    bool doNLP_;
+    int delay_ = 0;
+    void * aecInstance_ = NULL;
+    int frameSamplesPerChannel_ = 0 ;
+    float * inBufferF_ = NULL;
+    float * outBufferF_ = NULL;
+    
+public:
+    XAudioWebrtcAEC( bool doNLP = true):XAudioEchoCanceller("WebrtcAEC"), doNLP_(doNLP){
+    }
+    
+    virtual ~XAudioWebrtcAEC(){
+        close();
+    }
+    
+    virtual int open(int delay, int sampleRate, int channels, int maxSamplesPerChannel) override{
+        if(aecInstance_){
+            dbge("XAudioWebrtcAEC::open already init");
+            return -1;
+        }
+        delay_ = delay;
+        dbgi("XAudioWebrtcAEC::open frameSize=%d, sampleRate=%d, delay=%d, doNLP=%d", maxSamplesPerChannel, sampleRate, delay_, doNLP_);
+        aecInstance_ = WebRtcAec_Create();
+        WebRtcAec_Init(aecInstance_, sampleRate, 48000);
+        AecConfig config;
+        config.nlpMode = kAecNlpModerate;
+        config.metricsMode = kAecTrue;
+        config.skewMode = kAecFalse;
+        config.delay_logging = kAecTrue;
+        WebRtcAec_set_config(aecInstance_, config);
+        
+        frameSamplesPerChannel_ = maxSamplesPerChannel;
+        
+        inBufferF_ =  (float *) malloc(sizeof(float) * frameSamplesPerChannel_);
+        outBufferF_ = (float *) malloc(sizeof(float) * frameSamplesPerChannel_);
+        memset(inBufferF_,  0, frameSamplesPerChannel_ * sizeof(float));
+        memset(outBufferF_, 0, frameSamplesPerChannel_ * sizeof(float));
+        return 0;
+    }
+    
+    virtual void close() override{
+        if (aecInstance_) {
+            WebRtcAec_Free(aecInstance_);
+            aecInstance_ = NULL;
+        }
+        
+        if(inBufferF_){
+            free(inBufferF_);
+            inBufferF_ = NULL;
+        }
+        
+        if(outBufferF_){
+            free(outBufferF_);
+            outBufferF_ = NULL;
+        }
+    }
+    
+    int processFar(short * farBuffer, int numSamples) override{
+        for(int i = 0; i < numSamples; i++){
+            inBufferF_[i] = farBuffer[i];
+        }
+        int32_t ret = WebRtcAec_BufferFarend(aecInstance_, inBufferF_, numSamples);
+//        dbgi("Far process: inst=%p, ref[0]=%+5d,ref[1]=%+5d,ref[2]=%+5d", aecInstance_, farBuffer[0], farBuffer[1], farBuffer[2]);
+        return ret;
+    }
+    
+    int processNear(short * nearBuffer, int numSamples, short * outBuffer) override{
+        for(int i = 0; i < numSamples; i++){
+            inBufferF_[i] = nearBuffer[i];
+        }
+//        dbgi("Mic process: inst=%p, mic[0]=%+5d,mic[1]=%+5d,mic[2]=%+5d =>", aecInstance_, nearBuffer[0], nearBuffer[1], nearBuffer[2]);
+        const float* nearend = inBufferF_;
+        int32_t ret = WebRtcAec_Process(aecInstance_, &nearend, 1, &outBufferF_, numSamples, delay_, 0);
+        if(ret == 0){
+            for(int i = 0; i < numSamples; i++){
+                outBuffer[i] = outBufferF_[i];
+            }
+//            dbgi("Mic process: inst=%p, mic[0]=%+5d,mic[1]=%+5d,mic[2]=%+5d <=", aecInstance_, outBuffer[0], outBuffer[1], outBuffer[2]);
+        }
+
+        return ret;
+    }
+};
+
+class XAudioWebrtcAECM : public XAudioEchoCanceller{
+    void * aecInstance_ = NULL;
+    int delay_ = 0;
+    
+public:
+    XAudioWebrtcAECM():XAudioEchoCanceller("WebrtcAECM"){
+    }
+    
+    virtual ~XAudioWebrtcAECM(){
+        close();
+    }
+    
+    virtual int open(int delay, int sampleRate, int channels, int maxSamplesPerChannel) override{
+        if(aecInstance_){
+            dbge("XAudioWebrtcAECM::open already init");
+            return -1;
+        }
+        dbgi("XAudioWebrtcAECM::open frameSize=%d, sampleRate=%d, delay=%d", maxSamplesPerChannel, sampleRate, delay);
+        delay_ = delay;
+        aecInstance_ = WebRtcAecm_Create();
+        WebRtcAecm_Init(aecInstance_, sampleRate);
+        return 0;
+    }
+    
+    virtual void close() override{
+        if (aecInstance_) {
+            WebRtcAecm_Free(aecInstance_);
+            aecInstance_ = NULL;
+        }
+    }
+    
+    int processFar(short * farBuffer, int numSamples) override{
+        int ret = WebRtcAecm_BufferFarend(aecInstance_, farBuffer, numSamples);
+//        dbgi("AECM far process: inst=%p, ref[0]=%+5d,ref[1]=%+5d,ref[2]=%+5d", aecInstance_, farBuffer[0], farBuffer[1], farBuffer[2]);
+        return ret;
+    }
+    
+    int processNear(short * nearBuffer, int numSamples, short * outBuffer) override{
+//        dbgi("AECM mic process: inst=%p, mic[0]=%+5d,mic[1]=%+5d,mic[2]=%+5d =>", aecInstance_, nearBuffer[0], nearBuffer[1], nearBuffer[2]);
+        int ret = WebRtcAecm_Process(aecInstance_, nearBuffer, NULL, outBuffer, numSamples, delay_);
+//        dbgi("AECM mic process: inst=%p, mic[0]=%+5d,mic[1]=%+5d,mic[2]=%+5d <=", aecInstance_, outBuffer[0], outBuffer[1], outBuffer[2]);
+        return ret;
+    }
+};
+
+
+
+int tlv_aec(const char * tlvFilename, const char * outWaveFilename){
+    XAudioFrameFactory * factory = new XAudioFrameFactory();
+    XAudioTLVReader * reader = new XAudioTLVReader(factory);
+    wavfile_writer_t wavwriter = NULL;
+//    XAudioEchoCanceller * aec = new XAudioWebrtcAEC();
+    XAudioEchoCanceller * aec = new XAudioWebrtcAECM();
+//    int delay = 120;
+    int delay = 260;
+    int ret = -1;
+    do{
+        dbgi("tlv_aec");
+        ret = reader->open(tlvFilename, XAudioType::ANY);
+        if(ret){
+            dbge("fail to open [%s], ret=%d", tlvFilename, ret);
+            break;
+        }
+        dbgi("opened tlv [%s]", tlvFilename);
+        dbgi("numChannels=%d", reader->getConfig()->numChannels);
+        dbgi("samplerate=%d", reader->getConfig()->samplerate);
+        
+        wavwriter = wavfile_writer_open(outWaveFilename, reader->getConfig()->numChannels, reader->getConfig()->samplerate);
+        if(!wavwriter){
+            ret = -1;
+            dbge("fail to open wave [%s]", outWaveFilename);
+            break;
+        }
+        dbgi("opened wave [%s]", outWaveFilename);
+        
+        int maxSamplesPerChannel = reader->getConfig()->samplerate;
+        ret = aec->open(delay, reader->getConfig()->samplerate, reader->getConfig()->numChannels, maxSamplesPerChannel );
+        if(ret){
+            dbge("fail to open aec [%s]", aec->name().c_str());
+            break;
+        }
+        dbgi("opened aec [%s]", aec->name().c_str());
+        
+        int numFrames = 0;
+        short outbuffer[reader->getConfig()->samplerate];
+        XAudioFrame * frame = reader->read();
+        while(frame){
+            ret = 0;
+            int numSamples = frame->samplesPerChannel*frame->numChannels;
+            if(frame->type == XAudioType::PLAYING){
+                ret = aec->processFar(frame->samples, numSamples);
+                if(ret){
+                    dbge("fail to aec processFar, error=%d", ret);
+                }
+            }else if(frame->type == XAudioType::MIC){
+                ret = aec->processNear(frame->samples, numSamples, outbuffer);
+                if(ret){
+                    dbge("fail to aec processNear, error=%d", ret);
+                }else{
+                    ret = wavfile_writer_write_short(wavwriter, outbuffer, numSamples);
+                    if(ret<=0){
+                        ret = -1;
+                    }else{
+                        ret = 0;
+                        ++numFrames;
+                    }
+                }
+            }
+            frame->samplesPerChannel = 0;
+            factory->returnFrame(frame);
+            frame = NULL;
+            if(ret){
+                break;
+            }
+            frame = reader->read();
+        }
+        dbgi("write frames %d", numFrames);
+        ret = numFrames;
+    }while(0);
+    
+    if(aec){
+        delete aec;
+        aec = NULL;
+    }
+    
+    if(wavwriter){
+        wavfile_writer_close(wavwriter);
+        wavwriter = NULL;
+    }
+    
+    if(reader){
+        delete reader;
+        reader = NULL;
+    }
+    
+    if(factory){
+        delete factory;
+        factory = NULL;
+    }
+    return ret;
+}
+
+int main(int argc, char** argv){
+    const char * tlvFilename = "/Users/simon/Downloads/VAECDemo/src-aec.tlv";
+    const char * outWaveFilename = "/Users/simon/Downloads/VAECDemo/macout.wav";
+    int ret = 0;
+    
+//    ret = tlv_2_wav(tlvFilename, outWaveFilename, XAudioType::AEC);
+    ret = tlv_aec(tlvFilename, outWaveFilename);
+    
+    return ret;
+}
