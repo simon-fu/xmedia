@@ -1,0 +1,334 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 50;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		F48ED1DA20AABB0A00C5BF98 /* speex_echo.h in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1CF20AABAE400C5BF98 /* speex_echo.h */; };
+		F48ED1DB20AABB0B00C5BF98 /* smallft.h in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1D020AABAE400C5BF98 /* smallft.h */; };
+		F48ED1DC20AABB0B00C5BF98 /* fftwrap.c in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1D120AABAE400C5BF98 /* fftwrap.c */; };
+		F48ED1DD20AABB0B00C5BF98 /* sabine_aec.h in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1D220AABAE400C5BF98 /* sabine_aec.h */; };
+		F48ED1DE20AABB0B00C5BF98 /* smallft.c in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1D320AABAE400C5BF98 /* smallft.c */; };
+		F48ED1DF20AABB0B00C5BF98 /* mdf.c in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1D420AABAE400C5BF98 /* mdf.c */; };
+		F48ED1E020AABB0B00C5BF98 /* vorbis_psy.h in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1D520AABAE400C5BF98 /* vorbis_psy.h */; };
+		F48ED1E120AABB0B00C5BF98 /* fftwrap.h in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1D620AABAE400C5BF98 /* fftwrap.h */; };
+		F48ED1E220AABB0B00C5BF98 /* Platform.h in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1D720AABAE400C5BF98 /* Platform.h */; };
+		F48ED1E320AABB0B00C5BF98 /* scal.c in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1D820AABAE400C5BF98 /* scal.c */; };
+		F48ED1E420AABB0B00C5BF98 /* sabine_aec.c in Sources */ = {isa = PBXBuildFile; fileRef = F48ED1D920AABAE400C5BF98 /* sabine_aec.c */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		F48ED1BC20AAB9BE00C5BF98 /* libsabine_speex.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; includeInIndex = 0; path = libsabine_speex.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
+		F48ED1CF20AABAE400C5BF98 /* speex_echo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = speex_echo.h; sourceTree = "<group>"; };
+		F48ED1D020AABAE400C5BF98 /* smallft.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = smallft.h; sourceTree = "<group>"; };
+		F48ED1D120AABAE400C5BF98 /* fftwrap.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = fftwrap.c; sourceTree = "<group>"; };
+		F48ED1D220AABAE400C5BF98 /* sabine_aec.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = sabine_aec.h; sourceTree = "<group>"; };
+		F48ED1D320AABAE400C5BF98 /* smallft.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = smallft.c; sourceTree = "<group>"; };
+		F48ED1D420AABAE400C5BF98 /* mdf.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = mdf.c; sourceTree = "<group>"; };
+		F48ED1D520AABAE400C5BF98 /* vorbis_psy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = vorbis_psy.h; sourceTree = "<group>"; };
+		F48ED1D620AABAE400C5BF98 /* fftwrap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fftwrap.h; sourceTree = "<group>"; };
+		F48ED1D720AABAE400C5BF98 /* Platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Platform.h; sourceTree = "<group>"; };
+		F48ED1D820AABAE400C5BF98 /* scal.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = scal.c; sourceTree = "<group>"; };
+		F48ED1D920AABAE400C5BF98 /* sabine_aec.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = sabine_aec.c; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F48ED1B920AAB9BE00C5BF98 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		F48ED1B320AAB9BE00C5BF98 = {
+			isa = PBXGroup;
+			children = (
+				F48ED1CE20AABAE400C5BF98 /* sabine_speex */,
+				F48ED1BD20AAB9BE00C5BF98 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		F48ED1BD20AAB9BE00C5BF98 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F48ED1BC20AAB9BE00C5BF98 /* libsabine_speex.dylib */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F48ED1CE20AABAE400C5BF98 /* sabine_speex */ = {
+			isa = PBXGroup;
+			children = (
+				F48ED1CF20AABAE400C5BF98 /* speex_echo.h */,
+				F48ED1D520AABAE400C5BF98 /* vorbis_psy.h */,
+				F48ED1D820AABAE400C5BF98 /* scal.c */,
+				F48ED1D020AABAE400C5BF98 /* smallft.h */,
+				F48ED1D320AABAE400C5BF98 /* smallft.c */,
+				F48ED1D120AABAE400C5BF98 /* fftwrap.c */,
+				F48ED1D620AABAE400C5BF98 /* fftwrap.h */,
+				F48ED1D420AABAE400C5BF98 /* mdf.c */,
+				F48ED1D720AABAE400C5BF98 /* Platform.h */,
+				F48ED1D220AABAE400C5BF98 /* sabine_aec.h */,
+				F48ED1D920AABAE400C5BF98 /* sabine_aec.c */,
+			);
+			name = sabine_speex;
+			path = ../src/sabine_speex;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXHeadersBuildPhase section */
+		F48ED1BA20AAB9BE00C5BF98 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXHeadersBuildPhase section */
+
+/* Begin PBXNativeTarget section */
+		F48ED1BB20AAB9BE00C5BF98 /* sabine_speex */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F48ED1C520AAB9BE00C5BF98 /* Build configuration list for PBXNativeTarget "sabine_speex" */;
+			buildPhases = (
+				F48ED1B820AAB9BE00C5BF98 /* Sources */,
+				F48ED1B920AAB9BE00C5BF98 /* Frameworks */,
+				F48ED1BA20AAB9BE00C5BF98 /* Headers */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = sabine_speex;
+			productName = sabine_speex;
+			productReference = F48ED1BC20AAB9BE00C5BF98 /* libsabine_speex.dylib */;
+			productType = "com.apple.product-type.library.dynamic";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F48ED1B420AAB9BE00C5BF98 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0930;
+				ORGANIZATIONNAME = easemob;
+				TargetAttributes = {
+					F48ED1BB20AAB9BE00C5BF98 = {
+						CreatedOnToolsVersion = 9.3;
+					};
+				};
+			};
+			buildConfigurationList = F48ED1B720AAB9BE00C5BF98 /* Build configuration list for PBXProject "sabine_speex" */;
+			compatibilityVersion = "Xcode 9.3";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = F48ED1B320AAB9BE00C5BF98;
+			productRefGroup = F48ED1BD20AAB9BE00C5BF98 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F48ED1BB20AAB9BE00C5BF98 /* sabine_speex */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F48ED1B820AAB9BE00C5BF98 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F48ED1DA20AABB0A00C5BF98 /* speex_echo.h in Sources */,
+				F48ED1DB20AABB0B00C5BF98 /* smallft.h in Sources */,
+				F48ED1DC20AABB0B00C5BF98 /* fftwrap.c in Sources */,
+				F48ED1DD20AABB0B00C5BF98 /* sabine_aec.h in Sources */,
+				F48ED1DE20AABB0B00C5BF98 /* smallft.c in Sources */,
+				F48ED1DF20AABB0B00C5BF98 /* mdf.c in Sources */,
+				F48ED1E020AABB0B00C5BF98 /* vorbis_psy.h in Sources */,
+				F48ED1E120AABB0B00C5BF98 /* fftwrap.h in Sources */,
+				F48ED1E220AABB0B00C5BF98 /* Platform.h in Sources */,
+				F48ED1E320AABB0B00C5BF98 /* scal.c in Sources */,
+				F48ED1E420AABB0B00C5BF98 /* sabine_aec.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		F48ED1C320AAB9BE00C5BF98 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		F48ED1C420AAB9BE00C5BF98 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		F48ED1C620AAB9BE00C5BF98 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				EXECUTABLE_PREFIX = lib;
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GENERATE_MASTER_OBJECT_FILE = NO;
+				OTHER_CFLAGS = "-fvisibility=hidden";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRIP_STYLE = debugging;
+			};
+			name = Debug;
+		};
+		F48ED1C720AAB9BE00C5BF98 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				EXECUTABLE_PREFIX = lib;
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GENERATE_MASTER_OBJECT_FILE = NO;
+				OTHER_CFLAGS = "-fvisibility=hidden";
+				OTHER_LDFLAGS = "";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRIP_STYLE = debugging;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F48ED1B720AAB9BE00C5BF98 /* Build configuration list for PBXProject "sabine_speex" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F48ED1C320AAB9BE00C5BF98 /* Debug */,
+				F48ED1C420AAB9BE00C5BF98 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F48ED1C520AAB9BE00C5BF98 /* Build configuration list for PBXNativeTarget "sabine_speex" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F48ED1C620AAB9BE00C5BF98 /* Debug */,
+				F48ED1C720AAB9BE00C5BF98 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = F48ED1B420AAB9BE00C5BF98 /* Project object */;
+}

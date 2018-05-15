@@ -30,6 +30,8 @@ extern "C"{
     
     int wavfile_reader_read_short(wavfile_reader_t obj, short * data, int length);
     
+    int wavfile_reader_skip_short(wavfile_reader_t obj, int length);
+    
     int wavfile_reader_info(wavfile_reader_t obj, wavfileinfo * info);
     
     unsigned int wavfile_reader_samplerate(wavfile_reader_t obj);

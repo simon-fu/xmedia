@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F48ED1E620AAC79B00C5BF98 /* libsabine_speex.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F48ED1E520AAC79B00C5BF98 /* libsabine_speex.dylib */; };
 		F4E8486120A2B4220016B4ED /* main_aec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4E8486020A2B4220016B4ED /* main_aec.cpp */; };
 		F4E8486720A2B67D0016B4ED /* xwavfile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4E8486620A2B67D0016B4ED /* xwavfile.cpp */; };
 		F4E8486920A2BB760016B4ED /* libaudio_processing_all.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4E8486820A2BB760016B4ED /* libaudio_processing_all.a */; };
@@ -28,14 +29,16 @@
 
 /* Begin PBXFileReference section */
 		F4133B361D5EEBCF007BE9C2 /* xmedia-aec */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "xmedia-aec"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F48ED1E520AAC79B00C5BF98 /* libsabine_speex.dylib */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = libsabine_speex.dylib; sourceTree = BUILT_PRODUCTS_DIR; };
 		F4E8486020A2B4220016B4ED /* main_aec.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main_aec.cpp; path = ../../src/main_aec.cpp; sourceTree = "<group>"; };
-		F4E8486320A2B6630016B4ED /* libaudio_processing.so */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libaudio_processing.so; path = ../../../rtc/rtccore/mediacore/out_so/mac/libaudio_processing.so; sourceTree = "<group>"; };
 		F4E8486520A2B67C0016B4ED /* xwavfile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = xwavfile.h; path = ../../src/xwavfile.h; sourceTree = "<group>"; };
 		F4E8486620A2B67D0016B4ED /* xwavfile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = xwavfile.cpp; path = ../../src/xwavfile.cpp; sourceTree = "<group>"; };
 		F4E8486820A2BB760016B4ED /* libaudio_processing_all.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libaudio_processing_all.a; path = ../../../rtc/rtccore/mediacore/out_so/mac/libaudio_processing_all.a; sourceTree = "<group>"; };
 		F4E8486A20A2BB890016B4ED /* CoreServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreServices.framework; path = System/Library/Frameworks/CoreServices.framework; sourceTree = SDKROOT; };
 		F4E8486C20A2F3D80016B4ED /* xtlv_file.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = xtlv_file.h; path = ../../src/xtlv_file.h; sourceTree = "<group>"; };
 		F4E8486D20A2F3D80016B4ED /* xtlv_file.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = xtlv_file.cpp; path = ../../src/xtlv_file.cpp; sourceTree = "<group>"; };
+		F4E8486F20A591EA0016B4ED /* libspeexdsp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libspeexdsp.a; path = ../../../../../../../../../../usr/local/Cellar/speex/1.2rc1/lib/libspeexdsp.a; sourceTree = "<group>"; };
+		F4E8487020A591EA0016B4ED /* libspeex.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libspeex.a; path = ../../../../../../../../../../usr/local/Cellar/speex/1.2rc1/lib/libspeex.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -43,6 +46,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F48ED1E620AAC79B00C5BF98 /* libsabine_speex.dylib in Frameworks */,
 				F4E8486B20A2BB890016B4ED /* CoreServices.framework in Frameworks */,
 				F4E8486920A2BB760016B4ED /* libaudio_processing_all.a in Frameworks */,
 			);
@@ -83,9 +87,11 @@
 		F4E8486220A2B6630016B4ED /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				F48ED1E520AAC79B00C5BF98 /* libsabine_speex.dylib */,
+				F4E8487020A591EA0016B4ED /* libspeex.a */,
+				F4E8486F20A591EA0016B4ED /* libspeexdsp.a */,
 				F4E8486A20A2BB890016B4ED /* CoreServices.framework */,
 				F4E8486820A2BB760016B4ED /* libaudio_processing_all.a */,
-				F4E8486320A2B6630016B4ED /* libaudio_processing.so */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -287,9 +293,18 @@
 					"/usr/local//Cellar/speex/1.2rc1/include",
 					"$(PROJECT_DIR)/../../../../xctools/src",
 					/Users/simon/Desktop/simon/projects/easemob/src/xmedia/xctools/src,
+					"$(PROJECT_DIR)/../src/sabine_speex",
 				);
 				LD_RUNPATH_SEARCH_PATHS = /Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore/out_so/mac/;
-				LIBRARY_SEARCH_PATHS = /Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore/out_so/mac;
+				LIBRARY_SEARCH_PATHS = (
+					/Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore/out_so/mac,
+					"/usr/local//Cellar/speex/1.2rc1/lib",
+					/usr/local/Cellar/speex/1.2rc1/lib,
+				);
+				OTHER_LDFLAGS = (
+					"/usr/local//Cellar/speex/1.2rc1/lib/libspeex.a",
+					"/usr/local//Cellar/speex/1.2rc1/lib/libspeexdsp.a",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -303,9 +318,18 @@
 					"/usr/local//Cellar/speex/1.2rc1/include",
 					"$(PROJECT_DIR)/../../../../xctools/src",
 					/Users/simon/Desktop/simon/projects/easemob/src/xmedia/xctools/src,
+					"$(PROJECT_DIR)/../src/sabine_speex",
 				);
 				LD_RUNPATH_SEARCH_PATHS = /Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore/out_so/mac/;
-				LIBRARY_SEARCH_PATHS = /Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore/out_so/mac;
+				LIBRARY_SEARCH_PATHS = (
+					/Users/simon/Desktop/simon/projects/easemob/src/rtc/rtccore/mediacore/out_so/mac,
+					"/usr/local//Cellar/speex/1.2rc1/lib",
+					/usr/local/Cellar/speex/1.2rc1/lib,
+				);
+				OTHER_LDFLAGS = (
+					"/usr/local//Cellar/speex/1.2rc1/lib/libspeex.a",
+					"/usr/local//Cellar/speex/1.2rc1/lib/libspeexdsp.a",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

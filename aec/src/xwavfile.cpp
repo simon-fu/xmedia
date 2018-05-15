@@ -213,6 +213,11 @@ int wavfile_reader_read_short(wavfile_reader_t obj, short * data, int length){
     return samples;
 }
 
+int wavfile_reader_skip_short(wavfile_reader_t obj, int length){
+    fseek(obj->fp, length*sizeof(short), SEEK_CUR);
+    return 0;
+}
+
 int wavfile_reader_info(wavfile_reader_t obj, wavfileinfo * info){
     if(info){
         *info = obj->fileinfo;
