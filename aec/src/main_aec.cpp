@@ -5,6 +5,7 @@
 #include <signal.h> // SIGINT
 #include <list>
 #include <string>
+#include <cmath>
 
 #include "webrtc/modules/audio_processing/aecm/echo_control_mobile.h"
 #include "webrtc/modules/audio_processing/aec/echo_cancellation.h"
@@ -15,11 +16,6 @@
 #include "xcutil.h"
 #include "xwavfile.h"
 #include "sabine_aec.h"
-
-//#define dbgd(...) do{  printf("<aec>[D] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
-//#define dbgi(...) do{  printf("<aec>[I] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
-//#define dbge(...) do{  printf("<aec>[E] " __VA_ARGS__); printf("\n"); fflush(stdout); }while(0)
-
 
 
 // 08-12 12:51:55.198 10459 10683 I alog    : WebRtcAecm_Init: aecmInst=0x610c0a80, sampFreq=8000
@@ -39,502 +35,12 @@
 // 08-12 12:42:13.868  9797 10170 I alog    : WebRtcAecm_Process: aecmInst=0x626f1b18, nearendNoisy=0x65193568, nearendClean=0x626f1368, out=0x626f1368, nrOfSamples=160, msInSndCardBuf=150
 
 
-//static
-//int run_aecm(wavfile_reader_t readerNear
-//        , wavfile_reader_t readerFar
-//        , wavfile_writer_t writerOut
-//        , int32_t sampFreq
-//        , int nrOfSamples
-//        , int msInSndCardBuf
-//        , int16_t near_buf[]
-//        , int16_t far_buf[]
-//        , int16_t out_buf[]
-//        , int framebytes
-//        , int& frameCount){
-//
-//    int ret = 0;
-//    void* aecmInst = NULL;
-//    AecmConfig aecmConfig = {.cngMode=0, .echoMode=3};
-//
-//    do{
-//
-//        aecmInst = WebRtcAecm_Create();
-//        if(!aecmInst){
-//            dbge("WebRtcAecm_Create fail");
-//            break;
-//        }
-//        dbgi("WebRtcAecm_Create success, aecmInst=%p", aecmInst);
-//
-//        ret = WebRtcAecm_Init(aecmInst, sampFreq);
-//        if(ret != 0){
-//            dbge("WebRtcAecm_Init fail ret=%d", ret);
-//            break;
-//        }
-//        dbgi("WebRtcAecm_Init success");
-//
-//        ret = WebRtcAecm_set_config(aecmInst, aecmConfig);
-//        if(ret != 0){
-//            dbge("WebRtcAecm_set_config fail ret=%d, config=[%d, %d]", ret, aecmConfig.cngMode, aecmConfig.echoMode);
-//            break;
-//        }
-//        dbgi("WebRtcAecm_set_config success, config=[.cngMode=%d, .echoMode=%d]", aecmConfig.cngMode, aecmConfig.echoMode);
-//
-//
-//
-//
-//        frameCount = 0;
-//        while(1){
-//            ret = wavfile_reader_read(readerFar, far_buf, framebytes);
-//            if(ret != framebytes){
-//                dbgi("reach far-end file end");
-//                ret = 0;
-//                break;
-//            }
-//
-//            ret = WebRtcAecm_BufferFarend(aecmInst, far_buf, nrOfSamples);
-//            if(ret != 0){
-//                dbge("WebRtcAecm_BufferFarend fail ret=%d", ret);
-//                break;
-//            }
-//
-//            ret = wavfile_reader_read(readerNear, near_buf, framebytes);
-//            if(ret != framebytes){
-//                dbgi("reach near-end file end");
-//                ret = 0;
-//                break;
-//            }
-//
-//            ret = WebRtcAecm_Process(aecmInst,
-//                                       near_buf, // nearendNoisy,
-//                                       near_buf, // nearendClean,
-//                                       out_buf,
-//                                       nrOfSamples,
-//                                       msInSndCardBuf);
-//            if(ret != 0){
-//                dbge("WebRtcAecm_Process fail ret=%d", ret);
-//                break;
-//            }
-//
-//            //memcpy(out_buf, near_buf, framebytes);
-//            ret = wavfile_writer_write(writerOut, out_buf, framebytes);
-//            if(ret < 0){
-//                dbge("wavfile_writer_write fail ret=%d", ret);
-//                break;
-//            }
-//
-//            ret = 0;
-//            frameCount++;
-//        }
-//
-//    }while(0);
-//
-//    if(aecmInst){
-//        dbgi("WebRtcAecm_Free aecmInst=%p", aecmInst);
-//        WebRtcAecm_Free(aecmInst);
-//        aecmInst = NULL;
-//    }
-//
-//    return ret;
-//}
-//
-//static
-//inline void copy_int16_to_float(int16_t src[], float dst[], int num){
-//    for(int i = 0; i < num; i++){
-//        dst[i] = src[i];
-//    }
-//}
-//
-//static
-//inline void copy_float_to_int16(float src[], int16_t dst[], int num){
-//    for(int i = 0; i < num; i++){
-//        dst[i] = src[i];
-//    }
-//}
-//
-//static
-//int run_aec(wavfile_reader_t readerNear
-//        , wavfile_reader_t readerFar
-//        , wavfile_writer_t writerOut
-//        , int32_t sampFreq
-//        , int nrOfSamples
-//        , int msInSndCardBuf
-//        , int16_t near_buf[]
-//        , int16_t far_buf[]
-//        , int16_t out_buf[]
-//        , int framebytes
-//        , int& frameCount){
-//
-//    int ret = 0;
-//    void* aInst = NULL;
-//    // AecConfig aConfig = {.nlpMode=kAecNlpModerate, .skewMode=kAecFalse, .metricsMode=kAecFalse, .delay_logging=kAecFalse};
-//    // AecConfig aConfig = {.nlpMode=kAecNlpAggressive, .skewMode=kAecFalse, .metricsMode=kAecFalse, .delay_logging=kAecFalse};
-//    AecConfig config = {.nlpMode=kAecNlpConservative, .skewMode=kAecFalse, .metricsMode=kAecFalse, .delay_logging=kAecFalse};
-//    AecConfig * aConfig = NULL; // &config;
-//
-//    do{
-//
-//        aInst = WebRtcAec_Create();
-//        if(!aInst){
-//            dbge("WebRtcAec_Create fail");
-//            break;
-//        }
-//        dbgi("WebRtcAec_Create success, aInst=%p", aInst);
-//
-//        ret = WebRtcAec_Init(aInst, sampFreq, sampFreq);
-//        if(ret != 0){
-//            dbge("WebRtcAec_Init fail ret=%d", ret);
-//            break;
-//        }
-//        dbgi("WebRtcAec_Init success");
-//
-//        if(aConfig){
-//            ret = WebRtcAec_set_config(aInst, *aConfig);
-//            if(ret != 0){
-//                dbge("WebRtcAec_set_config fail ret=%d, config=[%d, %d, %d, %d]", ret, aConfig->nlpMode, aConfig->skewMode, aConfig->metricsMode, aConfig->delay_logging);
-//                break;
-//            }
-//            dbgi("WebRtcAec_set_config success, config=[%d, %d, %d, %d]", aConfig->nlpMode, aConfig->skewMode, aConfig->metricsMode, aConfig->delay_logging);
-//        }else{
-//            dbgi("skip set config");
-//        }
-//
-//
-//
-//        float far_data[nrOfSamples] ;
-//        float near_data[nrOfSamples] ;
-//        float out_data[nrOfSamples] ;
-//
-//        frameCount = 0;
-//        while(1){
-//            ret = wavfile_reader_read(readerFar, far_buf, framebytes);
-//            if(ret != framebytes){
-//                dbgi("reach far-end file end");
-//                ret = 0;
-//                break;
-//            }
-//            copy_int16_to_float(far_buf, far_data, nrOfSamples);
-//
-//            ret = WebRtcAec_BufferFarend(aInst, far_data, nrOfSamples);
-//            if(ret != 0){
-//                dbge("WebRtcAecm_BufferFarend fail ret=%d", ret);
-//                break;
-//            }
-//
-//            ret = wavfile_reader_read(readerNear, near_buf, framebytes);
-//            if(ret != framebytes){
-//                dbgi("reach near-end file end");
-//                ret = 0;
-//                break;
-//            }
-//            copy_int16_to_float(near_buf, near_data, nrOfSamples);
-//            float * nearend[1]  = {near_data};
-//            float * out[1]  = {out_data};
-//            ret = WebRtcAec_Process(aInst,
-//                                       nearend, // nearend,
-//                                       1, // ,
-//                                       out,
-//                                       nrOfSamples,
-//                                       msInSndCardBuf,
-//                                       0);
-//            if(ret != 0){
-//                dbge("WebRtcAec_Process fail ret=%d", ret);
-//                break;
-//            }
-//            copy_float_to_int16(out_data, out_buf, nrOfSamples);
-//
-//            //memcpy(out_buf, near_buf, framebytes);
-//            ret = wavfile_writer_write(writerOut, out_buf, framebytes);
-//            if(ret < 0){
-//                dbge("wavfile_writer_write fail ret=%d", ret);
-//                break;
-//            }
-//
-//            ret = 0;
-//            frameCount++;
-//        }
-//
-//    }while(0);
-//
-//    if(aInst){
-//        dbgi("WebRtcAec_Free aInst=%p", aInst);
-//        WebRtcAec_Free(aInst);
-//        aInst = NULL;
-//    }
-//
-//    return ret;
-//}
-//
-//
-//static
-//int run_speex(wavfile_reader_t readerNear
-//        , wavfile_reader_t readerFar
-//        , wavfile_writer_t writerOut
-//        , int32_t sampFreq
-//        , int nrOfSamples
-//        , int msInSndCardBuf
-//        , int16_t near_buf[]
-//        , int16_t far_buf[]
-//        , int16_t out_buf[]
-//        , int framebytes
-//        , int& frameCount){
-//
-//    int ret = 0;
-//
-//    SpeexPreprocessState *preprocess_state = NULL;
-//    SpeexEchoState *echo_state = NULL;
-//    int  preprocess_on = 1;
-//
-//    nrOfSamples = 2 * sampFreq/100; // 20 ms
-//    framebytes = nrOfSamples * 2;
-//    int frame_size = nrOfSamples;
-//    int filter_length =  sampFreq/10/2; // 100 ms
-//
-//    dbgi("use speex echo (preprocess_on=%d)", preprocess_on);
-//    dbgi("frame_size=%d", frame_size);
-//    dbgi("filter_length=%d", filter_length);
-//
-//    do{
-//
-//        echo_state = speex_echo_state_init(frame_size, filter_length);
-//        if(!echo_state){
-//            dbge("speex_echo_state_init fail");
-//            break;
-//        }
-//        dbgi("speex_echo_state_init success, obj=%p", echo_state);
-//
-//        int sampleRate = sampFreq;
-//        speex_echo_ctl(echo_state, SPEEX_ECHO_SET_SAMPLING_RATE, &sampleRate);
-//
-//        if(preprocess_on){
-//            preprocess_state = speex_preprocess_state_init(frame_size, sampFreq);
-//            if(!preprocess_state){
-//                dbge("speex_preprocess_state_init fail");
-//                break;
-//            }
-//            dbgi("speex_preprocess_state_init success, obj=%p", preprocess_state);
-//
-//
-//            ret = speex_preprocess_ctl(preprocess_state, SPEEX_PREPROCESS_SET_ECHO_STATE, echo_state);
-//            if(ret != 0){
-//                dbge("speex_preprocess_ctl (SPEEX_PREPROCESS_SET_ECHO_STATE) fail, ret=%d", ret);
-//                break;
-//            }
-//            dbge("speex_preprocess_ctl (SPEEX_PREPROCESS_SET_ECHO_STATE) success");
-//        }
-//
-//
-//
-//        frameCount = 0;
-//        while(1){
-//            ret = wavfile_reader_read(readerFar, far_buf, framebytes);
-//            if(ret != framebytes){
-//                dbgi("reach far-end file end");
-//                ret = 0;
-//                break;
-//            }
-//
-//            ret = wavfile_reader_read(readerNear, near_buf, framebytes);
-//            if(ret != framebytes){
-//                dbgi("reach near-end file end");
-//                ret = 0;
-//                break;
-//            }
-//
-//            // if(preprocess_state){
-//            //     speex_preprocess_run(preprocess_state, near_buf);
-//            // }
-//            speex_preprocess_run(preprocess_state, near_buf);
-//            speex_echo_playback(echo_state, far_buf);
-//            speex_echo_capture(echo_state, near_buf, out_buf);
-//
-//
-//            // speex_echo_cancellation(echo_state, far_buf, near_buf, out_buf);
-//            // speex_preprocess_run(preprocess_state, out_buf);
-//
-//
-//
-//            //memcpy(out_buf, near_buf, framebytes);
-//            ret = wavfile_writer_write(writerOut, out_buf, framebytes);
-//            if(ret < 0){
-//                dbge("wavfile_writer_write fail ret=%d", ret);
-//                break;
-//            }
-//
-//            ret = 0;
-//            frameCount++;
-//        }
-//
-//    }while(0);
-//
-//    if(preprocess_state){
-//        dbgi("speex_preprocess_state_destroy aInst=%p", preprocess_state);
-//        speex_preprocess_state_destroy(preprocess_state);
-//        preprocess_state = NULL;
-//    }
-//
-//    if(echo_state){
-//        dbgi("speex_echo_state_destroy aInst=%p", echo_state);
-//        speex_echo_state_destroy(echo_state);
-//        echo_state = NULL;
-//    }
-//
-//    return ret;
-//}
-//
-//
-//
-//int aec_wave_main(int argc, char** argv){
-//
-//    // const char * fileNear = "tmp/input.wav"; // "tmp/input.wav"; "tmp/mix.wav";
-//    // const char * fileFar = "tmp/reverse.wav";
-//    // const char * fileOut = "tmp/out.wav";
-//
-//    const char * fileNear = "tmp/input.wav"; // "tmp/input.wav"; "tmp/mix.wav";
-//    const char * fileFar = "tmp/reverse.wav";
-//    const char * fileOut = "tmp/out.wav";
-//
-//    int ret = 0;
-//    wavfile_reader_t readerNear = NULL;
-//    wavfile_reader_t readerFar = NULL;
-//    wavfile_writer_t writerOut = NULL;
-//
-//    int32_t sampFreq = 16000;
-//    int nrOfSamples = 160;
-//
-//    // int msInSndCardBuf = 150; // milliseconds
-//    int msInSndCardBuf = 150; // milliseconds
-//    // int msInSndCardBuf = 300; // milliseconds
-//
-//    int dropMilliSeconds = 300;
-//
-//    int16_t near_buf[nrOfSamples*10];
-//    int16_t far_buf[nrOfSamples*10];
-//    int16_t out_buf[nrOfSamples*10];
-//
-//    if(argc > 3){
-//        fileNear = argv[1];
-//        fileFar = argv[2];
-//        fileOut = argv[3];
-//    }
-//
-//    if(argc > 4){
-//        dropMilliSeconds = atoi(argv[4]);
-//    }
-//
-//    if(argc > 5){
-//        msInSndCardBuf = atoi(argv[5]);
-//    }
-//
-//
-//    dbgi("usage: %s [fileNear] [fileFar] [fileOut] [dropMilliSeconds] [msInSndCardBuf]", argv[0]);
-//    dbgi("fileNear = %s", fileNear);
-//    dbgi("fileFar = %s", fileFar);
-//    dbgi("fileOut = %s", fileOut);
-//
-//    dbgi("sampFreq = %d", sampFreq);
-//    dbgi("nrOfSamples = %d", nrOfSamples);
-//    dbgi("msInSndCardBuf = %d", msInSndCardBuf);
-//    dbgi("dropMilliSeconds = %d", dropMilliSeconds);
-//
-//    do{
-//        readerNear = wavfile_reader_open(fileNear);
-//        if(!readerNear){
-//            dbge("fail to open %s", fileNear);
-//            ret = -1;
-//            break;
-//        }
-//        dbge("successfully open %s", fileNear);
-//
-//        readerFar = wavfile_reader_open(fileFar);
-//        if(!readerFar){
-//            dbge("fail to open %s", fileFar);
-//            ret = -1;
-//            break;
-//        }
-//        dbge("successfully open %s", fileFar);
-//
-//        writerOut = wavfile_writer_open_with_reader(fileOut, readerNear);
-//        if(!writerOut){
-//            dbge("fail to open %s", fileOut);
-//            ret = -1;
-//            break;
-//        }
-//        dbge("successfully open %s", fileOut);
-//
-//
-//        int framebytes = nrOfSamples * sizeof(int16_t);
-//        int frameCount = 0;
-//
-//        int samplerate = wavfile_reader_samplerate(readerFar);
-//        int dropSamples = samplerate * dropMilliSeconds / 1000;
-//        int dropFrames = (dropSamples + (nrOfSamples-1)) /nrOfSamples;
-//        // dropFrames *= 2;
-//        // dropFrames = 30;
-//        dbgi("drop: samplerate=%d, dropSamples=%d, dropFrames=%d", samplerate, dropSamples, dropFrames);
-//        while(frameCount < dropFrames){
-//            ret = wavfile_reader_read(readerFar, far_buf, framebytes);
-//            if(ret != framebytes){
-//                dbgi("unexpectd reaching far-end file end");
-//                ret = -1;
-//                break;
-//            }
-//            ret = 0;
-//            frameCount++;
-//        }
-//        if(ret) break;
-//        dbgi("dropped frames %d", frameCount);
-//
-//        // run_aecm
-//        // run_aec
-//        // run_speex
-//        ret =  run_aecm( readerNear
-//        ,  readerFar
-//        ,  writerOut
-//        ,  sampFreq
-//        ,  nrOfSamples
-//        ,  msInSndCardBuf
-//        ,  near_buf
-//        ,  far_buf
-//        ,  out_buf
-//        ,  framebytes
-//        ,  frameCount);
-//
-//
-//        dbgi("processed frameCount = %d", frameCount);
-//        dbgi("processed samples = %d", frameCount*nrOfSamples);
-//        if(ret == 0){
-//            dbgi("process OK");
-//        }else{
-//            dbgi("process fail !!!");
-//        }
-//
-//    }while(0);
-//
-//
-//
-//    if(readerNear){
-//        wavfile_reader_close(readerNear);
-//        readerNear = NULL;
-//    }
-//
-//    if(readerFar){
-//        wavfile_reader_close(readerFar);
-//        readerFar = NULL;
-//    }
-//
-//    if(writerOut){
-//        wavfile_writer_close(writerOut);
-//        writerOut = NULL;
-//    }
-//
-//    dbgi("bye!");
-//    return 0;
-//}
 
-#define odbgv(FMT, ARGS...) //do{  printf("|%10s|V| " FMT, this->name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
-#define odbgd(FMT, ARGS...) do{  printf("|%11s|D| " FMT, this->name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
-#define odbgi(FMT, ARGS...) do{  printf("|%11s|I| " FMT, this->name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
-#define odbge(FMT, ARGS...) do{  printf("|%11s|E| " FMT, this->name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
+
+#define odbgv(FMT, ARGS...) //do{  printf("|%10s|V| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
+#define odbgd(FMT, ARGS...) do{  printf("|%11s|D| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
+#define odbgi(FMT, ARGS...) do{  printf("|%11s|I| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
+#define odbge(FMT, ARGS...) do{  printf("|%11s|E| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
 
 using namespace webrtc;
 
@@ -566,16 +72,6 @@ struct XAudioFrame{
     int samplerate;
     int64_t timestamp = -1;
     virtual ~XAudioFrame(){}
-};
-
-struct XAudioFrameFixed : public XAudioFrame{
-private:
-    int16_t sampleBuffer[48000];
-public:
-    XAudioFrameFixed(){
-        this->samples = sampleBuffer;
-        this->sampleBufferSize = sizeof(sampleBuffer)/sizeof(sampleBuffer[0]);
-    }
 };
 
 class XAudioFrameFactory{
@@ -824,10 +320,17 @@ public:
         close();
     }
     
-    int open(const std::string& filename, int frameSizeInMilliSeconds){
+    void setFrameDuration(int frameMilliSeconds){
+        frameSizeInSamples_ = config_.samplerate * frameMilliSeconds/1000;
+    }
+    
+    int open(const std::string& filename, int frameSizeInMilliSeconds = 0){
         int ret = -1;
         wavfile_reader_t reader = NULL;
         do{
+            if(frameSizeInMilliSeconds == 0){
+                frameSizeInMilliSeconds  =10;
+            }
             reader = wavfile_reader_open(filename.c_str());
             if (!reader) {
                 ret = -1;
@@ -994,6 +497,9 @@ class XAudioWebrtcAEC : public XAudioEchoCanceller{
     float * inBufferF_ = NULL;
     float * outBufferF_ = NULL;
     
+    void printLevel(const char * name, AecLevel& level){
+        odbgi("%s: inst=%3d, avr=%3d, max=%3d, min=%3d", name, level.instant, level.average, level.max, level.min);
+    }
 public:
     XAudioWebrtcAEC( bool doNLP = true):XAudioEchoCanceller("AEC"), doNLP_(doNLP){
     }
@@ -1028,6 +534,23 @@ public:
     
     virtual void close() override{
         if (aecInstance_) {
+            AecMetrics metrics;
+            int ret = WebRtcAec_GetMetrics(aecInstance_, &metrics);
+            if(ret == 0){
+                odbgi("metrics -----");
+                printLevel("  rerl", metrics.rerl);
+                printLevel("  erl", metrics.erl);
+                printLevel("  erle", metrics.erle);
+                printLevel("  nlp", metrics.aNlp);
+                int median, std;
+                float fraction_poor_delays;
+                WebRtcAec_GetDelayMetrics(aecInstance_, &median, &std, & fraction_poor_delays);
+                odbgi("  delay: median=%3d, std=%3d, poort_delay=%3.2f%%", median, std, fraction_poor_delays*100.0);
+                
+            }else{
+                odbge("WebRtcAec_GetMetrics fail with ret=%d", ret);
+            }
+            
             WebRtcAec_Free(aecInstance_);
             aecInstance_ = NULL;
         }
@@ -1120,7 +643,7 @@ public:
 
 
 class XAudioSpeexAEC : public XAudioEchoCanceller{
-    bool preprocess_on_ = true;
+    bool preprocess_on_ = false;
     int delay_ = 0;
     SpeexPreprocessState *preprocess_state_ = NULL;
     SpeexEchoState *echo_state_ = NULL;
@@ -1141,7 +664,7 @@ class XAudioSpeexAEC : public XAudioEchoCanceller{
         }
     }
 public:
-    XAudioSpeexAEC():XAudioEchoCanceller("SpeexAEC"){
+    XAudioSpeexAEC(bool preprocess):XAudioEchoCanceller("SpeexAEC"), preprocess_on_(preprocess){
     }
     
     virtual ~XAudioSpeexAEC(){
@@ -1204,6 +727,12 @@ public:
             freeInternalBuf();
             farData_ = new short[frameSamplsPerChannel];
             nearData_ = new short[frameSamplsPerChannel];
+//            memset(farData_, 0, frameSamplsPerChannel*sizeof(short));
+//            memset(nearData_, 0, frameSamplsPerChannel*sizeof(short));
+//            speex_echo_playback(echo_state_, farData_);
+//            speex_echo_capture(echo_state_, nearData_, nearData_);
+            
+            
             
             ret = 0;
         } while (0);
@@ -1229,13 +758,19 @@ public:
         }
     }
     
-    int doAEC(short * farBuffer, short * nearBuffer, short * outBuffer){
-//        speex_echo_playback(echo_state_, farBuffer);
+    int doAEC2(short * farBuffer, short * nearBuffer, short * outBuffer){
+        speex_echo_playback(echo_state_, farBuffer);
+        if(preprocess_state_){
+            speex_preprocess_run(preprocess_state_, nearBuffer);
+        }
+        speex_echo_capture(echo_state_, nearBuffer, outBuffer);
 //        if(preprocess_state_){
-//            speex_preprocess_run(preprocess_state_, nearBuffer);
+//            speex_preprocess_run(preprocess_state_, outBuffer);
 //        }
-//        speex_echo_capture(echo_state_, nearBuffer, outBuffer);
-        
+        return 0;
+    }
+    
+    int doAEC1(short * farBuffer, short * nearBuffer, short * outBuffer){
         speex_echo_cancellation(echo_state_, nearBuffer, farBuffer, outBuffer);
         if(preprocess_state_){
             speex_preprocess_run(preprocess_state_, outBuffer);
@@ -1257,7 +792,7 @@ public:
             return -1;
         }
         if(farNum_ > 0){
-            doAEC(farData_, nearBuffer, outBuffer);
+            doAEC1(farData_, nearBuffer, outBuffer);
             farNum_ = 0;
         }else{
             memcpy(outBuffer, nearBuffer, numSamples*sizeof(short));
@@ -1443,215 +978,6 @@ public:
     }
 };
 
-//class XAudioSabineSpeexAEC1 : public XAudioEchoCanceller {
-//    int delay_ = 0;
-//    SpeexAec * aecInst_ = NULL;
-//    int frameSamplsPerChannel_ = 0;
-//    BucketBuffer<short> farBucket_;
-//    BucketBuffer<short> nearBucket_;
-//
-//public:
-//    XAudioSabineSpeexAEC`():XAudioEchoCanceller("SabSpxAEC"){
-//    }
-//
-//    virtual ~XAudioSabineSpeexAEC`(){
-//        close();
-//    }
-//
-//
-//    virtual int open(int delay, int sampleRate, int channels, int frameSamplsPerChannel) override{
-//        if(aecInst_){
-//            odbge("open already init");
-//            return -1;
-//        }
-//
-//        int ret = 0;
-//        do {
-//            odbgd("open frameSize=%d, sampleRate=%d, delay=%d", frameSamplsPerChannel, sampleRate, delay);
-//            delay_ = delay;
-//            frameSamplsPerChannel_ = frameSamplsPerChannel;
-//            aecInst_ = SabineAecOpen(sampleRate);
-//            if(!aecInst_){
-//                odbge("SabineAecOpen fail");
-//                ret = -11;
-//                break;
-//            }
-//            odbgd("SabineAecOpen success, obj=%p", aecInst_);
-//
-//            farBucket_.open(frameSamplsPerChannel * 2);
-//            nearBucket_.open(frameSamplsPerChannel * 2);
-//
-//            ret = 0;
-//        } while (0);
-//
-//        if(ret){
-//            close();
-//        }
-//
-//        return ret;
-//    }
-//
-//    virtual void close() override{
-//        if(aecInst_){
-//            odbgd("SabineAecClose aInst=%p", aecInst_);
-//            SabineAecClose(aecInst_);
-//            aecInst_ = NULL;
-//        }
-//        farBucket_.close();
-//        nearBucket_.close();
-//    }
-//
-//    int doAEC(short * farBuffer, short * nearBuffer, short * outBuffer){
-//        SabineAecExecute(aecInst_, nearBuffer, farData_);
-//        memcpy(outBuffer, nearBuffer, frameSamplsPerChannel_ * BYTES_PER_SAMPLE);
-//        return 0;
-//    }
-//
-//    int processFar(short * farBuffer, int numSamples) override{
-//        if(numSamples != frameSamplsPerChannel_){
-//            return -1;
-//        }
-//        farBucket_.push(farBuffer, numSamples);
-//        return 0;
-//    }
-//
-//    int processNear(short * nearBuffer, int numSamples, short * outBuffer) override{
-//        if(numSamples != frameSamplsPerChannel_){
-//            return -1;
-//        }
-//        nearBucket_.push(nearBuffer, numSamples);
-//        if(nearBucket_.full() && farBucket_.full()){
-//            short * mic = nearBucket_.pull();
-//            SabineAecExecute(aecInst_, mic, farBucket_.pull());
-//            memcpy(outBuffer, nearBuffer, frameSamplsPerChannel_ * BYTES_PER_SAMPLE);
-//        }
-//
-//        if(farNum_ > 0){
-//            doAEC(farData_, nearBuffer, outBuffer);
-//            farNum_ = 0;
-//        }else{
-//            memcpy(outBuffer, nearBuffer, numSamples*sizeof(short));
-//        }
-//        return 0;
-//    }
-//};
-
-
-//static
-//int run_speex(wavfile_reader_t readerNear
-//        , wavfile_reader_t readerFar
-//        , wavfile_writer_t writerOut
-//        , int32_t sampFreq
-//        , int nrOfSamples
-//        , int msInSndCardBuf
-//        , int16_t near_buf[]
-//        , int16_t far_buf[]
-//        , int16_t out_buf[]
-//        , int framebytes
-//        , int& frameCount){
-//
-//    int ret = 0;
-//
-//    SpeexPreprocessState *preprocess_state = NULL;
-//    SpeexEchoState *echo_state = NULL;
-//    int  preprocess_on = 1;
-//
-//    nrOfSamples = 2 * sampFreq/100; // 20 ms
-//    framebytes = nrOfSamples * 2;
-//    int frame_size = nrOfSamples;
-//    int filter_length =  sampFreq/10/2; // 100 ms
-//
-//    dbgi("use speex echo (preprocess_on=%d)", preprocess_on);
-//    dbgi("frame_size=%d", frame_size);
-//    dbgi("filter_length=%d", filter_length);
-//
-//    do{
-//
-//        echo_state = speex_echo_state_init(frame_size, filter_length);
-//        if(!echo_state){
-//            dbge("speex_echo_state_init fail");
-//            break;
-//        }
-//        dbgi("speex_echo_state_init success, obj=%p", echo_state);
-//
-//        int sampleRate = sampFreq;
-//        speex_echo_ctl(echo_state, SPEEX_ECHO_SET_SAMPLING_RATE, &sampleRate);
-//
-//        if(preprocess_on){
-//            preprocess_state = speex_preprocess_state_init(frame_size, sampFreq);
-//            if(!preprocess_state){
-//                dbge("speex_preprocess_state_init fail");
-//                break;
-//            }
-//            dbgi("speex_preprocess_state_init success, obj=%p", preprocess_state);
-//
-//
-//            ret = speex_preprocess_ctl(preprocess_state, SPEEX_PREPROCESS_SET_ECHO_STATE, echo_state);
-//            if(ret != 0){
-//                dbge("speex_preprocess_ctl (SPEEX_PREPROCESS_SET_ECHO_STATE) fail, ret=%d", ret);
-//                break;
-//            }
-//            dbge("speex_preprocess_ctl (SPEEX_PREPROCESS_SET_ECHO_STATE) success");
-//        }
-//
-//
-//
-//        frameCount = 0;
-//        while(1){
-//            ret = wavfile_reader_read(readerFar, far_buf, framebytes);
-//            if(ret != framebytes){
-//                dbgi("reach far-end file end");
-//                ret = 0;
-//                break;
-//            }
-//
-//            ret = wavfile_reader_read(readerNear, near_buf, framebytes);
-//            if(ret != framebytes){
-//                dbgi("reach near-end file end");
-//                ret = 0;
-//                break;
-//            }
-//
-//            // if(preprocess_state){
-//            //     speex_preprocess_run(preprocess_state, near_buf);
-//            // }
-//            speex_preprocess_run(preprocess_state, near_buf);
-//            speex_echo_playback(echo_state, far_buf);
-//            speex_echo_capture(echo_state, near_buf, out_buf);
-//
-//
-//            // speex_echo_cancellation(echo_state, far_buf, near_buf, out_buf);
-//            // speex_preprocess_run(preprocess_state, out_buf);
-//
-//
-//
-//            //memcpy(out_buf, near_buf, framebytes);
-//            ret = wavfile_writer_write(writerOut, out_buf, framebytes);
-//            if(ret < 0){
-//                dbge("wavfile_writer_write fail ret=%d", ret);
-//                break;
-//            }
-//
-//            ret = 0;
-//            frameCount++;
-//        }
-//
-//    }while(0);
-//
-//    if(preprocess_state){
-//        dbgi("speex_preprocess_state_destroy aInst=%p", preprocess_state);
-//        speex_preprocess_state_destroy(preprocess_state);
-//        preprocess_state = NULL;
-//    }
-//
-//    if(echo_state){
-//        dbgi("speex_echo_state_destroy aInst=%p", echo_state);
-//        speex_echo_state_destroy(echo_state);
-//        echo_state = NULL;
-//    }
-//
-//    return ret;
-//}
 
 class TLVFileAEC{
 protected:
@@ -1662,11 +988,11 @@ public:
     }
     virtual ~TLVFileAEC(){}
     
-    int run(const char * tlvFilename, const char * outWaveFilename, XAudioEchoCanceller * aec){
+    int run(const char * tlvFilename, const char * outWaveFilename, XAudioEchoCanceller * aec, int delay){
         XAudioFrameFactory * factory = new XAudioFrameFactory();
         XAudioTLVReader * reader = new XAudioTLVReader(factory);
         wavfile_writer_t wavwriter = NULL;
-        int delay = 115; // 120, 134, 260
+//        int delay = 115; // 120, 134, 260
         int ret = -1;
         do{
             ret = reader->open(tlvFilename, XAudioType::ANY);
@@ -1755,58 +1081,297 @@ public:
         return ret;
     }
     
-    static int exec(const char * tlvFilename, const char * outWaveFilename, XAudioEchoCanceller * aec);
+    static int exec(const char * tlvFilename, const char * outWaveFilename, XAudioEchoCanceller * aec, int delay);
 };
 
-int TLVFileAEC::exec(const char *tlvFilename, const char *outWaveFilename, XAudioEchoCanceller * aec){
+int TLVFileAEC::exec(const char *tlvFilename, const char *outWaveFilename, XAudioEchoCanceller * aec, int delay){
     TLVFileAEC obj;
-    return obj.run(tlvFilename, outWaveFilename, aec);
+    return obj.run(tlvFilename, outWaveFilename, aec, delay);
 }
+
+class AECSource{
+public:
+    virtual ~AECSource(){}
+    virtual void close() = 0;
+    virtual void setFrameDuration(int frameMilliSeconds) = 0;
+    virtual int getSamplerate() = 0;
+    virtual int getChannels() = 0;
+    virtual void readNext(XAudioFrame * &farFrame, XAudioFrame * &nearFrame) = 0;
+};
+
+
+class WaveAECSource : public AECSource{
+protected:
+    std::string name_;
+    XAudioFrameFactory * frameFactory_ = NULL;
+    wavfile_reader_t wavFarReader_ = NULL;
+    wavfile_reader_t wavNearReader_ = NULL;
+    wavfileinfo farInfo_;
+    wavfileinfo nearInfo_;
+    int frameSizeInSamples_ = 0;
+    
+public:
+    WaveAECSource(XAudioFrameFactory * frameFactory)
+    : frameFactory_(frameFactory){
+        makeObjName("WAVE-SRC", name_);
+    }
+    virtual ~WaveAECSource(){
+        close();
+    }
+    
+    int open(const char * farWaveFilename, const char * nearWaveFilename, int skipDuration = 0){
+        int ret = -1;
+        do{
+            
+            wavFarReader_ = wavfile_reader_open(farWaveFilename);
+            if (!wavFarReader_) {
+                ret = -1;
+                odbge("fail to open [%s], ret=%d", farWaveFilename, ret);
+                break;
+            }
+            wavfile_reader_info(wavFarReader_, &farInfo_);
+            odbgi("opened wave [%s]", farWaveFilename);
+            
+            wavNearReader_ = wavfile_reader_open(nearWaveFilename);
+            if (!wavNearReader_) {
+                ret = -1;
+                odbge("fail to open [%s], ret=%d", nearWaveFilename, ret);
+                break;
+            }
+            wavfile_reader_info(wavNearReader_, &nearInfo_);
+            odbgi("opened wave [%s]", nearWaveFilename);
+            
+            if(farInfo_.channels != nearInfo_.channels
+               || farInfo_.samplerate != nearInfo_.samplerate){
+                odbge("inconsist audio config!");
+                ret = -1;
+                break;
+            }
+            
+            if(frameSizeInSamples_ == 0){
+                // never set before, use default
+                frameSizeInSamples_ = 10*farInfo_.samplerate/1000;
+            }
+            
+            int skipSamples = farInfo_.samplerate * std::abs(skipDuration) / 1000;
+            if(skipDuration > 0){
+                odbgi("skip far %d samples, %d milliseconds", skipSamples, skipDuration);
+                wavfile_reader_skip_short(wavFarReader_, skipSamples);
+            }else if(skipDuration < 0){
+                odbgi("skip near %d samples, %d milliseconds", skipSamples, -skipDuration);
+                wavfile_reader_skip_short(wavNearReader_, skipSamples);
+            }
+            
+            
+            ret = 0;
+        }while(0);
+        if(ret){
+            close();
+        }
+        return ret;
+    }
+    
+    virtual void close() override{
+        if(wavNearReader_){
+            wavfile_reader_close(wavNearReader_);
+            wavNearReader_ = NULL;
+        }
+        if(wavFarReader_){
+            wavfile_reader_close(wavFarReader_);
+            wavFarReader_ = NULL;
+        }
+    }
+    
+    virtual void setFrameDuration(int frameMilliSeconds) override{
+        frameSizeInSamples_ = frameMilliSeconds*farInfo_.samplerate/1000;
+    }
+    
+    virtual int getSamplerate()override{
+        return farInfo_.samplerate;
+    }
+    virtual int getChannels()override{
+        return 1;
+    }
+    
+    XAudioFrame * read(wavfile_reader_t wavReader_, wavfileinfo &info, int numSamples, XAudioType typ){
+        XAudioFrame * next = frameFactory_->attainFrame(numSamples);
+        int numRead = wavfile_reader_read_short(wavReader_, next->samples, numSamples);
+        if(numRead != numSamples){
+            frameFactory_->returnFrame(next);
+            next = NULL;
+        }else{
+            next->type = typ;
+            next->timestamp = 0; // TODO:
+            next->samplesPerChannel = numSamples/info.channels;
+            next->numChannels = info.channels;
+            next->samplerate = info.samplerate;
+        }
+        return next;
+    }
+    
+    virtual void readNext(XAudioFrame * &farFrame, XAudioFrame * &nearFrame) override{
+        farFrame = this->read(wavFarReader_, farInfo_, frameSizeInSamples_, XAudioType::PLAYING);
+        nearFrame = this->read(wavNearReader_, nearInfo_, frameSizeInSamples_, XAudioType::MIC);
+    }
+    
+};
+
+class SingleWaveAECSource : public AECSource{
+protected:
+    std::string name_;
+    XAudioFrameFactory * frameFactory_ = NULL;
+    wavfile_reader_t wavFarReader_ = NULL;
+    wavfileinfo farInfo_;
+    int frameSizeInSamples_ = 0;
+    short * sampleBuf_ = NULL;
+    int sampleBufSize_ = 0;
+    int numSample2Read_ = 0;
+    
+    void reallocInternalBuf(int samplePerChannel){
+        int newSize = samplePerChannel * farInfo_.channels;
+        numSample2Read_ = newSize;
+        if(newSize == 0){
+            if(sampleBuf_){
+                delete[] sampleBuf_;
+                sampleBuf_ = NULL;
+            }
+            sampleBufSize_ = 0;
+        }
+        else if(sampleBufSize_ < newSize){
+            if(sampleBuf_){
+                delete[] sampleBuf_;
+                sampleBuf_ = NULL;
+            }
+            sampleBuf_ = new short[newSize];
+            sampleBufSize_ = newSize;
+        }
+        
+    }
+public:
+    SingleWaveAECSource(XAudioFrameFactory * frameFactory)
+    : frameFactory_(frameFactory){
+        makeObjName("WAVE-SRC", name_);
+    }
+    virtual ~SingleWaveAECSource(){
+        close();
+    }
+    
+    int open(const char * farWaveFilename, int skipDuration = 0){
+        int ret = -1;
+        do{
+            
+            wavFarReader_ = wavfile_reader_open(farWaveFilename);
+            if (!wavFarReader_) {
+                ret = -11;
+                odbge("fail to open [%s], ret=%d", farWaveFilename, ret);
+                break;
+            }
+            wavfile_reader_info(wavFarReader_, &farInfo_);
+            if(farInfo_.channels < 2){
+                ret = -21;
+                odbge("require channels >= 2, file=[%s]", farWaveFilename);
+                break;
+            }
+            odbgi("opened wave [%s]", farWaveFilename);
+            
+            if(frameSizeInSamples_ == 0){
+                // never set before, use default
+                frameSizeInSamples_ = 10*farInfo_.samplerate/1000;
+                reallocInternalBuf(frameSizeInSamples_);
+            }
+            
+            
+            ret = 0;
+        }while(0);
+        if(ret){
+            close();
+        }
+        return ret;
+    }
+    
+    virtual void close() override{
+        if(wavFarReader_){
+            wavfile_reader_close(wavFarReader_);
+            wavFarReader_ = NULL;
+        }
+        frameSizeInSamples_ = 0;
+        reallocInternalBuf(0);
+    }
+    
+    virtual void setFrameDuration(int frameMilliSeconds) override{
+        frameSizeInSamples_ = frameMilliSeconds*farInfo_.samplerate/1000;
+        reallocInternalBuf(frameSizeInSamples_);
+    }
+    
+    virtual int getSamplerate()override{
+        return farInfo_.samplerate;
+    }
+    virtual int getChannels()override{
+        return 1;
+    }
+    
+    void setFrame(XAudioFrame * next, wavfileinfo &info, int numSamples, XAudioType typ){
+        next->type = typ;
+        next->timestamp = 0; // TODO:
+        next->samplesPerChannel = numSamples;
+        next->numChannels = 1;
+        next->samplerate = info.samplerate;
+    }
+    
+    virtual void readNext(XAudioFrame * &farFrame, XAudioFrame * &nearFrame) override{
+        farFrame = NULL;
+        nearFrame = NULL;
+        int numRead = wavfile_reader_read_short(wavFarReader_, sampleBuf_, numSample2Read_);
+        if(numRead != numSample2Read_){
+            return;
+        }
+        farFrame = frameFactory_->attainFrame(frameSizeInSamples_);
+        nearFrame = frameFactory_->attainFrame(frameSizeInSamples_);
+        for(int i = 0; i < frameSizeInSamples_; i++){
+            nearFrame->samples[i] = sampleBuf_[i*farInfo_.channels + 0];
+            farFrame->samples[i] = sampleBuf_[i*farInfo_.channels + 1];
+        }
+        this->setFrame(farFrame, farInfo_, frameSizeInSamples_, XAudioType::PLAYING);
+        this->setFrame(nearFrame, farInfo_, frameSizeInSamples_, XAudioType::MIC);
+    }
+    
+};
+
+
 
 class WavFileAEC{
 protected:
     std::string name_;
 public:
     WavFileAEC(){
-        makeObjName("WAV-AEC", name_);
+        makeObjName("WAVE-AEC", name_);
     }
-    virtual ~WavFileAEC(){}
-    
     int run(const char * farWaveFilename, const char * nearWaveFilename, const char * outWaveFilename, XAudioEchoCanceller * aec, int delay){
-        XAudioFrameFactory * factory = new XAudioFrameFactory();
-        XAudioWaveReader * farReader = new XAudioWaveReader(factory);
-        XAudioWaveReader * nearReader = new XAudioWaveReader(factory);
+        XAudioFrameFactory * frameFactory = new XAudioFrameFactory();
+        AECSource * source = new WaveAECSource(frameFactory);
         wavfile_writer_t wavwriter = NULL;
 //        int delay = 120; // 120, 134, 260
         int ret = -1;
         do{
             int frameDuration = aec->preferFrameDuration(); // 10;
-            ret = farReader->open(farWaveFilename, frameDuration);
+            odbgi("system delay %d, frame-duration %d", delay, frameDuration);
+            
+            if(farWaveFilename && nearWaveFilename){
+                WaveAECSource * wavsrc = new WaveAECSource(frameFactory);
+                source = wavsrc;
+                ret = wavsrc->open(farWaveFilename, nearWaveFilename, delay);
+
+            }else{
+                SingleWaveAECSource * wavsrc = new SingleWaveAECSource(frameFactory);
+                source = wavsrc;
+                ret = wavsrc->open(farWaveFilename, delay);
+            }
             if(ret){
-                odbge("fail to open [%s], ret=%d", farWaveFilename, ret);
                 break;
             }
-            odbgi("opened wave [%s]", farWaveFilename);
-            odbgi(" numChannels=%d", farReader->getConfig()->numChannels);
-            odbgi(" samplerate=%d", farReader->getConfig()->samplerate);
+            source->setFrameDuration(frameDuration);
             
-            ret = nearReader->open(nearWaveFilename, frameDuration);
-            if(ret){
-                odbge("fail to open [%s], ret=%d", nearWaveFilename, ret);
-                break;
-            }
-            odbgi("opened wave [%s]", nearWaveFilename);
-            odbgi(" numChannels=%d", nearReader->getConfig()->numChannels);
-            odbgi(" samplerate=%d", nearReader->getConfig()->samplerate);
-            
-            if(farReader->getConfig()->numChannels != nearReader->getConfig()->numChannels
-               || farReader->getConfig()->samplerate != nearReader->getConfig()->samplerate){
-                odbge("inconsist audio config!");
-                ret = -1;
-                break;
-            }
-            
-            wavwriter = wavfile_writer_open(outWaveFilename, farReader->getConfig()->numChannels, farReader->getConfig()->samplerate);
+            wavwriter = wavfile_writer_open(outWaveFilename, 1, source->getSamplerate());
             if(!wavwriter){
                 ret = -1;
                 odbge("fail to open wave [%s]", outWaveFilename);
@@ -1814,69 +1379,66 @@ public:
             }
             odbgi("opened wave [%s]", outWaveFilename);
             
-            odbgi("system delay %d, frame-duration %d", delay, frameDuration);
-            
-            int skipSamples = farReader->getConfig()->samplerate * std::abs(delay) / 1000;
-            if(delay > 0){
-                odbgi("skip far %d samples, %d milliseconds", skipSamples, delay);
-                farReader->skip(skipSamples);
-            }else if(delay < 0){
-                odbgi("skip near %d samples, %d milliseconds", skipSamples, -delay);
-                nearReader->skip(skipSamples);
-            }
             
             int aecDelay = 0;
-            int frameSamplsPerChannel = frameDuration * farReader->getConfig()->samplerate / 1000;
-            ret = aec->open(aecDelay, farReader->getConfig()->samplerate, farReader->getConfig()->numChannels, frameSamplsPerChannel );
+            int numChannels = source->getChannels();
+            int frameSamplsPerChannel = frameDuration * source->getSamplerate() / 1000;
+            ret = aec->open(aecDelay, source->getSamplerate(), numChannels, frameSamplsPerChannel );
             if(ret){
                 odbge("fail to open aec [%s]", aec->name().c_str());
                 break;
             }
             odbgi("opened aec [%s], delay %d", aec->name().c_str(), aecDelay);
-
+            
             
             int numFrames = 0;
-            short outbuffer[farReader->getConfig()->samplerate];
-            XAudioFrame * farFrame = farReader->read();
-            XAudioFrame * nearFrame = nearReader->read();
+            short outbuffer[source->getSamplerate()];
+            XAudioFrame * farFrame = NULL;
+            XAudioFrame * nearFrame = NULL;
+            source->readNext(farFrame, nearFrame);
             while(farFrame && nearFrame){
                 ret = 0;
-                int numSamples = farFrame->samplesPerChannel * farFrame->numChannels;
-
-                ret = aec->processFar(farFrame->samples, numSamples);
-                if(ret){
-                    odbge("fail to aec processFar, error=%d", ret);
-                    break;
-                }
                 
-                ret = aec->processNear(nearFrame->samples, numSamples, outbuffer);
-                if(ret){
-                    odbge("fail to aec processNear, error=%d", ret);
-                }else{
-                    ret = wavfile_writer_write_short(wavwriter, outbuffer, numSamples);
-                    if(ret<=0){
-                        ret = -1;
-                    }else{
-                        ret = 0;
-                        ++numFrames;
+                if(farFrame){
+                    int numSamples = farFrame->samplesPerChannel * numChannels;
+                    ret = aec->processFar(farFrame->samples, numSamples);
+                    if(ret){
+                        odbge("fail to aec processFar, error=%d", ret);
+                        break;
                     }
+//                    ret = wavfile_writer_write_short(wavwriter, farFrame->samples, farFrame->samplesPerChannel);
+                    frameFactory->returnFrame(farFrame);
                 }
-                if(ret){
-                    break;
+
+                if(nearFrame){
+                    int numSamples = nearFrame->samplesPerChannel * numChannels;
+                    ret = aec->processNear(nearFrame->samples, numSamples, outbuffer);
+                    if(ret){
+                        odbge("fail to aec processNear, error=%d", ret);
+                    }else{
+                        ret = wavfile_writer_write_short(wavwriter, outbuffer, numSamples);
+                        if(ret<=0){
+                            ret = -1;
+                        }else{
+                            ret = 0;
+                            ++numFrames;
+                        }
+                    }
+                    if(ret){
+                        break;
+                    }
+//                    ret = wavfile_writer_write_short(wavwriter, nearFrame->samples, nearFrame->samplesPerChannel);
+                    frameFactory->returnFrame(nearFrame);
                 }
                 
-
-                factory->returnFrame(farFrame);
-                factory->returnFrame(nearFrame);
-                farFrame = farReader->read();
-                nearFrame = nearReader->read();
+                source->readNext(farFrame, nearFrame);
             }
             if(farFrame){
-                factory->returnFrame(farFrame);
+                frameFactory->returnFrame(farFrame);
                 farFrame = NULL;
             }
             if(nearFrame){
-                factory->returnFrame(nearFrame);
+                frameFactory->returnFrame(nearFrame);
                 nearFrame = NULL;
             }
             
@@ -1894,52 +1456,307 @@ public:
             wavwriter = NULL;
         }
         
-        if(farReader){
-            delete farReader;
-            farReader = NULL;
+        if(source){
+            delete source;
+            source = NULL;
         }
         
-        if(nearReader){
-            delete nearReader;
-            nearReader = NULL;
-        }
-        
-        if(factory){
-            delete factory;
-            factory = NULL;
+        if(frameFactory){
+            delete frameFactory;
+            frameFactory = NULL;
         }
         return ret;
     }
     
     static int exec(const char * farWaveFilename, const char * nearWaveFilename, const char * outWaveFilename, XAudioEchoCanceller * aec, int delay);
 };
-
 int WavFileAEC::exec(const char * farWaveFilename, const char * nearWaveFilename, const char * outWaveFilename, XAudioEchoCanceller * aec, int delay){
     WavFileAEC obj;
     return obj.run(farWaveFilename, nearWaveFilename, outWaveFilename, aec, delay);
 }
 
+#include "webrtc/modules/audio_processing/aec/aec_core.h"
+extern "C"{
+    void aec_fft(float time_data[PART_LEN2], float freq_data[2][PART_LEN1]) ;
+    void aec_fft2(float time_data[PART_LEN2], float freq_data[2][PART_LEN1]) ;
+    void aec_scaled_inverse_fft(float freq_data[2][PART_LEN1],
+                                float time_data[PART_LEN2],
+                                float scale,
+                                int conjugate);
+    int aec_get_sqrt_hanning(float * data);
+}
+
+static int BitCount(uint32_t u32) {
+    uint32_t tmp = u32 - ((u32 >> 1) & 033333333333) -
+    ((u32 >> 2) & 011111111111);
+    tmp = ((tmp + (tmp >> 3)) & 030707070707);
+    tmp = (tmp + (tmp >> 6));
+    tmp = (tmp + (tmp >> 12) + (tmp >> 24)) & 077;
+    
+    return ((int) tmp);
+}
+
+static inline
+int xxcorr_convert_index(int s){
+    return (s) < PART_LEN ? (s) + PART_LEN : (s)-PART_LEN;
+}
+
+static
+int xxcorr(float x1[PART_LEN], float x2[PART_LEN], float Cxy[PART_LEN2]){
+    float ex1[PART_LEN2];
+    float ex2[PART_LEN2];
+    float Y1[2][PART_LEN1];
+    float Y2[2][PART_LEN1];
+    float S12[2][PART_LEN1];
+    
+    memcpy(ex1, x1, PART_LEN*sizeof(x1[0]));
+    memcpy(ex2, x2, PART_LEN*sizeof(x2[0]));
+    memset(&ex1[PART_LEN], 0, PART_LEN * sizeof(ex1[0]));
+    memset(&ex2[PART_LEN], 0, PART_LEN * sizeof(ex2[0]));
+    
+    aec_fft(ex1, Y1);
+    aec_fft(ex2, Y2);
+    
+    // S12=Y1.*conj(Y2);
+    for(int i = 0; i < PART_LEN1; i++){
+        S12[0][i] = Y1[0][i]*Y2[0][i] + Y1[1][i]*Y2[1][i];
+        S12[1][i] = Y1[1][i]*Y2[0][i] - Y1[0][i]*Y2[1][i];
+    }
+    
+    //time12=ifft(S12);
+    aec_scaled_inverse_fft(S12, Cxy, 2.0f, 0);
+    
+//    for(int i = 0; i < PART_LEN; i++){
+//        float *pa = &Cxy[i];
+//        float *pb = &Cxy[PART_LEN+i];
+//        float temp = *pa;
+//        *pa = *pb;
+//        *pb = temp;
+//    }
+    
+    return 0;
+}
+
+void aec_dig_out(){
+    const std::string name_="Test-FFT";
+    
+    odbgi("");
+    odbgi("-------------- aec_dig_out --------------");
+    int verbose = 0;
+    // test FFT
+    {
+        odbgi("");
+        float time_data1[PART_LEN2];
+        float time_data2[PART_LEN2];
+        float freq_data1[2][PART_LEN1];
+        float freq_data2[2][PART_LEN1];
+        memset(time_data1, 0, sizeof(time_data1));
+        for(int i = 0; i < PART_LEN2; ++i){
+            time_data1[i] = i+1;
+            time_data2[i] = i+1;
+        }
+        aec_fft(time_data1, freq_data1);
+        aec_fft2(time_data2, freq_data2);
+        bool equal = true;
+        for(int i = 0; i < PART_LEN1; ++i){
+            if(freq_data1[0][i] != freq_data2[0][i]
+               || freq_data1[1][i] != freq_data2[1][i]){
+                equal = false;
+                break;
+            }
+        }
+        odbgi("fft %s fft2", equal?"==": "!=");
+        if(verbose){
+            // print FFT data
+            for(int i = 0; i < PART_LEN1; ++i){
+                odbgi("freq_data[%d]: %+4.4f    %+4.4f", i, freq_data1[0][i], freq_data1[1][i]);
+            }
+            odbgi("-----");
+            float* x_fft_ptr = NULL;
+            x_fft_ptr = &freq_data1[0][0];
+            for (int i = 0; i < PART_LEN1; i++) {
+                odbgi("x_fft_ptr[%d]: %+4.4f    %+4.4f", i, x_fft_ptr[i], x_fft_ptr[PART_LEN1 + i]);
+            }
+        }
+    }
+
+
+
+    // test inverse FFT
+    {
+        odbgi("");
+        float std_time_data[PART_LEN2];
+        float time_data_for_fft[PART_LEN2];
+        float freq_data_for_fft[2][PART_LEN1];
+        float inv_time_data[PART_LEN2];
+        for(int i = 0; i < PART_LEN2; ++i){
+            std_time_data[i] = i+1;
+        }
+        memcpy(time_data_for_fft, std_time_data, sizeof(std_time_data));
+        aec_fft(time_data_for_fft, freq_data_for_fft);
+        aec_scaled_inverse_fft(freq_data_for_fft, inv_time_data, 2.0f, 0);
+        float max_diff = 0;
+        for(int i = 0; i < PART_LEN2; ++i){
+            float diff = std::abs(inv_time_data[i] - std_time_data[i]);
+            if(diff > max_diff){
+                max_diff = diff;
+            }
+        }
+        odbgi("inverse_fft max_diff=%.8f", max_diff);
+    }
+
+    
+    // test Hanning window
+    {
+        odbgi("");
+        int winSize = aec_get_sqrt_hanning(NULL);
+        float winData[winSize];
+        aec_get_sqrt_hanning(winData);
+        odbgi("hanning winSize = %d", winSize);
+        if(verbose){
+            for(int i = 0; i < winSize/2+1; ++i){
+                int idx1 = i;
+                int idx2 = winSize-1-i;
+                float val = winData[idx1] + winData[idx2];
+                odbgi("sum(%d,%d)=sum(%.4f,%.4f)=%.4f", idx1, idx2, winData[idx1], winData[idx2], val);
+            }
+        }
+    }
+    
+    // test xcorr
+    {
+        odbgi("");
+        
+        // matlab
+//        d = 20;
+//        N = 64;
+//        x1 = [1:N];
+//        x2 = [d:N,1:d-1];
+//        ex1=[x1, zeros(1,N)];
+//        ex2=[x2, zeros(1,N)];
+//        Y1=fft(ex1);
+//        Y2=fft(ex2);
+//        S12=Y1.*conj(Y2);
+//        time12=ifft(S12);
+//        time12_real=real(time12);
+//        Cxy=fftshift(time12_real);
+//        [max,location]=max(Cxy);
+//        d2=location-N ;
+        
+        int d = -21; // delay
+        float Fs=500; // samplerate
+        int N = PART_LEN;
+        float x1[PART_LEN];
+        float x2[PART_LEN];
+        float ex1[2*N];
+        float ex2[2*N];
+        float Y1[2][PART_LEN1];
+        float Y2[2][PART_LEN1];
+        float S12[2][PART_LEN1];
+        float Cxy[PART_LEN2];
+        
+        // std Cxy of delay = -21 from matlab
+        static float stdCxy[PART_LEN2]={
+            0.0000, 0.5358, 0.9574, 1.2504, 1.4046, 1.4134, 1.2749, 0.9912,
+            0.5688, 0.0182, -0.6461, -1.4061, -2.2404, -3.1252, -4.0344, -4.9403,
+            -5.8145, -6.6281, -7.3529, -7.9618, -8.4294, -8.7329, -8.8525, -8.7721,
+            -8.4797, -7.9678, -7.2337, -6.2796, -5.1131, -3.7468, -2.1983, -0.4900,
+            1.3510, 3.2939, 5.3041, 7.3440, 9.3739, 11.3525, 13.2379, 14.9882,
+            16.5625, 17.9218, 19.0296, 19.8529, 19.3083, 18.5843, 17.6922, 16.6443,
+            15.4531, 14.1315, 12.6930, 11.1508, 9.5186, 7.8099, 6.0384, 4.2179,
+            2.3619, 0.4845, -1.4006, -3.2793, -5.1375, -6.9607, -8.7346, -10.4444,
+            -12.0753, -14.0478, -15.7525, -17.1777, -18.3162, -19.1659, -19.7291, -20.0123,
+            -20.0260, -19.7842, -19.3042, -18.6055, -17.7099, -16.6409, -15.4228, -14.0807,
+            -12.6397, -11.1244, -9.5587, -7.9655, -6.3658, -4.7791, -3.2228, -1.7124,
+            -0.2607, 1.1215, 2.4255, 3.6452, 4.7762, 5.8162, 6.7645, 7.6218,
+            8.3901, 9.0721, 9.6715, 10.1921, 10.6377, 11.0121, 11.3186, 11.5601,
+            11.7384, 11.8548, 11.9093, 11.9010, 11.6305, 11.1923, 10.6087, 9.9040,
+            9.1035, 8.2331, 7.3186, 6.3853, 5.4571, 4.5562, 3.7027, 2.9139,
+            2.2042, 1.5849, 1.0637, 0.6449, 0.3293, 0.1144, -0.0057, -0.0400,
+        };
+        
+        for(int i = 0; i < N; ++i){
+            x1[i] = cos(2*M_PI*10*i/Fs);
+        }
+        int esize = sizeof(x1[0]);
+        int offset = abs(d);
+        if(d > 0){
+            memcpy(&x2[0],        &x1[offset],   sizeof(esize)*(N-offset));
+            memcpy(&x2[N-offset], &x1[0],        sizeof(esize)*(offset));
+        }else{
+            memcpy(&x2[0],        &x1[N-offset], sizeof(esize)*(offset));
+            memcpy(&x2[offset],   &x1[0],        sizeof(esize)*(N-offset));
+        }
+        
+        
+        xxcorr(x1, x2, Cxy);
+        int location = 0;
+        float max = Cxy[0];
+        odbgi("");
+        for(int i = 0; i < (N*2); i++){
+            if(max < Cxy[i]){
+                max = Cxy[i];
+                location = i;
+            }
+            odbgi("Cxy[%3d]=%.6f", xxcorr_convert_index(i), Cxy[i]);
+        }
+        location = xxcorr_convert_index(location);
+        
+        int d2=location-N ;
+        odbgi("location=%d, d2=%d, max=%.6f", location, d2, max);
+        
+        int CxyIdx = 0;
+        int stdIdx = 0;
+        float maxCxyDiff = 0;
+        for(int i = 0; i < 2*N; ++i){
+            int index = xxcorr_convert_index(i);
+            float diff = fabs(Cxy[i] - stdCxy[index]);
+            if(maxCxyDiff < diff){
+                maxCxyDiff = diff;
+                CxyIdx = i;
+                stdIdx = index;
+            }
+        }
+        odbgi("maxCxyDiff=%.6f, Cxy[%d]=%.6f, stdCxy[%d]=%.6f", maxCxyDiff, CxyIdx, Cxy[CxyIdx], stdIdx, stdCxy[stdIdx]);
+    }
+    
+}
 
 int main(int argc, char** argv){
-    const char * tlvFilename = "/Users/simon/Downloads/VAECDemo/src-aec.tlv";
-    const char * outWaveFilename = "/Users/simon/Downloads/VAECDemo/macout.wav";
+    
+    const char * outWaveFilename = "/Users/simon/Desktop/simon/projects/easemob/src/xmedia/aec/tmp/macout.wav";
     int ret = 0;
-//    ret = TLVFileAEC::exec(tlvFilename, outWaveFilename, new XAudioWebrtcAEC());
-//    ret = TLVFileAEC::exec(tlvFilename, outWaveFilename, new XAudioWebrtcAECM());
     
+    const char * tlvFilename = "/Users/simon/Desktop/simon/projects/easemob/src/xmedia/aec/testdata/xiaomi5/001-src-aec.tlv";
+    const char * farWaveFilename = "/Users/simon/Desktop/simon/projects/easemob/src/xmedia/aec/tmp/xiaomi5-001-far.wav";
+    const char * nearWaveFilename = "/Users/simon/Desktop/simon/projects/easemob/src/xmedia/aec/tmp/xiaomi5-001-near.wav";
     
-//    const char * farWaveFilename = "/Users/simon/Downloads/VAECDemo/aec-far.wav";
-//    const char * nearWaveFilename = "/Users/simon/Downloads/VAECDemo/aec-near.wav";
-//    ret = TLV2Wave::exec(tlvFilename, farWaveFilename, XAudioType::PLAYING);
-//    ret = TLV2Wave::exec(tlvFilename, nearWaveFilename, XAudioType::MIC);
-//    ret = WavFileAEC::exec(farWaveFilename, nearWaveFilename, outWaveFilename, new XAudioWebrtcAEC());
-//    ret = WavFileAEC::exec(farWaveFilename, nearWaveFilename, outWaveFilename, new XAudioWebrtcAECM());
-//    ret = WavFileAEC::exec(farWaveFilename, nearWaveFilename, outWaveFilename, new XAudioSpeexAEC());
-//    ret = WavFileAEC::exec(farWaveFilename, nearWaveFilename, outWaveFilename, new XAudioSabineSpeexAEC());
+    bool do_TLV_AEC = false;
+    if(do_TLV_AEC){
+        ret = TLVFileAEC::exec(tlvFilename, outWaveFilename, new XAudioWebrtcAEC(), 200);
+        //    ret = TLVFileAEC::exec(tlvFilename, outWaveFilename, new XAudioWebrtcAECM(), 120);
+    }
 
-    const char * farWaveFilename = "/Users/simon/Desktop/simon/projects/easemob/src/xmedia/aec/src/sabine_speex/hua_ref.wav";
-    const char * nearWaveFilename = "/Users/simon/Desktop/simon/projects/easemob/src/xmedia/aec/src/sabine_speex/hua_mic.wav";
-    ret = WavFileAEC::exec(farWaveFilename, nearWaveFilename, outWaveFilename, new XAudioWebrtcAECM(), 0);
+    bool do_TLV2Wave = false;
+    if(do_TLV2Wave){
+        ret = TLV2Wave::exec(tlvFilename, farWaveFilename, XAudioType::PLAYING);
+        ret = TLV2Wave::exec(tlvFilename, nearWaveFilename, XAudioType::MIC);
+    }
+    
+
+    ret = WavFileAEC::exec(farWaveFilename, nearWaveFilename, outWaveFilename, new XAudioWebrtcAEC(), 119);
+//    ret = WavFileAEC::exec(farWaveFilename, nearWaveFilename, outWaveFilename, new XAudioSpeexAEC(true), 119);
+////    ret = WavFileAEC::exec(farWaveFilename, nearWaveFilename, outWaveFilename, new XAudioWebrtcAECM(), 120);
+////    ret = WavFileAEC::exec(farWaveFilename, nearWaveFilename, outWaveFilename, new XAudioSabineSpeexAEC(), 100);
+
+//    const char * farWaveFilename = "/Users/simon/Desktop/simon/projects/easemob/src/xmedia/aec/testdata/hua_ref.wav";
+//    const char * nearWaveFilename = "/Users/simon/Desktop/simon/projects/easemob/src/xmedia/aec/testdata/hua_mic.wav";
+//    ret = WavFileAEC::exec(farWaveFilename, nearWaveFilename, outWaveFilename, new XAudioSpeexAEC(true), 0);
+    
+//    const char * stereoFilename = "/Users/simon/Desktop/simon/projects/easemob/src/xmedia/aec/testdata/std_stereo.wav";
+//    ret = WavFileAEC::exec(stereoFilename, NULL, outWaveFilename, new XAudioSpeexAEC(false), 0);
+    
+    aec_dig_out();
     
     return ret;
 }

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F48ED51D20C0ECFA00C5BF98 /* XUDPPing.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F48ED51B20C0ECFA00C5BF98 /* XUDPPing.cpp */; };
 		F4C057AA2053F2E3009E4F58 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C057A92053F2E3009E4F58 /* main.cpp */; };
 		F4C057B2205660FE009E4F58 /* XSocket.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4C057B0205660FE009E4F58 /* XSocket.cpp */; };
 /* End PBXBuildFile section */
@@ -24,6 +25,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F48ED51B20C0ECFA00C5BF98 /* XUDPPing.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XUDPPing.cpp; sourceTree = "<group>"; };
+		F48ED51C20C0ECFA00C5BF98 /* XUDPPing.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = XUDPPing.h; sourceTree = "<group>"; };
 		F4C057A62053F2E3009E4F58 /* socktunnel */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = socktunnel; sourceTree = BUILT_PRODUCTS_DIR; };
 		F4C057A92053F2E3009E4F58 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		F4C057B0205660FE009E4F58 /* XSocket.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XSocket.cpp; sourceTree = "<group>"; };
@@ -63,6 +66,8 @@
 				F4C057A92053F2E3009E4F58 /* main.cpp */,
 				F4C057B0205660FE009E4F58 /* XSocket.cpp */,
 				F4C057B1205660FE009E4F58 /* XSocket.h */,
+				F48ED51B20C0ECFA00C5BF98 /* XUDPPing.cpp */,
+				F48ED51C20C0ECFA00C5BF98 /* XUDPPing.h */,
 			);
 			path = socktunnel;
 			sourceTree = "<group>";
@@ -126,6 +131,7 @@
 			files = (
 				F4C057AA2053F2E3009E4F58 /* main.cpp in Sources */,
 				F4C057B2205660FE009E4F58 /* XSocket.cpp in Sources */,
+				F48ED51D20C0ECFA00C5BF98 /* XUDPPing.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

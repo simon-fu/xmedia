@@ -1,31 +1,62 @@
+% close all;
+% N=64;
+% std_time_data=[1:2*N];
+% time_data_for_fft=std_time_data;
+% freq_data_for_fft=fft(time_data_for_fft);
+% inv_time_data=ifft(freq_data_for_fft);
+% diff=inv_time_data-std_time_data;
+% [max,index]=max(abs(diff));
+% max
+% index
 
-close all; clear all;
-N=8000;
-k=1:N;
-a=N/4;
-b=N/2;
-c=3*N/4;
-y(1:a)=sin(1*(1:a));
-y((a+1):b)=0.5*sin(1*(a+1:b));
-y((b+1):c)=5*sin(1*((b+1):c));
-y((c+1):N)=2*sin(1*((c+1):N));
 
-figure(1)
-subplot(3,1,1);
-plot(k,y);
-a=zeros(1,N+1);
-	a(1)=1;
-d=2;
-u=0.01;
-for m=1:N
-	z(m)=a(m)*y(m);
-	a(m+1)=a(m)+u*(d-abs(z(m)));
-end
-% figure(2)
-subplot(3,1,2);
-plot(k,z);
-grid on;
-% figure(3)
-subplot(3,1,3);
-plot(k,a(1:N));
-grid on;
+close all;
+clear;  
+% N=1024;  %长度  
+N=64;  %长度
+d=0;     %延迟点数
+Fs=500;  %采样频率  
+n=0:N-1;  
+t=n/Fs;   %时间序列  
+a1=1;     %信号幅度  
+a2=1;    
+x1=a1*cos(2*pi*10*n/Fs);     %信号1  
+% x1=x1+randn(size(x1))/max(randn(size(x1)));      %加噪声  
+x2=a2*cos(2*pi*10*(n+d)/Fs); %信号2  
+% x2=x2+randn(size(x2));   % 噪声
+
+% N = 64;
+% x1 = [1:N];
+% x2 = [d:N,1:d-1];
+offset=abs(d);
+x2=[x1(offset+1:N), x1(1:offset)];
+x2=[x1(N-offset:N), x1(1:N-offset-1)];
+
+ex1=[x1, zeros(1,N)];
+ex2=[x2, zeros(1,N)];
+Y1=fft(ex1);  
+Y2=fft(ex2); 
+S12=Y1.*conj(Y2);  
+time12=ifft(S12);
+time12_real=real(time12);
+Cxy=fftshift(time12_real);  
+[maxval,location]=max(Cxy);%求出最大值max,及最大值所在的位置（第几行）location;  
+d2=location-N ; %求得延迟点数
+Delay2=d2/Fs ;   %求得时间延迟  
+
+Cxy2 = xcorr(x1,x2);
+DiffCxy=abs(Cxy2-Cxy(2:2*N));
+[MaxDiffCxy]=max(DiffCxy);
+
+d2
+Delay2
+maxval
+MaxDiffCxy
+
+% figure; plot(x1);
+% figure; plot(x2);
+
+% figure; plot(time12);
+% figure; plot(time12_real);
+figure; plot(Cxy);
+figure; plot(Cxy2);

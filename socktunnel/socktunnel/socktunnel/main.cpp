@@ -26,6 +26,7 @@
 #include <arpa/inet.h>
 
 #include "XSocket.h"
+#include "XUDPPing.h"
 
 #define DUMP_DATA 0
 #define dbgd(...) // do{  printf("<tunnel>[D] " __VA_ARGS__); printf("\n"); }while(0)
@@ -780,7 +781,8 @@ void run_tunnel_tcppair(){
 //
 int main(int argc, const char * argv[]) {
 //    run_tunnel_server();
-    run_tunnel_tcppair();
+//    run_tunnel_tcppair();
+    return xudp_ping_main(argc, argv);
     dbgi("bye");
     return 0;
 }
