@@ -120,7 +120,7 @@ long Align_Nfft_16k = 1024;
 
 long Align_Nfft_8k = 512;
 
-long InIIR_Nsos;
+//long InIIR_Nsos;  // simon, comment out
 
 long InIIR_Nsos_8k = 8L;
 float InIIR_Hsos_8k[LINIIR] =

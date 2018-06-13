@@ -140,7 +140,7 @@ Further information is also available from www.pesq.org
 
 #define TWOPI 6.28318530717959
 
-int Nb ;
+static int Nb ; // simon, add static
 
 #define Nfmax 512
 

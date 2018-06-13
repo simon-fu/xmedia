@@ -107,34 +107,39 @@ Further information is also available from www.pesq.org
 #include <math.h>
 #include "pesq.h"
 #include "dsp.h"
+#include "pesqmain.h" // simon
+#define prtinfo(...)  //printf(__VA_ARGS__)
+#define fprterr  fprintf
+
 
 #define ITU_RESULTS_FILE          "pesq_results.txt"
 
 
 int main (int argc, const char *argv []);
 void usage (void);
-void pesq_measure (SIGNAL_INFO * ref_info, SIGNAL_INFO * deg_info,
+int pesq_measure (SIGNAL_INFO * ref_info, SIGNAL_INFO * deg_info,
     ERROR_INFO * err_info, long * Error_Flag, char ** Error_Type);
 
 void usage (void) {
-    printf ("Usage:\n");
-    printf (" PESQ HELP               Displays this text\n");
-    printf (" PESQ [options] ref deg\n");
-    printf (" Run model on reference ref and degraded deg\n");
-    printf ("\n");
-    printf ("Options: +8000 +16000 +swap +wb\n");
-    printf (" Sample rate - No default. Must select either +8000 or +16000.\n");
-    printf (" Swap byte order - machine native format by default. Select +swap for byteswap.\n");
-    printf (" Default mode of operation is P.862 (narrowband handset listening). Select +wb \n");
-    printf (" to use P.862.2 wideband extension (headphone listening).\n");
-    printf ("\n");
-    printf ("File names may not begin with a + character.\n");
-    printf ("\n");
-    printf ("Files with names ending .wav or .WAV are assumed to have a 44-byte header, which");
-    printf (" is automatically skipped.  All other file types are assumed to have no header.\n");
+    prtinfo ("Usage:\n");
+    prtinfo (" PESQ HELP               Displays this text\n");
+    prtinfo (" PESQ [options] ref deg\n");
+    prtinfo (" Run model on reference ref and degraded deg\n");
+    prtinfo ("\n");
+    prtinfo ("Options: +8000 +16000 +swap +wb\n");
+    prtinfo (" Sample rate - No default. Must select either +8000 or +16000.\n");
+    prtinfo (" Swap byte order - machine native format by default. Select +swap for byteswap.\n");
+    prtinfo (" Default mode of operation is P.862 (narrowband handset listening). Select +wb \n");
+    prtinfo (" to use P.862.2 wideband extension (headphone listening).\n");
+    prtinfo ("\n");
+    prtinfo ("File names may not begin with a + character.\n");
+    prtinfo ("\n");
+    prtinfo ("Files with names ending .wav or .WAV are assumed to have a 44-byte header, which");
+    prtinfo (" is automatically skipped.  All other file types are assumed to have no header.\n");
 }
 
-int main (int argc, const char *argv []) {
+// simon, main -> pesq_main
+int pesq_main (int argc, const char *argv [], float * p_pesq_mos, float * p_mapped_mos) {
     int  arg;
     int  names = 0;
     long sample_rate = -1;
@@ -145,92 +150,94 @@ int main (int argc, const char *argv []) {
 
     long Error_Flag = 0;
     char * Error_Type = "Unknown error type.";
-
+    
     if (Error_Flag == 0) {
-        printf("\n");
-        printf("Perceptual Evaluation of Speech Quality (PESQ)\n");
-        printf("Reference implementation for ITU-T Recommendations P.862, P.862.1 and P.862.2.\n");
-        printf("Version 2.0 October 2005.\n");
-        printf("\n");
-        printf("PESQ Intellectual Property Rights Notice.\n");
-        printf("\n");
-        printf("DEFINITIONS:\n");
-        printf("For the purposes of this Intellectual Property Rights Notice the terms\n");
-        printf("'Perceptual Evaluation of Speech Quality Algorithm' and 'PESQ Algorithm'\n");
-        printf("refer to the objective speech quality measurement algorithm defined in ITU-T\n");
-        printf("Recommendation P.862; the term 'PESQ Software' refers to the C-code component\n"); 
-		printf("of P.862. These definitions also apply to those parts of ITU-T Recommendation\n");
-		printf("P.862.2 and its source code that are common with P.862.\n");
-        printf("\n");
-        printf("NOTICE:\n");
-        printf("All copyright, trade marks, trade names, patents, know-how and all or any other\n");
-        printf("intellectual rights subsisting in or used in connection with including all\n");
-        printf("algorithms, documents and manuals relating to the PESQ Algorithm and or PESQ\n");
-        printf("Software are and remain the sole property in law, ownership, regulations,\n");
-        printf("treaties and patent rights of the Owners identified below. The user may not\n");
-        printf("dispute or question the ownership of the PESQ Algorithm and or PESQ Software.\n");
-        printf("\n");
-        printf("OWNERS ARE:\n");
-        printf("1.	British Telecommunications plc (BT), all rights assigned\n");
-        printf("      to Psytechnics Limited\n");
-        printf("2.	Royal KPN NV, all rights assigned to OPTICOM GmbH\n");
-        printf("\n");
-        printf("RESTRICTIONS:\n");
-        printf("The user cannot:\n");
-        printf("1.	alter, duplicate, modify, adapt, or translate in whole or in\n");
-        printf("      part any aspect of the PESQ Algorithm and or PESQ Software\n");
-        printf("2.	sell, hire, loan, distribute, dispose or put to any commercial\n");
-        printf("      use other than those permitted below in whole or in part any\n");
-        printf("      aspect of the PESQ Algorithm and or PESQ Software\n");
-        printf("\n");
-        printf("PERMITTED USE:\n");
-        printf("The user may:\n");
-        printf("1.	Use the PESQ Software to:\n");
-        printf("      i)   understand the PESQ Algorithm; or\n");
-        printf("      ii)  evaluate the ability of the PESQ Algorithm to perform its intended\n");
-        printf("           function of predicting the speech quality of a system; or\n");
-        printf("      iii) evaluate the computational complexity of the PESQ Algorithm,\n");
-        printf("           with the limitation that none of said evaluations or its\n");
-        printf("           results shall be used for external commercial use.\n");
-        printf("2.	Use the PESQ Software to test if an implementation of the PESQ\n");
-        printf("      Algorithm conforms to ITU-T Recommendation P.862.\n");
-        printf("3.	With the prior written permission of both Psytechnics Limited and\n");
-        printf("      OPTICOM GmbH, use the PESQ Software in accordance with the above\n");
-        printf("      Restrictions to perform work that meets all of the following criteria:\n");
-        printf("      i)    the work must contribute directly to the maintenance of an\n");
-        printf("            existing ITU recommendation or the development of a new ITU\n");
-        printf("            recommendation under an approved ITU Study Item; and\n");
-        printf("      ii)   the work and its results must be fully described in a\n");
-        printf("            written contribution to the ITU that is presented at a formal\n");
-        printf("            ITU meeting within one year of the start of the work; and\n");
-        printf("      iii)  neither the work nor its results shall be put to any\n");
-        printf("            commercial use other than making said contribution to the ITU.\n");
-        printf("            Said permission will be provided on a case-by-case basis.\n");
-        printf("\n");
-        printf("ANY OTHER USE OR APPLICATION OF THE PESQ SOFTWARE AND/OR THE PESQ ALGORITHM\n");
-        printf("WILL REQUIRE A PESQ LICENCE AGREEMENT, WHICH MAY BE OBTAINED FROM EITHER\n");
-        printf("OPTICOM GMBH OR PSYTECHNICS LIMITED. \n");
-        printf("\n");
-        printf("EACH COMPANY OFFERS OEM LICENSE AGREEMENTS, WHICH COMBINE OEM\n");
-        printf("IMPLEMENTATIONS OF THE PESQ ALGORITHM TOGETHER WITH A PESQ PATENT LICENSE\n");
-        printf("AGREEMENT. PESQ PATENT-ONLY LICENSE AGREEMENTS MAY BE OBTAINED FROM OPTICOM.\n");
-        printf("\n");
+# if 0 // simon, comment out
+        prtinfo("\n");
+        prtinfo("Perceptual Evaluation of Speech Quality (PESQ)\n");
+        prtinfo("Reference implementation for ITU-T Recommendations P.862, P.862.1 and P.862.2.\n");
+        prtinfo("Version 2.0 October 2005.\n");
+        prtinfo("\n");
+        prtinfo("PESQ Intellectual Property Rights Notice.\n");
+        prtinfo("\n");
+        prtinfo("DEFINITIONS:\n");
+        prtinfo("For the purposes of this Intellectual Property Rights Notice the terms\n");
+        prtinfo("'Perceptual Evaluation of Speech Quality Algorithm' and 'PESQ Algorithm'\n");
+        prtinfo("refer to the objective speech quality measurement algorithm defined in ITU-T\n");
+        prtinfo("Recommendation P.862; the term 'PESQ Software' refers to the C-code component\n");
+		prtinfo("of P.862. These definitions also apply to those parts of ITU-T Recommendation\n");
+		prtinfo("P.862.2 and its source code that are common with P.862.\n");
+        prtinfo("\n");
+        prtinfo("NOTICE:\n");
+        prtinfo("All copyright, trade marks, trade names, patents, know-how and all or any other\n");
+        prtinfo("intellectual rights subsisting in or used in connection with including all\n");
+        prtinfo("algorithms, documents and manuals relating to the PESQ Algorithm and or PESQ\n");
+        prtinfo("Software are and remain the sole property in law, ownership, regulations,\n");
+        prtinfo("treaties and patent rights of the Owners identified below. The user may not\n");
+        prtinfo("dispute or question the ownership of the PESQ Algorithm and or PESQ Software.\n");
+        prtinfo("\n");
+        prtinfo("OWNERS ARE:\n");
+        prtinfo("1.	British Telecommunications plc (BT), all rights assigned\n");
+        prtinfo("      to Psytechnics Limited\n");
+        prtinfo("2.	Royal KPN NV, all rights assigned to OPTICOM GmbH\n");
+        prtinfo("\n");
+        prtinfo("RESTRICTIONS:\n");
+        prtinfo("The user cannot:\n");
+        prtinfo("1.	alter, duplicate, modify, adapt, or translate in whole or in\n");
+        prtinfo("      part any aspect of the PESQ Algorithm and or PESQ Software\n");
+        prtinfo("2.	sell, hire, loan, distribute, dispose or put to any commercial\n");
+        prtinfo("      use other than those permitted below in whole or in part any\n");
+        prtinfo("      aspect of the PESQ Algorithm and or PESQ Software\n");
+        prtinfo("\n");
+        prtinfo("PERMITTED USE:\n");
+        prtinfo("The user may:\n");
+        prtinfo("1.	Use the PESQ Software to:\n");
+        prtinfo("      i)   understand the PESQ Algorithm; or\n");
+        prtinfo("      ii)  evaluate the ability of the PESQ Algorithm to perform its intended\n");
+        prtinfo("           function of predicting the speech quality of a system; or\n");
+        prtinfo("      iii) evaluate the computational complexity of the PESQ Algorithm,\n");
+        prtinfo("           with the limitation that none of said evaluations or its\n");
+        prtinfo("           results shall be used for external commercial use.\n");
+        prtinfo("2.	Use the PESQ Software to test if an implementation of the PESQ\n");
+        prtinfo("      Algorithm conforms to ITU-T Recommendation P.862.\n");
+        prtinfo("3.	With the prior written permission of both Psytechnics Limited and\n");
+        prtinfo("      OPTICOM GmbH, use the PESQ Software in accordance with the above\n");
+        prtinfo("      Restrictions to perform work that meets all of the following criteria:\n");
+        prtinfo("      i)    the work must contribute directly to the maintenance of an\n");
+        prtinfo("            existing ITU recommendation or the development of a new ITU\n");
+        prtinfo("            recommendation under an approved ITU Study Item; and\n");
+        prtinfo("      ii)   the work and its results must be fully described in a\n");
+        prtinfo("            written contribution to the ITU that is presented at a formal\n");
+        prtinfo("            ITU meeting within one year of the start of the work; and\n");
+        prtinfo("      iii)  neither the work nor its results shall be put to any\n");
+        prtinfo("            commercial use other than making said contribution to the ITU.\n");
+        prtinfo("            Said permission will be provided on a case-by-case basis.\n");
+        prtinfo("\n");
+        prtinfo("ANY OTHER USE OR APPLICATION OF THE PESQ SOFTWARE AND/OR THE PESQ ALGORITHM\n");
+        prtinfo("WILL REQUIRE A PESQ LICENCE AGREEMENT, WHICH MAY BE OBTAINED FROM EITHER\n");
+        prtinfo("OPTICOM GMBH OR PSYTECHNICS LIMITED. \n");
+        prtinfo("\n");
+        prtinfo("EACH COMPANY OFFERS OEM LICENSE AGREEMENTS, WHICH COMBINE OEM\n");
+        prtinfo("IMPLEMENTATIONS OF THE PESQ ALGORITHM TOGETHER WITH A PESQ PATENT LICENSE\n");
+        prtinfo("AGREEMENT. PESQ PATENT-ONLY LICENSE AGREEMENTS MAY BE OBTAINED FROM OPTICOM.\n");
+        prtinfo("\n");
        
-		printf("***********************************************************************\n");
-		printf("*  OPTICOM GmbH                    *  Psytechnics Limited             *\n");
-		printf("*  Naegelsbachstr. 38,             *  Fraser House, 23 Museum Street, *\n");
-		printf("*  D- 91052 Erlangen, Germany      *  Ipswich IP1 1HN, England        *\n");
-		printf("*  Phone: +49 (0) 9131 53020 0     *  Phone: +44 (0) 1473 261 800     *\n");
-		printf("*  Fax:   +49 (0) 9131 53020 20    *  Fax:   +44 (0) 1473 261 880     *\n");
-		printf("*  E-mail: info@opticom.de,        *  E-mail: info@psytechnics.com,   *\n");
-		printf("*  www.opticom.de                  *  www.psytechnics.com             *\n");
-		printf("***********************************************************************\n");
+		prtinfo("***********************************************************************\n");
+		prtinfo("*  OPTICOM GmbH                    *  Psytechnics Limited             *\n");
+		prtinfo("*  Naegelsbachstr. 38,             *  Fraser House, 23 Museum Street, *\n");
+		prtinfo("*  D- 91052 Erlangen, Germany      *  Ipswich IP1 1HN, England        *\n");
+		prtinfo("*  Phone: +49 (0) 9131 53020 0     *  Phone: +44 (0) 1473 261 800     *\n");
+		prtinfo("*  Fax:   +49 (0) 9131 53020 20    *  Fax:   +44 (0) 1473 261 880     *\n");
+		prtinfo("*  E-mail: info@opticom.de,        *  E-mail: info@psytechnics.com,   *\n");
+		prtinfo("*  www.opticom.de                  *  www.psytechnics.com             *\n");
+		prtinfo("***********************************************************************\n");
 		
-        printf("\n");
-
+        prtinfo("\n");
+#endif
+        
         if (argc < 3){
             usage ();
-            return 0;                                                                  
+            return 1;
         } else {
 
             strcpy (ref_info.path_name, "");
@@ -258,7 +265,7 @@ int main (int argc, const char *argv []) {
                                 sample_rate = 8000L;
                             } else {
                                 usage ();
-                                fprintf (stderr, "Invalid parameter '%s'.\n", argv [arg]);
+                                fprterr (stderr, "Invalid parameter '%s'.\n", argv [arg]);
                                 return 1;
                             }
                         }
@@ -273,7 +280,7 @@ int main (int argc, const char *argv []) {
                             break;
                         default:
                             usage ();
-                            fprintf (stderr, "Invalid parameter '%s'.\n", argv [arg]);
+                            fprterr (stderr, "Invalid parameter '%s'.\n", argv [arg]);
                             return 1;
                     }
                     names++;
@@ -281,12 +288,12 @@ int main (int argc, const char *argv []) {
             }
 
             if (sample_rate == -1) {
-                printf ("PESQ Error. Must specify either +8000 or +16000 sample frequency option!\n");
+                fprterr (stderr, "PESQ Error. Must specify either +8000 or +16000 sample frequency option!\n");
                 exit (1);
             }
             
             if (sample_rate == 8000L && err_info.mode == WB_MODE ) {
-                printf ("PESQ Error. P.862.2 operation must use 16kHz sample rate\n");
+                fprterr (stderr, "PESQ Error. P.862.2 operation must use 16kHz sample rate\n");
                 exit (1);
             }
             
@@ -307,26 +314,37 @@ int main (int argc, const char *argv []) {
             }                
 
             select_rate (sample_rate, &Error_Flag, &Error_Type);
-            pesq_measure (&ref_info, &deg_info, &err_info, &Error_Flag, &Error_Type);
+            int measure_ret = pesq_measure (&ref_info, &deg_info, &err_info, &Error_Flag, &Error_Type);
+            if(measure_ret != 0){
+                return 1;
+            }
         }
     }
 
     if (Error_Flag == 0) {
 		if ( err_info.mode == NB_MODE )
-			printf ("\nP.862 Prediction (Raw MOS, MOS-LQO):  = %.3f\t%.3f\n", (double) err_info.pesq_mos, 
+			prtinfo ("\nP.862 Prediction (Raw MOS, MOS-LQO):  = %.3f\t%.3f\n", (double) err_info.pesq_mos,
 			(double) err_info.mapped_mos);
 		else
-			printf ("\nP.862.2 Prediction (MOS-LQO):  = %.3f\n", (double) err_info.mapped_mos);
+			prtinfo ("\nP.862.2 Prediction (MOS-LQO):  = %.3f\n", (double) err_info.mapped_mos);
+        
+        if(p_pesq_mos){
+            *p_pesq_mos = err_info.pesq_mos;
+        }
+        if(p_mapped_mos){
+            *p_mapped_mos = err_info.mapped_mos;
+        }
+            
         return 0;
     } else {
-        printf ("An error of type %d ", Error_Flag);
+        prtinfo ("An error of type %ld ", Error_Flag);
         if (Error_Type != NULL) {
-            printf (" (%s) occurred during processing.\n", Error_Type);
+            prtinfo (" (%s) occurred during processing.\n", Error_Type);
         } else {
-            printf ("occurred during processing.\n");
+            prtinfo ("occurred during processing.\n");
         }
 
-        return 0;
+        return 1;
     }
 }
 
@@ -424,7 +442,7 @@ long WB_InIIR_Nsos_16k = 1L;
 float WB_InIIR_Hsos_16k[LINIIR] = {
     2.740826f,  -5.4816519f,  2.740826f,  -1.9444777f,  0.94597794f };
        
-void pesq_measure (SIGNAL_INFO * ref_info, SIGNAL_INFO * deg_info,
+int pesq_measure (SIGNAL_INFO * ref_info, SIGNAL_INFO * deg_info,
     ERROR_INFO * err_info, long * Error_Flag, char ** Error_Type)
 {
     float * ftmp = NULL;
@@ -439,19 +457,19 @@ void pesq_measure (SIGNAL_INFO * ref_info, SIGNAL_INFO * deg_info,
         
     if ((*Error_Flag) == 0)
     {
-        printf ("Reading reference file %s...", ref_info-> path_name);
+        prtinfo ("Reading reference file %s...", ref_info-> path_name);
 
        load_src (Error_Flag, Error_Type, ref_info);
        if ((*Error_Flag) == 0)
-           printf ("done.\n");
+           prtinfo ("done.\n");
     }
     if ((*Error_Flag) == 0)
     {
-        printf ("Reading degraded file %s...", deg_info-> path_name);
+        prtinfo ("Reading degraded file %s...", deg_info-> path_name);
 
        load_src (Error_Flag, Error_Type, deg_info);
        if ((*Error_Flag) == 0)
-           printf ("done.\n");
+           prtinfo ("done.\n");
     }
 
     if (((ref_info-> Nsamples - 2 * SEARCHBUFFER * Downsample < Fs / 4) ||
@@ -469,17 +487,17 @@ void pesq_measure (SIGNAL_INFO * ref_info, SIGNAL_INFO * deg_info,
 
     if ((*Error_Flag) == 0)
     {   
-        int     maxNsamples = max (ref_info-> Nsamples, deg_info-> Nsamples);
+        long     maxNsamples = max (ref_info-> Nsamples, deg_info-> Nsamples);
         float * model_ref; 
         float * model_deg; 
         long    i;
-        FILE *resultsFile;
+        FILE *resultsFile = NULL; // simon, init with NULL
 
-        printf (" Level normalization...\n");            
+        prtinfo (" Level normalization...\n");
         fix_power_level (ref_info, "reference", maxNsamples);
         fix_power_level (deg_info, "degraded", maxNsamples);
 
-        printf (" IRS filtering...\n"); 
+        prtinfo (" IRS filtering...\n");
         if( Fs == 16000 ) {
             WB_InIIR_Nsos = WB_InIIR_Nsos_16k;
             WB_InIIR_Hsos = WB_InIIR_Hsos_16k;
@@ -527,7 +545,7 @@ void pesq_measure (SIGNAL_INFO * ref_info, SIGNAL_INFO * deg_info,
     
         input_filter( ref_info, deg_info, ftmp );
 
-        printf (" Variable delay compensation...\n");            
+        prtinfo (" Variable delay compensation...\n");
         calc_VAD (ref_info);
         calc_VAD (deg_info);
         
@@ -578,7 +596,7 @@ void pesq_measure (SIGNAL_INFO * ref_info, SIGNAL_INFO * deg_info,
             }
         }        
 
-        printf (" Acoustic model processing...\n");    
+        prtinfo (" Acoustic model processing...\n");
         pesq_psychoacoustic_model (ref_info, deg_info, err_info, ftmp);
     
         safe_free (ref_info-> data);
@@ -599,20 +617,22 @@ void pesq_measure (SIGNAL_INFO * ref_info, SIGNAL_INFO * deg_info,
 			err_info->pesq_mos = -1.0;
 		}
 
-        resultsFile = fopen (ITU_RESULTS_FILE, "at");
+//        resultsFile = fopen (ITU_RESULTS_FILE, "at"); // simon, comment out
 
         if (resultsFile != NULL) {
             long start, end;
 
             if (0 != fseek (resultsFile, 0, SEEK_SET)) {
-                printf ("Could not move to start of results file %s!\n", ITU_RESULTS_FILE);
-                exit (1);
+                fprterr (stderr, "Could not move to start of results file %s!\n", ITU_RESULTS_FILE);
+//                exit (1);
+                return -1;
             }
             start = ftell (resultsFile);
 
             if (0 != fseek (resultsFile, 0, SEEK_END)) {
-                printf ("Could not move to end of results file %s!\n", ITU_RESULTS_FILE);
-                exit (1);
+                fprterr (stderr, "Could not move to end of results file %s!\n", ITU_RESULTS_FILE);
+//                exit (1);
+                return -1;
             }
             end = ftell (resultsFile);
 
@@ -626,21 +646,32 @@ void pesq_measure (SIGNAL_INFO * ref_info, SIGNAL_INFO * deg_info,
 
 			fprintf (resultsFile, "%.3f\t ", err_info->pesq_mos);
             fprintf (resultsFile, "%.3f\t ", err_info->mapped_mos);
-            fprintf (resultsFile, "%d\t", Fs);
+            fprintf (resultsFile, "%ld\t", Fs);
 
 			if ( err_info->mode == NB_MODE )
 				fprintf (resultsFile, "nb");
 			else
 				fprintf (resultsFile, "wb");
 
-           fprintf (resultsFile, "\n", Fs);
+           fprintf (resultsFile, "\n");
 
            fclose (resultsFile);
         }
 
     }
 
-    return;
+    return 0;
+}
+
+/* add by simon*/
+int pesq_wav(int sampleRate, const char * ref_filename, const char * deg_filename, float * p_pesq_mos, float * p_mapped_mos) {
+//    const char *argv [] = {"main", "+16000", ref_filename, deg_filename};
+    char sampleRateStr[32];
+    sprintf(sampleRateStr, "%+d", sampleRate);
+    const char *argv [] = {"main", sampleRateStr, ref_filename, deg_filename};
+    int argc = sizeof(argv)/sizeof(argv[0]);
+    int ret = pesq_main (argc, argv, p_pesq_mos, p_mapped_mos) ;
+    return ret == 0 ? 0 : -1;
 }
 
 /* END OF FILE */

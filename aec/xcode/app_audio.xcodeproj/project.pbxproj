@@ -7,7 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F44D36D520CA237C00007D69 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44D36D420CA237C00007D69 /* main.cpp */; };
+		F44D373520CA254F00007D69 /* xtlv_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44D36FA20CA254F00007D69 /* xtlv_file.cpp */; };
+		F44D373620CA254F00007D69 /* xwavfile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44D36FB20CA254F00007D69 /* xwavfile.cpp */; };
+		F44D374C20CA259300007D69 /* main_audio.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44D374B20CA259300007D69 /* main_audio.cpp */; };
+		F44D375620CA8AB100007D69 /* dsp.c in Sources */ = {isa = PBXBuildFile; fileRef = F44D374F20CA8AB100007D69 /* dsp.c */; };
+		F44D375720CA8AB100007D69 /* pesqmain.c in Sources */ = {isa = PBXBuildFile; fileRef = F44D375020CA8AB100007D69 /* pesqmain.c */; };
+		F44D375820CA8AB100007D69 /* pesqio.c in Sources */ = {isa = PBXBuildFile; fileRef = F44D375220CA8AB100007D69 /* pesqio.c */; };
+		F44D375920CA8AB100007D69 /* pesqmod.c in Sources */ = {isa = PBXBuildFile; fileRef = F44D375320CA8AB100007D69 /* pesqmod.c */; };
+		F44D375A20CA8AB100007D69 /* pesqdsp.c in Sources */ = {isa = PBXBuildFile; fileRef = F44D375520CA8AB100007D69 /* pesqdsp.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,7 +31,20 @@
 
 /* Begin PBXFileReference section */
 		F44D36D120CA237C00007D69 /* app_audio */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = app_audio; sourceTree = BUILT_PRODUCTS_DIR; };
-		F44D36D420CA237C00007D69 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		F44D36FA20CA254F00007D69 /* xtlv_file.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = xtlv_file.cpp; sourceTree = "<group>"; };
+		F44D36FB20CA254F00007D69 /* xwavfile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = xwavfile.cpp; sourceTree = "<group>"; };
+		F44D36FC20CA254F00007D69 /* xwavfile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = xwavfile.h; sourceTree = "<group>"; };
+		F44D370620CA254F00007D69 /* xtlv_file.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = xtlv_file.h; sourceTree = "<group>"; };
+		F44D374B20CA259300007D69 /* main_audio.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main_audio.cpp; sourceTree = "<group>"; };
+		F44D374E20CA8AB100007D69 /* pesq.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = pesq.h; sourceTree = "<group>"; };
+		F44D374F20CA8AB100007D69 /* dsp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = dsp.c; sourceTree = "<group>"; };
+		F44D375020CA8AB100007D69 /* pesqmain.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = pesqmain.c; sourceTree = "<group>"; };
+		F44D375120CA8AB100007D69 /* pesqpar.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = pesqpar.h; sourceTree = "<group>"; };
+		F44D375220CA8AB100007D69 /* pesqio.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = pesqio.c; sourceTree = "<group>"; };
+		F44D375320CA8AB100007D69 /* pesqmod.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = pesqmod.c; sourceTree = "<group>"; };
+		F44D375420CA8AB100007D69 /* dsp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dsp.h; sourceTree = "<group>"; };
+		F44D375520CA8AB100007D69 /* pesqdsp.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = pesqdsp.c; sourceTree = "<group>"; };
+		F44D375B20CA91F000007D69 /* pesqmain.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = pesqmain.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,6 +61,7 @@
 		F44D36C820CA237C00007D69 = {
 			isa = PBXGroup;
 			children = (
+				F44D36E120CA254F00007D69 /* src */,
 				F44D36D320CA237C00007D69 /* app_audio */,
 				F44D36D220CA237C00007D69 /* Products */,
 			);
@@ -57,9 +78,38 @@
 		F44D36D320CA237C00007D69 /* app_audio */ = {
 			isa = PBXGroup;
 			children = (
-				F44D36D420CA237C00007D69 /* main.cpp */,
 			);
 			path = app_audio;
+			sourceTree = "<group>";
+		};
+		F44D36E120CA254F00007D69 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				F44D374D20CA8AB100007D69 /* pesq */,
+				F44D36FA20CA254F00007D69 /* xtlv_file.cpp */,
+				F44D370620CA254F00007D69 /* xtlv_file.h */,
+				F44D36FB20CA254F00007D69 /* xwavfile.cpp */,
+				F44D36FC20CA254F00007D69 /* xwavfile.h */,
+				F44D374B20CA259300007D69 /* main_audio.cpp */,
+			);
+			name = src;
+			path = ../src;
+			sourceTree = "<group>";
+		};
+		F44D374D20CA8AB100007D69 /* pesq */ = {
+			isa = PBXGroup;
+			children = (
+				F44D375B20CA91F000007D69 /* pesqmain.h */,
+				F44D375020CA8AB100007D69 /* pesqmain.c */,
+				F44D374E20CA8AB100007D69 /* pesq.h */,
+				F44D375420CA8AB100007D69 /* dsp.h */,
+				F44D374F20CA8AB100007D69 /* dsp.c */,
+				F44D375120CA8AB100007D69 /* pesqpar.h */,
+				F44D375220CA8AB100007D69 /* pesqio.c */,
+				F44D375320CA8AB100007D69 /* pesqmod.c */,
+				F44D375520CA8AB100007D69 /* pesqdsp.c */,
+			);
+			path = pesq;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -118,7 +168,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F44D36D520CA237C00007D69 /* main.cpp in Sources */,
+				F44D373520CA254F00007D69 /* xtlv_file.cpp in Sources */,
+				F44D375620CA8AB100007D69 /* dsp.c in Sources */,
+				F44D375A20CA8AB100007D69 /* pesqdsp.c in Sources */,
+				F44D375820CA8AB100007D69 /* pesqio.c in Sources */,
+				F44D374C20CA259300007D69 /* main_audio.cpp in Sources */,
+				F44D373620CA254F00007D69 /* xwavfile.cpp in Sources */,
+				F44D375920CA8AB100007D69 /* pesqmod.c in Sources */,
+				F44D375720CA8AB100007D69 /* pesqmain.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -238,6 +295,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				HEADER_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/../../xctools/src",
+					/usr/local/Cellar/opus/1.1.4/include/,
+				);
+				LIBRARY_SEARCH_PATHS = /usr/local/Cellar/opus/1.1.4/lib;
+				OTHER_LDFLAGS = /usr/local/Cellar/opus/1.1.4/lib/libopus.a;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -246,6 +309,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+				HEADER_SEARCH_PATHS = (
+					"$(PROJECT_DIR)/../../xctools/src",
+					/usr/local/Cellar/opus/1.1.4/include/,
+				);
+				LIBRARY_SEARCH_PATHS = /usr/local/Cellar/opus/1.1.4/lib;
+				OTHER_LDFLAGS = /usr/local/Cellar/opus/1.1.4/lib/libopus.a;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
