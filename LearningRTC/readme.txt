@@ -8,9 +8,9 @@ brew install ffmpeg
 
 文件和目录说明
 ============
-make-yuv-file.sh	生成yuv文件到data目录中
-data/     			存放用于测试的视频和音频文件
-yuvplayer/			一个简单的yuv播放器例子
+make-yuv-file.sh    生成yuv文件到data目录中
+data/               存放用于测试的视频和音频文件
+yuvplayer/          一个简单的yuv播放器例子
 
 
 yuvplayer 说明
