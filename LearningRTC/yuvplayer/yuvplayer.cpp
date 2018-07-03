@@ -100,7 +100,6 @@ static int playYUVFile(const char * filename, int width, int height, int framera
 	int ret = -1;
 	FILE * fp = NULL;
 	YUVRenderer * renderer = NULL;
-	YUVRenderer * renderer2 = NULL;
 	int bitsPerPixel = 12;
 	int imageSize = width*height*bitsPerPixel/8;
 	uint8_t * buffer = new uint8_t[imageSize];
@@ -117,8 +116,7 @@ static int playYUVFile(const char * filename, int width, int height, int framera
         odbgi("framerate: [%d] (%d ms)", framerate, frameInterval);
 
         // TODO: check result of creating render 
-		renderer2 = YUVRenderer::create("renderer1", width, height, &ret);
-        renderer = YUVRenderer::create("renderer2", width, height, &ret);
+		renderer = YUVRenderer::create("renderer1", width, height, &ret);
 
 		SDL_Event event;
 		bool quitLoop = false;
@@ -145,7 +143,6 @@ static int playYUVFile(const char * filename, int width, int height, int framera
 			        	}
 			        }
 			        renderer->draw(buffer, width);
-			        renderer2->draw(buffer, width);
 			        ++nframes;
 		        }
 		        nextDrawTime += frameInterval;//SDL_Delay(40);
@@ -174,7 +171,6 @@ static int playYUVFile(const char * filename, int width, int height, int framera
 			                    event.window.data2);
 			            // TODO: only refresh one renderer
 			            renderer->refresh();
-			            renderer2->refresh();
 					}
 				}
 			}
@@ -187,10 +183,6 @@ static int playYUVFile(const char * filename, int width, int height, int framera
 	if(renderer){
 		delete renderer;
 		renderer = NULL;
-	}
-	if(renderer2){
-		delete renderer2;
-		renderer2 = NULL;
 	}
 	if(fp){
 		fclose(fp);
@@ -211,7 +203,6 @@ int main(int argc, char* argv[]){
 		return -1;
 	}
 
-	// playYUVFile("../data/test_yuv420p_320x180.yuv", 320, 180, 25, true);
 	playYUVFile("../data/test_yuv420p_640x360.yuv", 640, 360, 25, true);
 
 	SDL_Quit();
