@@ -193,6 +193,26 @@ static int playYUVFile(const char * filename, int width, int height, int framera
 	return ret;
 }
 
+static
+std::string getFilePath(const std::string& fname){
+    static std::string path;
+    static char div = '\0';
+    if(!div){
+        const char * srcpath = __FILE__;
+        div = '/';
+        const char * p = strrchr(srcpath, div);
+        if(!p){
+            div = '\\';
+            p = strrchr(__FILE__, div);
+        }
+        if(p){
+            path = srcpath;
+            path = path.substr(0, p-srcpath) + div;
+        }
+    }
+    return path + fname;
+}
+
 int main(int argc, char* argv[]){
 	std::string name_ = "main";
 	int ret = SDL_Init(SDL_INIT_VIDEO) ;
@@ -200,8 +220,8 @@ int main(int argc, char* argv[]){
 		odbge( "Could not initialize SDL - %s\n", SDL_GetError()); 
 		return -1;
 	}
-
-	playYUVFile("../data/test_yuv420p_640x360.yuv", 640, 360, 25, true);
+    std::string filepath = getFilePath("../data/test_yuv420p_640x360.yuv");
+	playYUVFile(filepath.c_str(), 640, 360, 25, true);
 
 	SDL_Quit();
 

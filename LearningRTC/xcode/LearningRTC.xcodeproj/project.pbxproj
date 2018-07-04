@@ -1,0 +1,491 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 50;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		F4829D2320EC7D2700B34AE0 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4829D2220EC7D2700B34AE0 /* main.cpp */; };
+		F4829D3820EC7DC700B34AE0 /* yuvplayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4829D3720EC7DC700B34AE0 /* yuvplayer.cpp */; };
+		F4829D3D20EC7F2A00B34AE0 /* libSDL2main.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */; };
+		F4829D4E20EC885B00B34AE0 /* pcmplayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4829D4A20EC884700B34AE0 /* pcmplayer.cpp */; };
+		F4829D4F20EC88B900B34AE0 /* libSDL2main.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */; };
+		F4829D5120EC88BA00B34AE0 /* libSDL2-2.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */; };
+		F4829D5320EC891D00B34AE0 /* libSDL2-2.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F4829D1D20EC7D2700B34AE0 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		F4829D2B20EC7D8C00B34AE0 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+		F4829D4020EC883600B34AE0 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		F4829D1F20EC7D2700B34AE0 /* LearningRTC */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LearningRTC; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4829D2220EC7D2700B34AE0 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		F4829D2D20EC7D8C00B34AE0 /* yuvplayer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = yuvplayer; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4829D3620EC7DC700B34AE0 /* build.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = build.sh; sourceTree = "<group>"; };
+		F4829D3720EC7DC700B34AE0 /* yuvplayer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = yuvplayer.cpp; sourceTree = "<group>"; };
+		F4829D3A20EC7F2A00B34AE0 /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2.a; path = ../../../../../../../../../../usr/local/Cellar/sdl2/2.0.5/lib/libSDL2.a; sourceTree = "<group>"; };
+		F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2main.a; path = ../../../../../../../../../../usr/local/Cellar/sdl2/2.0.5/lib/libSDL2main.a; sourceTree = "<group>"; };
+		F4829D4220EC883600B34AE0 /* pcmplayer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = pcmplayer; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4829D4A20EC884700B34AE0 /* pcmplayer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = pcmplayer.cpp; sourceTree = "<group>"; };
+		F4829D4C20EC884700B34AE0 /* build.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = build.sh; sourceTree = "<group>"; };
+		F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libSDL2-2.0.0.dylib"; path = "../../../../../../../../../../usr/local/Cellar/sdl2/2.0.5/lib/libSDL2-2.0.0.dylib"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F4829D1C20EC7D2700B34AE0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4829D2A20EC7D8C00B34AE0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4829D5320EC891D00B34AE0 /* libSDL2-2.0.0.dylib in Frameworks */,
+				F4829D3D20EC7F2A00B34AE0 /* libSDL2main.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4829D3F20EC883600B34AE0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4829D5120EC88BA00B34AE0 /* libSDL2-2.0.0.dylib in Frameworks */,
+				F4829D4F20EC88B900B34AE0 /* libSDL2main.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		F4829D1620EC7D2700B34AE0 = {
+			isa = PBXGroup;
+			children = (
+				F4829D4920EC884700B34AE0 /* pcmplayer */,
+				F4829D3420EC7DC700B34AE0 /* yuvplayer */,
+				F4829D2120EC7D2700B34AE0 /* LearningRTC */,
+				F4829D2020EC7D2700B34AE0 /* Products */,
+				F4829D3920EC7F2900B34AE0 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		F4829D2020EC7D2700B34AE0 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F4829D1F20EC7D2700B34AE0 /* LearningRTC */,
+				F4829D2D20EC7D8C00B34AE0 /* yuvplayer */,
+				F4829D4220EC883600B34AE0 /* pcmplayer */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F4829D2120EC7D2700B34AE0 /* LearningRTC */ = {
+			isa = PBXGroup;
+			children = (
+				F4829D2220EC7D2700B34AE0 /* main.cpp */,
+			);
+			path = LearningRTC;
+			sourceTree = "<group>";
+		};
+		F4829D3420EC7DC700B34AE0 /* yuvplayer */ = {
+			isa = PBXGroup;
+			children = (
+				F4829D3620EC7DC700B34AE0 /* build.sh */,
+				F4829D3720EC7DC700B34AE0 /* yuvplayer.cpp */,
+			);
+			name = yuvplayer;
+			path = ../yuvplayer;
+			sourceTree = "<group>";
+		};
+		F4829D3920EC7F2900B34AE0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */,
+				F4829D3A20EC7F2A00B34AE0 /* libSDL2.a */,
+				F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		F4829D4920EC884700B34AE0 /* pcmplayer */ = {
+			isa = PBXGroup;
+			children = (
+				F4829D4A20EC884700B34AE0 /* pcmplayer.cpp */,
+				F4829D4C20EC884700B34AE0 /* build.sh */,
+			);
+			name = pcmplayer;
+			path = ../pcmplayer;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F4829D1E20EC7D2700B34AE0 /* LearningRTC */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F4829D2620EC7D2700B34AE0 /* Build configuration list for PBXNativeTarget "LearningRTC" */;
+			buildPhases = (
+				F4829D1B20EC7D2700B34AE0 /* Sources */,
+				F4829D1C20EC7D2700B34AE0 /* Frameworks */,
+				F4829D1D20EC7D2700B34AE0 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LearningRTC;
+			productName = LearningRTC;
+			productReference = F4829D1F20EC7D2700B34AE0 /* LearningRTC */;
+			productType = "com.apple.product-type.tool";
+		};
+		F4829D2C20EC7D8C00B34AE0 /* yuvplayer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F4829D3320EC7D8D00B34AE0 /* Build configuration list for PBXNativeTarget "yuvplayer" */;
+			buildPhases = (
+				F4829D2920EC7D8C00B34AE0 /* Sources */,
+				F4829D2A20EC7D8C00B34AE0 /* Frameworks */,
+				F4829D2B20EC7D8C00B34AE0 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = yuvplayer;
+			productName = yuvplayer;
+			productReference = F4829D2D20EC7D8C00B34AE0 /* yuvplayer */;
+			productType = "com.apple.product-type.tool";
+		};
+		F4829D4120EC883600B34AE0 /* pcmplayer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F4829D4620EC883600B34AE0 /* Build configuration list for PBXNativeTarget "pcmplayer" */;
+			buildPhases = (
+				F4829D3E20EC883600B34AE0 /* Sources */,
+				F4829D3F20EC883600B34AE0 /* Frameworks */,
+				F4829D4020EC883600B34AE0 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = pcmplayer;
+			productName = pcmplayer;
+			productReference = F4829D4220EC883600B34AE0 /* pcmplayer */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F4829D1720EC7D2700B34AE0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastUpgradeCheck = 0930;
+				ORGANIZATIONNAME = easemob;
+				TargetAttributes = {
+					F4829D1E20EC7D2700B34AE0 = {
+						CreatedOnToolsVersion = 9.3;
+					};
+					F4829D2C20EC7D8C00B34AE0 = {
+						CreatedOnToolsVersion = 9.3;
+					};
+					F4829D4120EC883600B34AE0 = {
+						CreatedOnToolsVersion = 9.3;
+					};
+				};
+			};
+			buildConfigurationList = F4829D1A20EC7D2700B34AE0 /* Build configuration list for PBXProject "LearningRTC" */;
+			compatibilityVersion = "Xcode 9.3";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+			);
+			mainGroup = F4829D1620EC7D2700B34AE0;
+			productRefGroup = F4829D2020EC7D2700B34AE0 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F4829D1E20EC7D2700B34AE0 /* LearningRTC */,
+				F4829D2C20EC7D8C00B34AE0 /* yuvplayer */,
+				F4829D4120EC883600B34AE0 /* pcmplayer */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F4829D1B20EC7D2700B34AE0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4829D2320EC7D2700B34AE0 /* main.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4829D2920EC7D8C00B34AE0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4829D3820EC7DC700B34AE0 /* yuvplayer.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4829D3E20EC883600B34AE0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4829D4E20EC885B00B34AE0 /* pcmplayer.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		F4829D2420EC7D2700B34AE0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = /usr/local/include;
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		F4829D2520EC7D2700B34AE0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = /usr/local/include;
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		F4829D2720EC7D2700B34AE0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F4829D2820EC7D2700B34AE0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		F4829D3120EC7D8D00B34AE0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/sdl2/2.0.5/lib,
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F4829D3220EC7D8D00B34AE0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/sdl2/2.0.5/lib,
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		F4829D4720EC883600B34AE0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/sdl2/2.0.5/lib,
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F4829D4820EC883600B34AE0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/sdl2/2.0.5/lib,
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F4829D1A20EC7D2700B34AE0 /* Build configuration list for PBXProject "LearningRTC" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4829D2420EC7D2700B34AE0 /* Debug */,
+				F4829D2520EC7D2700B34AE0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F4829D2620EC7D2700B34AE0 /* Build configuration list for PBXNativeTarget "LearningRTC" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4829D2720EC7D2700B34AE0 /* Debug */,
+				F4829D2820EC7D2700B34AE0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F4829D3320EC7D8D00B34AE0 /* Build configuration list for PBXNativeTarget "yuvplayer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4829D3120EC7D8D00B34AE0 /* Debug */,
+				F4829D3220EC7D8D00B34AE0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F4829D4620EC883600B34AE0 /* Build configuration list for PBXNativeTarget "pcmplayer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4829D4720EC883600B34AE0 /* Debug */,
+				F4829D4820EC883600B34AE0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = F4829D1720EC7D2700B34AE0 /* Project object */;
+}

@@ -151,6 +151,25 @@ int playPCMFile(const char * filename, int samplerate, int channels){
 	return ret;
 }
 
+static
+std::string getFilePath(const std::string& fname){
+    static std::string path;
+    static char div = '\0';
+    if(!div){
+        const char * srcpath = __FILE__;
+        div = '/';
+        const char * p = strrchr(srcpath, div);
+        if(!p){
+            div = '\\';
+            p = strrchr(__FILE__, div);
+        }
+        if(p){
+            path = srcpath;
+            path = path.substr(0, p-srcpath) + div;
+        }
+    }
+    return path + fname;
+}
 int main(int argc, char* argv[]){
 	std::string name_ = "main";
 	int ret = SDL_Init(SDL_INIT_AUDIO);
@@ -159,8 +178,8 @@ int main(int argc, char* argv[]){
 		return -1;
 	}
 
-	// playPCMFile("NocturneNo2inEflat_44.1k_s16le.pcm", 44100, 2);
-	playPCMFile("../data/test_s16le_44100Hz_2ch.pcm", 44100, 2);
+    std::string filepath = getFilePath("../data/test_s16le_44100Hz_2ch.pcm");
+	playPCMFile(filepath.c_str(), 44100, 2);
 
 	SDL_Quit();
 
