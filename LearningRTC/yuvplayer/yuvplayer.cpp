@@ -115,7 +115,7 @@ static int playYUVFile(const char * filename, int width, int height, int framera
         odbgi("video size: [%dx%d]", width, height);
         odbgi("framerate: [%d] (%d ms)", framerate, frameInterval);
 
-        // TODO: check result of creating render 
+        // TODO: check result of creating renderer 
 		renderer = YUVRenderer::create("renderer1", width, height, &ret);
 
 		SDL_Event event;
@@ -169,13 +169,11 @@ static int playYUVFile(const char * filename, int width, int height, int framera
 			            odbgi("Window %d resized to %dx%d",
 			                    event.window.windowID, event.window.data1,
 			                    event.window.data2);
-			            // TODO: only refresh one renderer
 			            renderer->refresh();
 					}
 				}
 			}
-        }// while
-
+        }// while(!quitLoop)
 
 		ret = 0;
 	}while(0);
@@ -197,7 +195,7 @@ static int playYUVFile(const char * filename, int width, int height, int framera
 
 int main(int argc, char* argv[]){
 	std::string name_ = "main";
-	int ret = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) ;
+	int ret = SDL_Init(SDL_INIT_VIDEO) ;
 	if(ret){
 		odbge( "Could not initialize SDL - %s\n", SDL_GetError()); 
 		return -1;
