@@ -14,6 +14,15 @@
 		F4829D4F20EC88B900B34AE0 /* libSDL2main.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */; };
 		F4829D5120EC88BA00B34AE0 /* libSDL2-2.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */; };
 		F4829D5320EC891D00B34AE0 /* libSDL2-2.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */; };
+		F4829D7220ECA63300B34AE0 /* libSDL2-2.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */; };
+		F4829D7320ECA63300B34AE0 /* libSDL2main.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */; };
+		F4829D7920ECA65000B34AE0 /* camera.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4829D6B20ECA58A00B34AE0 /* camera.cpp */; };
+		F4829D8020ECA84A00B34AE0 /* libavcodec.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7A20ECA84A00B34AE0 /* libavcodec.a */; };
+		F4829D8120ECA84A00B34AE0 /* libavformat.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7B20ECA84A00B34AE0 /* libavformat.a */; };
+		F4829D8220ECA84A00B34AE0 /* libavutil.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7C20ECA84A00B34AE0 /* libavutil.a */; };
+		F4829D8320ECA84A00B34AE0 /* libswscale.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7D20ECA84A00B34AE0 /* libswscale.a */; };
+		F4829D8420ECA84A00B34AE0 /* libavfilter.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7E20ECA84A00B34AE0 /* libavfilter.a */; };
+		F4829D8520ECA84A00B34AE0 /* libavdevice.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7F20ECA84A00B34AE0 /* libavdevice.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -44,20 +53,38 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
+		F4829D7420ECA63300B34AE0 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		F4829D1F20EC7D2700B34AE0 /* LearningRTC */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LearningRTC; sourceTree = BUILT_PRODUCTS_DIR; };
 		F4829D2220EC7D2700B34AE0 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
-		F4829D2D20EC7D8C00B34AE0 /* yuvplayer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = yuvplayer; sourceTree = BUILT_PRODUCTS_DIR; };
-		F4829D3620EC7DC700B34AE0 /* build.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = build.sh; sourceTree = "<group>"; };
+		F4829D2D20EC7D8C00B34AE0 /* YUVPlayer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = YUVPlayer; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4829D3620EC7DC700B34AE0 /* build_and_run.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = build_and_run.sh; sourceTree = "<group>"; };
 		F4829D3720EC7DC700B34AE0 /* yuvplayer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = yuvplayer.cpp; sourceTree = "<group>"; };
 		F4829D3A20EC7F2A00B34AE0 /* libSDL2.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2.a; path = ../../../../../../../../../../usr/local/Cellar/sdl2/2.0.5/lib/libSDL2.a; sourceTree = "<group>"; };
 		F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2main.a; path = ../../../../../../../../../../usr/local/Cellar/sdl2/2.0.5/lib/libSDL2main.a; sourceTree = "<group>"; };
-		F4829D4220EC883600B34AE0 /* pcmplayer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = pcmplayer; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4829D4220EC883600B34AE0 /* PCMPlayer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = PCMPlayer; sourceTree = BUILT_PRODUCTS_DIR; };
 		F4829D4A20EC884700B34AE0 /* pcmplayer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = pcmplayer.cpp; sourceTree = "<group>"; };
-		F4829D4C20EC884700B34AE0 /* build.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = build.sh; sourceTree = "<group>"; };
+		F4829D4C20EC884700B34AE0 /* build_and_run.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = build_and_run.sh; sourceTree = "<group>"; };
 		F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = "libSDL2-2.0.0.dylib"; path = "../../../../../../../../../../usr/local/Cellar/sdl2/2.0.5/lib/libSDL2-2.0.0.dylib"; sourceTree = "<group>"; };
+		F4829D6B20ECA58A00B34AE0 /* camera.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = camera.cpp; sourceTree = "<group>"; };
+		F4829D7820ECA63300B34AE0 /* Camera */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Camera; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4829D7A20ECA84A00B34AE0 /* libavcodec.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavcodec.a; path = ../../../../../../../../../../usr/local/Cellar/ffmpeg/3.3/lib/libavcodec.a; sourceTree = "<group>"; };
+		F4829D7B20ECA84A00B34AE0 /* libavformat.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavformat.a; path = ../../../../../../../../../../usr/local/Cellar/ffmpeg/3.3/lib/libavformat.a; sourceTree = "<group>"; };
+		F4829D7C20ECA84A00B34AE0 /* libavutil.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavutil.a; path = ../../../../../../../../../../usr/local/Cellar/ffmpeg/3.3/lib/libavutil.a; sourceTree = "<group>"; };
+		F4829D7D20ECA84A00B34AE0 /* libswscale.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libswscale.a; path = ../../../../../../../../../../usr/local/Cellar/ffmpeg/3.3/lib/libswscale.a; sourceTree = "<group>"; };
+		F4829D7E20ECA84A00B34AE0 /* libavfilter.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavfilter.a; path = ../../../../../../../../../../usr/local/Cellar/ffmpeg/3.3/lib/libavfilter.a; sourceTree = "<group>"; };
+		F4829D7F20ECA84A00B34AE0 /* libavdevice.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavdevice.a; path = ../../../../../../../../../../usr/local/Cellar/ffmpeg/3.3/lib/libavdevice.a; sourceTree = "<group>"; };
+		F4829D8620EDF4FE00B34AE0 /* build_and_run.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = build_and_run.sh; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -86,12 +113,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F4829D7120ECA63300B34AE0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4829D8020ECA84A00B34AE0 /* libavcodec.a in Frameworks */,
+				F4829D8120ECA84A00B34AE0 /* libavformat.a in Frameworks */,
+				F4829D8220ECA84A00B34AE0 /* libavutil.a in Frameworks */,
+				F4829D8320ECA84A00B34AE0 /* libswscale.a in Frameworks */,
+				F4829D8420ECA84A00B34AE0 /* libavfilter.a in Frameworks */,
+				F4829D8520ECA84A00B34AE0 /* libavdevice.a in Frameworks */,
+				F4829D7220ECA63300B34AE0 /* libSDL2-2.0.0.dylib in Frameworks */,
+				F4829D7320ECA63300B34AE0 /* libSDL2main.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		F4829D1620EC7D2700B34AE0 = {
 			isa = PBXGroup;
 			children = (
+				F4829D6A20ECA58A00B34AE0 /* camera */,
 				F4829D4920EC884700B34AE0 /* pcmplayer */,
 				F4829D3420EC7DC700B34AE0 /* yuvplayer */,
 				F4829D2120EC7D2700B34AE0 /* LearningRTC */,
@@ -104,8 +147,9 @@
 			isa = PBXGroup;
 			children = (
 				F4829D1F20EC7D2700B34AE0 /* LearningRTC */,
-				F4829D2D20EC7D8C00B34AE0 /* yuvplayer */,
-				F4829D4220EC883600B34AE0 /* pcmplayer */,
+				F4829D2D20EC7D8C00B34AE0 /* YUVPlayer */,
+				F4829D4220EC883600B34AE0 /* PCMPlayer */,
+				F4829D7820ECA63300B34AE0 /* Camera */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -121,8 +165,8 @@
 		F4829D3420EC7DC700B34AE0 /* yuvplayer */ = {
 			isa = PBXGroup;
 			children = (
-				F4829D3620EC7DC700B34AE0 /* build.sh */,
 				F4829D3720EC7DC700B34AE0 /* yuvplayer.cpp */,
+				F4829D3620EC7DC700B34AE0 /* build_and_run.sh */,
 			);
 			name = yuvplayer;
 			path = ../yuvplayer;
@@ -131,6 +175,12 @@
 		F4829D3920EC7F2900B34AE0 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				F4829D7A20ECA84A00B34AE0 /* libavcodec.a */,
+				F4829D7F20ECA84A00B34AE0 /* libavdevice.a */,
+				F4829D7E20ECA84A00B34AE0 /* libavfilter.a */,
+				F4829D7B20ECA84A00B34AE0 /* libavformat.a */,
+				F4829D7C20ECA84A00B34AE0 /* libavutil.a */,
+				F4829D7D20ECA84A00B34AE0 /* libswscale.a */,
 				F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */,
 				F4829D3A20EC7F2A00B34AE0 /* libSDL2.a */,
 				F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */,
@@ -142,10 +192,20 @@
 			isa = PBXGroup;
 			children = (
 				F4829D4A20EC884700B34AE0 /* pcmplayer.cpp */,
-				F4829D4C20EC884700B34AE0 /* build.sh */,
+				F4829D4C20EC884700B34AE0 /* build_and_run.sh */,
 			);
 			name = pcmplayer;
 			path = ../pcmplayer;
+			sourceTree = "<group>";
+		};
+		F4829D6A20ECA58A00B34AE0 /* camera */ = {
+			isa = PBXGroup;
+			children = (
+				F4829D6B20ECA58A00B34AE0 /* camera.cpp */,
+				F4829D8620EDF4FE00B34AE0 /* build_and_run.sh */,
+			);
+			name = camera;
+			path = ../camera;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -168,9 +228,9 @@
 			productReference = F4829D1F20EC7D2700B34AE0 /* LearningRTC */;
 			productType = "com.apple.product-type.tool";
 		};
-		F4829D2C20EC7D8C00B34AE0 /* yuvplayer */ = {
+		F4829D2C20EC7D8C00B34AE0 /* YUVPlayer */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F4829D3320EC7D8D00B34AE0 /* Build configuration list for PBXNativeTarget "yuvplayer" */;
+			buildConfigurationList = F4829D3320EC7D8D00B34AE0 /* Build configuration list for PBXNativeTarget "YUVPlayer" */;
 			buildPhases = (
 				F4829D2920EC7D8C00B34AE0 /* Sources */,
 				F4829D2A20EC7D8C00B34AE0 /* Frameworks */,
@@ -180,14 +240,14 @@
 			);
 			dependencies = (
 			);
-			name = yuvplayer;
+			name = YUVPlayer;
 			productName = yuvplayer;
-			productReference = F4829D2D20EC7D8C00B34AE0 /* yuvplayer */;
+			productReference = F4829D2D20EC7D8C00B34AE0 /* YUVPlayer */;
 			productType = "com.apple.product-type.tool";
 		};
-		F4829D4120EC883600B34AE0 /* pcmplayer */ = {
+		F4829D4120EC883600B34AE0 /* PCMPlayer */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F4829D4620EC883600B34AE0 /* Build configuration list for PBXNativeTarget "pcmplayer" */;
+			buildConfigurationList = F4829D4620EC883600B34AE0 /* Build configuration list for PBXNativeTarget "PCMPlayer" */;
 			buildPhases = (
 				F4829D3E20EC883600B34AE0 /* Sources */,
 				F4829D3F20EC883600B34AE0 /* Frameworks */,
@@ -197,9 +257,26 @@
 			);
 			dependencies = (
 			);
-			name = pcmplayer;
+			name = PCMPlayer;
 			productName = pcmplayer;
-			productReference = F4829D4220EC883600B34AE0 /* pcmplayer */;
+			productReference = F4829D4220EC883600B34AE0 /* PCMPlayer */;
+			productType = "com.apple.product-type.tool";
+		};
+		F4829D6E20ECA63300B34AE0 /* Camera */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F4829D7520ECA63300B34AE0 /* Build configuration list for PBXNativeTarget "Camera" */;
+			buildPhases = (
+				F4829D6F20ECA63300B34AE0 /* Sources */,
+				F4829D7120ECA63300B34AE0 /* Frameworks */,
+				F4829D7420ECA63300B34AE0 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Camera;
+			productName = pcmplayer;
+			productReference = F4829D7820ECA63300B34AE0 /* Camera */;
 			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
@@ -235,8 +312,9 @@
 			projectRoot = "";
 			targets = (
 				F4829D1E20EC7D2700B34AE0 /* LearningRTC */,
-				F4829D2C20EC7D8C00B34AE0 /* yuvplayer */,
-				F4829D4120EC883600B34AE0 /* pcmplayer */,
+				F4829D2C20EC7D8C00B34AE0 /* YUVPlayer */,
+				F4829D4120EC883600B34AE0 /* PCMPlayer */,
+				F4829D6E20ECA63300B34AE0 /* Camera */,
 			);
 		};
 /* End PBXProject section */
@@ -263,6 +341,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				F4829D4E20EC885B00B34AE0 /* pcmplayer.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4829D6F20ECA63300B34AE0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4829D7920ECA65000B34AE0 /* camera.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -446,6 +532,32 @@
 			};
 			name = Release;
 		};
+		F4829D7620ECA63300B34AE0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/sdl2/2.0.5/lib,
+					/usr/local/Cellar/ffmpeg/3.3/lib,
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F4829D7720ECA63300B34AE0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/sdl2/2.0.5/lib,
+					/usr/local/Cellar/ffmpeg/3.3/lib,
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -467,7 +579,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F4829D3320EC7D8D00B34AE0 /* Build configuration list for PBXNativeTarget "yuvplayer" */ = {
+		F4829D3320EC7D8D00B34AE0 /* Build configuration list for PBXNativeTarget "YUVPlayer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F4829D3120EC7D8D00B34AE0 /* Debug */,
@@ -476,11 +588,20 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F4829D4620EC883600B34AE0 /* Build configuration list for PBXNativeTarget "pcmplayer" */ = {
+		F4829D4620EC883600B34AE0 /* Build configuration list for PBXNativeTarget "PCMPlayer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F4829D4720EC883600B34AE0 /* Debug */,
 				F4829D4820EC883600B34AE0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F4829D7520ECA63300B34AE0 /* Build configuration list for PBXNativeTarget "Camera" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4829D7620ECA63300B34AE0 /* Debug */,
+				F4829D7720ECA63300B34AE0 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

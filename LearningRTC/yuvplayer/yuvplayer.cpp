@@ -1,8 +1,9 @@
 
 #include <string>
 #include <stdio.h>
-#include <SDL2/SDL.h>
-
+extern "C"{
+#include "SDL2/SDL.h"
+}
 
 #define odbgd(FMT, ARGS...) do{  printf("|%7s|D| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
 #define odbgi(FMT, ARGS...) do{  printf("|%7s|I| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
@@ -69,6 +70,13 @@ public:
 		SDL_UpdateTexture( sdlTexture_, NULL, pixels, linesize);  
 		this->refresh();
 	}
+    
+    void drawYUV(const Uint8 *Yplane, int Ypitch,
+                 const Uint8 *Uplane, int Upitch,
+                 const Uint8 *Vplane, int Vpitch){
+        SDL_UpdateYUVTexture(sdlTexture_, NULL, Yplane, Ypitch, Uplane, Upitch, Vplane, Vpitch);
+        this->refresh();
+    }
 
 	void refresh(){
 		// refresh last image

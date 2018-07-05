@@ -1,7 +1,10 @@
 
 #include <string>
 #include <stdio.h>
-#include <SDL2/SDL.h>
+extern "C"{
+    #include "SDL2/SDL.h"
+}
+
 
 
 #define odbgd(FMT, ARGS...) do{  printf("|%7s|D| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)

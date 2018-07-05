@@ -1,0 +1,375 @@
+
+#include <string>
+#include <stdio.h>
+extern "C"{
+    #include "SDL2/SDL.h"
+    #include "libavcodec/avcodec.h"
+    #include "libavformat/avformat.h"
+    #include "libswscale/swscale.h"
+    #include "libavdevice/avdevice.h"
+    #include "libavutil/imgutils.h"
+}
+
+#define odbgd(FMT, ARGS...) do{  printf("|%7s|D| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
+#define odbgi(FMT, ARGS...) do{  printf("|%7s|I| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
+#define odbge(FMT, ARGS...) do{  printf("|%7s|E| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
+
+class YUVRenderer{
+protected:
+    int width_;
+    int height_;
+    std::string name_;
+    SDL_Window * window_ = NULL;
+    SDL_Renderer* sdlRenderer_ = NULL;
+    SDL_Texture* sdlTexture_ = NULL;
+    SDL_Rect sdlRect_;
+    
+    void freeMe(){
+        if(sdlTexture_){
+            SDL_DestroyTexture(sdlTexture_);
+            sdlTexture_ = NULL;
+        }
+        if(sdlRenderer_){
+            SDL_DestroyRenderer(sdlRenderer_);
+            sdlRenderer_ = NULL;
+        }
+        if(window_){
+            SDL_DestroyWindow(window_);
+            window_ = NULL;
+        }
+    }
+    
+    int initMe(){
+        int ret = -1;
+        do{
+            window_ = SDL_CreateWindow(name_.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width_, height_,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+            if(!window_) {
+                odbge("SDL: could not create window - exiting:%s\n",SDL_GetError());
+                ret = -11;
+                break;
+            }
+            sdlRenderer_ = SDL_CreateRenderer(window_, -1, 0);
+            //IYUV: Y + U + V  (3 planes)
+            //YV12: Y + V + U  (3 planes)
+            sdlTexture_ = SDL_CreateTexture(sdlRenderer_, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, width_, height_);
+            ret = 0;
+        }while(0);
+        if(ret){
+            freeMe();
+        }
+        return ret;
+    }
+    
+public:
+    YUVRenderer(const std::string& name, int w, int h):name_(name), width_(w), height_(h){
+        sdlRect_.x = 0;
+        sdlRect_.y = 0;
+        sdlRect_.w = width_;
+        sdlRect_.h = height_;
+    }
+    virtual ~YUVRenderer(){
+        freeMe();
+    }
+    
+    void draw(const void * pixels, int linesize){
+        SDL_UpdateTexture( sdlTexture_, NULL, pixels, linesize);
+        
+        this->refresh();
+    }
+    
+    void drawYUV(const Uint8 *Yplane, int Ypitch,
+                 const Uint8 *Uplane, int Upitch,
+                 const Uint8 *Vplane, int Vpitch){
+        SDL_UpdateYUVTexture(sdlTexture_, NULL, Yplane, Ypitch, Uplane, Upitch, Vplane, Vpitch);
+        this->refresh();
+    }
+    
+    void refresh(){
+        // refresh last image
+        SDL_RenderClear( sdlRenderer_ );
+        //SDL_RenderCopy( sdlRenderer_, sdlTexture_, &sdlRect_, &sdlRect_ );
+        SDL_RenderCopy( sdlRenderer_, sdlTexture_, NULL, NULL);
+        SDL_RenderPresent( sdlRenderer_ );
+    }
+    
+    static YUVRenderer * create(const std::string& name, int w, int h, int * error);
+};
+
+YUVRenderer * YUVRenderer::create(const std::string& name, int w, int h, int * error){
+    YUVRenderer * renderer = new YUVRenderer(name, w, h);
+    int ret = renderer->initMe();
+    if(ret){
+        delete renderer;
+        renderer  = NULL;
+    }
+    if(error){
+        *error = ret;
+    }
+    return renderer;
+}
+
+class FFMpegCameraReader{
+protected:
+    std::string name_ = "FFCamera";
+    std::string deviceName_;
+    std::string optFormat_ ;
+    std::string optFramerate_ ;
+    std::string optPixelFmt_;
+    std::string optVideoSize_;
+    int width_;
+    int height_;
+    int framerate_;
+    AVPixelFormat outputFormat_ = AV_PIX_FMT_YUV420P; // AV_PIX_FMT_NV12;
+    AVFormatContext    *formatCtx_ = NULL;
+    AVCodecContext     *codecCtx_ = NULL;
+    struct SwsContext  *imgConvertCtx_ = NULL;
+    AVPacket   * avPacket_ = NULL;
+    AVFrame    * avFrame_ = NULL;
+    AVFrame    * avFrameYUV_ = NULL;
+    uint8_t    * imageBuffer_ = NULL;
+    size_t     imageSize_ = 0;
+    AVFrame    * lastFrame_ = NULL;
+    
+public:
+    FFMpegCameraReader(const std::string& deviceName
+                       , int width, int height, int framerate
+                       , const std::string& optFormat, const std::string& optPixelFmt
+                       )
+    :deviceName_(deviceName), optFormat_(optFormat), optPixelFmt_(optPixelFmt), framerate_(framerate), width_(width), height_(height) {
+        char buf[64];
+        sprintf(buf, "%dx%d", width_, height_);
+        optVideoSize_ = buf;
+        
+        sprintf(buf, "%d", framerate_);
+        optFramerate_ = buf;
+    }
+    virtual ~FFMpegCameraReader(){
+        this->close();
+    }
+    int open(){
+        if(formatCtx_){
+            // already opened
+            return 0;
+        }
+        int ret = -1;
+        do{
+            formatCtx_ = avformat_alloc_context();
+            AVInputFormat *ifmt=av_find_input_format(optFormat_.c_str());
+            AVDictionary* options = NULL;
+            av_dict_set(&options,"video_size",optVideoSize_.c_str(),0);
+            av_dict_set(&options,"framerate", optFramerate_.c_str(),0);
+            av_dict_set(&options,"pixel_format", optPixelFmt_.c_str(),0);
+            ret = avformat_open_input(&formatCtx_, deviceName_.c_str(), ifmt, &options) ;
+            if(ret != 0){
+                odbge("fail to open [%s], [%d]-[%s]", deviceName_.c_str(), ret, av_err2str(ret));
+                break;
+            }
+            ret = avformat_find_stream_info(formatCtx_, NULL);
+            if(ret < 0){
+                odbge("fail to find stream, [%d]-[%s]", ret, av_err2str(ret));
+                break;
+            }
+            
+            AVCodecID codec_id = AV_CODEC_ID_NONE;
+            for(int i=0; i< formatCtx_->nb_streams; i++){
+                AVMediaType mediaType = formatCtx_->streams[i]->codecpar->codec_type;
+                if(mediaType == AVMEDIA_TYPE_VIDEO){
+                    codec_id = formatCtx_->streams[i]->codecpar->codec_id;
+                    break;
+                }
+            }
+            if(codec_id == AV_CODEC_ID_NONE){
+                odbge("fail to find a video stream");
+                ret = -21;
+                break;
+            }
+            AVCodec * pCodec = avcodec_find_decoder(codec_id);
+            if(!pCodec){
+                odbge("fail to find codec [%d]", codec_id);
+                ret = -31;
+                break;
+            }
+            codecCtx_ = avcodec_alloc_context3(pCodec);
+            if(!codecCtx_){
+                odbge("fail to alloc codec context");
+                ret = -41;
+                break;
+            }
+            AVDictionary* codecOpt = NULL;
+            av_dict_set(&codecOpt,"video_size", optVideoSize_.c_str(), 0);
+            av_dict_set(&codecOpt,"pixel_format", optPixelFmt_.c_str(),0);
+            if(avcodec_open2(codecCtx_, pCodec, &codecOpt)<0){
+                odbge("fail to open codec context");
+                ret = -51;
+                break;
+            }
+            
+            avPacket_ = (AVPacket *) av_malloc(sizeof(AVPacket));
+            avFrame_ = av_frame_alloc();
+            
+            if(codecCtx_->pix_fmt != outputFormat_){
+                imgConvertCtx_ = sws_getContext(codecCtx_->width, codecCtx_->height, codecCtx_->pix_fmt
+                                                , codecCtx_->width, codecCtx_->height, outputFormat_
+                                                , SWS_BICUBIC, NULL, NULL, NULL);
+                if(!imgConvertCtx_){
+                    odbge("fail to create image converter");
+                    ret = -61;
+                    break;
+                }
+                
+                // alloc yuv buffer
+                imageSize_ = av_image_get_buffer_size(outputFormat_, codecCtx_->width, codecCtx_->height, 1);
+                imageBuffer_ = (uint8_t *) av_malloc(imageSize_);
+                
+                // alloc yuv frame with yuv buffer
+                avFrameYUV_ = av_frame_alloc();
+                avFrameYUV_->width = codecCtx_->width;
+                avFrameYUV_->height = codecCtx_->height;
+                avFrameYUV_->format = outputFormat_;
+//                av_image_fill_arrays(avFrameYUV_->data, avFrameYUV_->linesize, imageBuffer_, outputFormat_, codecCtx_->width, codecCtx_->height, 1);
+                avFrameYUV_->data[0] = imageBuffer_;
+                avFrameYUV_->data[1] = imageBuffer_ + codecCtx_->width * codecCtx_->height;
+                avFrameYUV_->data[2] = imageBuffer_ + codecCtx_->width * codecCtx_->height * 5 / 4;
+                avFrameYUV_->linesize[0] = codecCtx_->width;
+                avFrameYUV_->linesize[1] = codecCtx_->width/2;
+                avFrameYUV_->linesize[2] = codecCtx_->width/2;
+            }
+            
+            ret = 0;
+        }while(0);
+        
+        if(ret){
+            this->close();
+        }
+        return ret;
+    }
+    
+    void close(){
+        if(imgConvertCtx_){
+            sws_freeContext(imgConvertCtx_);
+            imgConvertCtx_ = NULL;
+        }
+        av_freep(&avPacket_);
+        av_frame_free(&avFrame_);
+        av_frame_free(&avFrameYUV_);
+        av_freep(&imageBuffer_);
+        avcodec_free_context(&codecCtx_);
+        lastFrame_ = NULL;
+    }
+    
+    // may block if no frame available
+    int readFrame(){
+        int ret = -1;
+        do{
+            // try to read remain frame in codec context
+            ret = avcodec_receive_frame(codecCtx_, avFrame_);
+            if(ret == 0){
+                break;
+            }
+            ret = av_read_frame(formatCtx_, avPacket_);
+            if(ret < 0){
+                odbge("fail to read frame, [%d]-[%s]", ret, av_err2str(ret));
+                break;
+            }
+            avcodec_send_packet(codecCtx_, avPacket_);
+            ret = avcodec_receive_frame(codecCtx_, avFrame_);
+        }while(0);
+
+        if(ret == 0){
+            if(imgConvertCtx_){
+                sws_scale(imgConvertCtx_, (const unsigned char* const*)avFrame_->data, avFrame_->linesize
+                          , 0, avFrame_->height
+                          , avFrameYUV_->data, avFrameYUV_->linesize);
+                avFrameYUV_->width = avFrame_->width;
+                avFrameYUV_->height = avFrame_->height;
+                avFrameYUV_->pkt_size = (int)imageSize_;
+                lastFrame_ = avFrameYUV_;
+            }else{
+                lastFrame_ = avFrame_;
+            }
+        }
+        //av_frame_unref(avFrame_); // TODO: check calling av_frame_unref?
+        return ret;
+    }
+    
+    int frameWidth(){
+        if(!lastFrame_) return 0;
+        return lastFrame_->width;
+    }
+    
+    int frameHeight(){
+        if(!lastFrame_) return 0;
+        return lastFrame_->height;
+    }
+    
+    int frameSize(){
+        if(!lastFrame_) return 0;
+        return lastFrame_->pkt_size;
+    }
+    
+    uint8_t ** frameData(){
+        if(!lastFrame_) return NULL;
+        return lastFrame_->data;
+    }
+    
+    int * frameLineSize(){
+        if(!lastFrame_) return NULL;
+        return lastFrame_->linesize;
+    }
+};
+
+int main(int argc, char* argv[]){
+    std::string name_ = "main";
+    av_register_all();
+    avformat_network_init();
+    avdevice_register_all();
+    av_log_set_level(AV_LOG_QUIET);
+    
+    // for Mac: ffmpeg -list_devices true -f avfoundation -i dummy
+    const std::string& deviceName = "FaceTime HD Camera"; // or "2";
+    const std::string& optFormat = "avfoundation";
+    const std::string& optPixelFmt = "yuyv422";
+    int width = 640;
+    int height = 480;
+    int framerate = 30;
+    FFMpegCameraReader * reader = NULL;
+    int ret = -1;
+    do{
+        reader = new FFMpegCameraReader(deviceName, width, height, framerate, optFormat, optPixelFmt);
+        ret = reader->open();
+        if(ret){
+            odbge("fail to open camera, ret=%d", ret);
+            break;
+        }
+        YUVRenderer * renderer = YUVRenderer::create("renderer", width, height, NULL);
+        uint32_t startTime = SDL_GetTicks();
+        bool quitLoop = false;
+        int nframe = 0;
+        while(!quitLoop){
+            int ret = reader->readFrame();
+            if(ret){
+                break;
+            }
+            ++nframe;
+            renderer->draw(reader->frameData()[0], reader->frameWidth());
+            
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                if(event.type==SDL_QUIT){
+                    odbgi("got QUIT event %d", event.type);
+                    quitLoop = true;
+                    break;
+                }
+            }
+        }
+        uint32_t elapsed = SDL_GetTicks() - startTime;
+        odbgi("read frames %d in %u ms, fps=%d", nframe, elapsed, 1000*nframe/elapsed);
+        delete renderer;
+        ret = 0;
+    }while(0);
+    if(reader){
+        delete reader;
+        reader = NULL;
+    }
+    return ret;
+}
