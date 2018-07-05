@@ -188,7 +188,7 @@ static int playYUVFile(const char * filename, int width, int height, int framera
 }
 
 static
-std::string getAbsolutePath(const std::string& relativePath){
+std::string getFilePath(const std::string& relativePath){
     static std::string path;
     static char div = '\0';
     if(!div){
@@ -215,10 +215,10 @@ int main(int argc, char* argv[]){
 		return -1;
 	}
     
-    std::string filepath = getAbsolutePath("../data/test_yuv420p_640x360.yuv");
+    std::string filepath = getFilePath("../data/test_yuv420p_640x360.yuv");
     playYUVFile(filepath.c_str(), 640, 360, 25, true);
     
-    // std::string filepath = getAbsolutePath("../data/camera_out_yuv420p_640x480.yuv");
+    // std::string filepath = getFilePath("../data/camera_out_yuv420p_640x480.yuv");
 	// playYUVFile(filepath.c_str(), 640, 480, 30, true);
 
 	SDL_Quit();

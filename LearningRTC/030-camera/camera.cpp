@@ -226,7 +226,7 @@ public:
 };
 
 static
-std::string getAbsolutePath(const std::string& relativePath){
+std::string getFilePath(const std::string& relativePath){
     static std::string path;
     static char div = '\0';
     if(!div){
@@ -262,7 +262,7 @@ int main(int argc, char* argv[]){
     
     char fname[128];
     sprintf(fname, "../data/camera_out_yuv420p_%dx%d.yuv", width, height);
-    std::string outFilePath = getAbsolutePath(fname);
+    std::string outFilePath = getFilePath(fname);
 
     FFMpegCameraReader * reader = NULL;
     FILE * outfp = NULL;
@@ -282,33 +282,26 @@ int main(int argc, char* argv[]){
             break;
         }
         
-        uint32_t startTime = SDL_GetTicks();
-        bool quitLoop = false;
         int nframe = 0;
-        while(!quitLoop && nframe < 120){
+        int maxframes = 120;
+        
+        uint32_t startTime = SDL_GetTicks();
+        while(nframe < maxframes){
             int ret = reader->readFrame();
             if(ret){
                 break;
             }
             ++nframe;
-//            renderer->draw(reader->frameData()[0], reader->frameWidth());
             ret = (int)fwrite(reader->frameData()[0], sizeof(char), reader->frameSize(), outfp);
             if(ret != reader->frameSize()){
                 odbge("fail to write file, ret=[%d]", ret);
                 break;
             }
-            
-            SDL_Event event;
-            while (SDL_PollEvent(&event)) {
-                if(event.type==SDL_QUIT){
-                    odbgi("got QUIT event %d", event.type);
-                    quitLoop = true;
-                    break;
-                }
-            }
+            odbgi("write frame %d/%d", nframe, maxframes);
         }
         uint32_t elapsed = SDL_GetTicks() - startTime;
-        odbgi("read frames %d in %u ms, fps=%d", nframe, elapsed, 1000*nframe/elapsed);
+        odbgi("write frames %d in %u ms, fps=%d", nframe, elapsed, 1000*nframe/elapsed);
+        odbgi("output file [%s]", outFilePath.c_str());
         ret = 0;
     }while(0);
     if(outfp){
