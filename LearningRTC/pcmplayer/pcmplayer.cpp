@@ -155,7 +155,7 @@ int playPCMFile(const char * filename, int samplerate, int channels){
 }
 
 static
-std::string getFilePath(const std::string& fname){
+std::string getAbsolutePath(const std::string& relativePath){
     static std::string path;
     static char div = '\0';
     if(!div){
@@ -171,8 +171,9 @@ std::string getFilePath(const std::string& fname){
             path = path.substr(0, p-srcpath) + div;
         }
     }
-    return path + fname;
+    return path + relativePath;
 }
+
 int main(int argc, char* argv[]){
 	std::string name_ = "main";
 	int ret = SDL_Init(SDL_INIT_AUDIO);
@@ -181,7 +182,7 @@ int main(int argc, char* argv[]){
 		return -1;
 	}
 
-    std::string filepath = getFilePath("../data/test_s16le_44100Hz_2ch.pcm");
+    std::string filepath = getAbsolutePath("../data/test_s16le_44100Hz_2ch.pcm");
 	playPCMFile(filepath.c_str(), 44100, 2);
 
 	SDL_Quit();

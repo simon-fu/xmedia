@@ -14,99 +14,6 @@ extern "C"{
 #define odbgi(FMT, ARGS...) do{  printf("|%7s|I| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
 #define odbge(FMT, ARGS...) do{  printf("|%7s|E| " FMT, name_.c_str(), ##ARGS); printf("\n"); fflush(stdout); }while(0)
 
-class YUVRenderer{
-protected:
-    int width_;
-    int height_;
-    std::string name_;
-    SDL_Window * window_ = NULL;
-    SDL_Renderer* sdlRenderer_ = NULL;
-    SDL_Texture* sdlTexture_ = NULL;
-    SDL_Rect sdlRect_;
-    
-    void freeMe(){
-        if(sdlTexture_){
-            SDL_DestroyTexture(sdlTexture_);
-            sdlTexture_ = NULL;
-        }
-        if(sdlRenderer_){
-            SDL_DestroyRenderer(sdlRenderer_);
-            sdlRenderer_ = NULL;
-        }
-        if(window_){
-            SDL_DestroyWindow(window_);
-            window_ = NULL;
-        }
-    }
-    
-    int initMe(){
-        int ret = -1;
-        do{
-            window_ = SDL_CreateWindow(name_.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width_, height_,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
-            if(!window_) {
-                odbge("SDL: could not create window - exiting:%s\n",SDL_GetError());
-                ret = -11;
-                break;
-            }
-            sdlRenderer_ = SDL_CreateRenderer(window_, -1, 0);
-            //IYUV: Y + U + V  (3 planes)
-            //YV12: Y + V + U  (3 planes)
-            sdlTexture_ = SDL_CreateTexture(sdlRenderer_, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, width_, height_);
-            ret = 0;
-        }while(0);
-        if(ret){
-            freeMe();
-        }
-        return ret;
-    }
-    
-public:
-    YUVRenderer(const std::string& name, int w, int h):name_(name), width_(w), height_(h){
-        sdlRect_.x = 0;
-        sdlRect_.y = 0;
-        sdlRect_.w = width_;
-        sdlRect_.h = height_;
-    }
-    virtual ~YUVRenderer(){
-        freeMe();
-    }
-    
-    void draw(const void * pixels, int linesize){
-        SDL_UpdateTexture( sdlTexture_, NULL, pixels, linesize);
-        
-        this->refresh();
-    }
-    
-    void drawYUV(const Uint8 *Yplane, int Ypitch,
-                 const Uint8 *Uplane, int Upitch,
-                 const Uint8 *Vplane, int Vpitch){
-        SDL_UpdateYUVTexture(sdlTexture_, NULL, Yplane, Ypitch, Uplane, Upitch, Vplane, Vpitch);
-        this->refresh();
-    }
-    
-    void refresh(){
-        // refresh last image
-        SDL_RenderClear( sdlRenderer_ );
-        //SDL_RenderCopy( sdlRenderer_, sdlTexture_, &sdlRect_, &sdlRect_ );
-        SDL_RenderCopy( sdlRenderer_, sdlTexture_, NULL, NULL);
-        SDL_RenderPresent( sdlRenderer_ );
-    }
-    
-    static YUVRenderer * create(const std::string& name, int w, int h, int * error);
-};
-
-YUVRenderer * YUVRenderer::create(const std::string& name, int w, int h, int * error){
-    YUVRenderer * renderer = new YUVRenderer(name, w, h);
-    int ret = renderer->initMe();
-    if(ret){
-        delete renderer;
-        renderer  = NULL;
-    }
-    if(error){
-        *error = ret;
-    }
-    return renderer;
-}
 
 class FFMpegCameraReader{
 protected:
@@ -318,6 +225,26 @@ public:
     }
 };
 
+static
+std::string getAbsolutePath(const std::string& relativePath){
+    static std::string path;
+    static char div = '\0';
+    if(!div){
+        const char * srcpath = __FILE__;
+        div = '/';
+        const char * p = strrchr(srcpath, div);
+        if(!p){
+            div = '\\';
+            p = strrchr(__FILE__, div);
+        }
+        if(p){
+            path = srcpath;
+            path = path.substr(0, p-srcpath) + div;
+        }
+    }
+    return path + relativePath;
+}
+
 int main(int argc, char* argv[]){
     std::string name_ = "main";
     av_register_all();
@@ -332,7 +259,13 @@ int main(int argc, char* argv[]){
     int width = 640;
     int height = 480;
     int framerate = 30;
+    
+    char fname[128];
+    sprintf(fname, "../data/camera_out_yuv420p_%dx%d.yuv", width, height);
+    std::string outFilePath = getAbsolutePath(fname);
+
     FFMpegCameraReader * reader = NULL;
+    FILE * outfp = NULL;
     int ret = -1;
     do{
         reader = new FFMpegCameraReader(deviceName, width, height, framerate, optFormat, optPixelFmt);
@@ -341,17 +274,29 @@ int main(int argc, char* argv[]){
             odbge("fail to open camera, ret=%d", ret);
             break;
         }
-        YUVRenderer * renderer = YUVRenderer::create("renderer", width, height, NULL);
+        
+        outfp = fopen(outFilePath.c_str(), "wb");
+        if(!outfp){
+            odbge("fail to write open [%s]", outFilePath.c_str());
+            ret = -1;
+            break;
+        }
+        
         uint32_t startTime = SDL_GetTicks();
         bool quitLoop = false;
         int nframe = 0;
-        while(!quitLoop){
+        while(!quitLoop && nframe < 120){
             int ret = reader->readFrame();
             if(ret){
                 break;
             }
             ++nframe;
-            renderer->draw(reader->frameData()[0], reader->frameWidth());
+//            renderer->draw(reader->frameData()[0], reader->frameWidth());
+            ret = (int)fwrite(reader->frameData()[0], sizeof(char), reader->frameSize(), outfp);
+            if(ret != reader->frameSize()){
+                odbge("fail to write file, ret=[%d]", ret);
+                break;
+            }
             
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
@@ -364,9 +309,12 @@ int main(int argc, char* argv[]){
         }
         uint32_t elapsed = SDL_GetTicks() - startTime;
         odbgi("read frames %d in %u ms, fps=%d", nframe, elapsed, 1000*nframe/elapsed);
-        delete renderer;
         ret = 0;
     }while(0);
+    if(outfp){
+        fclose(outfp);
+        outfp = NULL;
+    }
     if(reader){
         delete reader;
         reader = NULL;

@@ -19,42 +19,6 @@ protected:
 	SDL_Texture* sdlTexture_ = NULL;
 	SDL_Rect sdlRect_;
 
-	void freeMe(){
-		if(sdlTexture_){
-			SDL_DestroyTexture(sdlTexture_);
-			sdlTexture_ = NULL;
-		}
-		if(sdlRenderer_){
-			SDL_DestroyRenderer(sdlRenderer_);
-			sdlRenderer_ = NULL;
-		}
-		if(window_){
-			SDL_DestroyWindow(window_);
-			window_ = NULL;
-		}
-	}
-
-	int initMe(){
-		int ret = -1;
-		do{
-			window_ = SDL_CreateWindow(name_.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width_, height_,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
-			if(!window_) {  
-				odbge("SDL: could not create window - exiting:%s\n",SDL_GetError());  
-				ret = -11;
-				break;
-			}
-			sdlRenderer_ = SDL_CreateRenderer(window_, -1, 0);  
-			//IYUV: Y + U + V  (3 planes)
-			//YV12: Y + V + U  (3 planes)
-			sdlTexture_ = SDL_CreateTexture(sdlRenderer_, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, width_, height_);  
-			ret = 0;
-		}while(0);
-		if(ret){
-			freeMe();
-		}
-		return ret;
-	}
-
 public:
 	YUVRenderer(const std::string& name, int w, int h):name_(name), width_(w), height_(h){
 		sdlRect_.x = 0;
@@ -62,10 +26,47 @@ public:
 		sdlRect_.w = width_;
 		sdlRect_.h = height_;
 	}
+    
 	virtual ~YUVRenderer(){
-		freeMe();
+		this->close();
 	}
 
+    int open(){
+        int ret = -1;
+        do{
+            window_ = SDL_CreateWindow(name_.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width_, height_,SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+            if(!window_) {
+                odbge("SDL: could not create window - exiting:%s\n",SDL_GetError());
+                ret = -11;
+                break;
+            }
+            sdlRenderer_ = SDL_CreateRenderer(window_, -1, 0);
+            //IYUV: Y + U + V  (3 planes)
+            //YV12: Y + V + U  (3 planes)
+            sdlTexture_ = SDL_CreateTexture(sdlRenderer_, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, width_, height_);
+            ret = 0;
+        }while(0);
+        if(ret){
+            this->close();
+        }
+        return ret;
+    }
+    
+    void close(){
+        if(sdlTexture_){
+            SDL_DestroyTexture(sdlTexture_);
+            sdlTexture_ = NULL;
+        }
+        if(sdlRenderer_){
+            SDL_DestroyRenderer(sdlRenderer_);
+            sdlRenderer_ = NULL;
+        }
+        if(window_){
+            SDL_DestroyWindow(window_);
+            window_ = NULL;
+        }
+    }
+    
 	void draw(const void * pixels, int linesize){
 		SDL_UpdateTexture( sdlTexture_, NULL, pixels, linesize);  
 		this->refresh();
@@ -86,22 +87,7 @@ public:
 		SDL_RenderPresent( sdlRenderer_ ); 
 	}
 
-	static YUVRenderer * create(const std::string& name, int w, int h, int * error);
 };
-
-YUVRenderer * YUVRenderer::create(const std::string& name, int w, int h, int * error){
-	YUVRenderer * renderer = new YUVRenderer(name, w, h);
-	int ret = renderer->initMe();
-	if(ret){
-		delete renderer;
-		renderer  = NULL;
-	}
-	if(error){
-		*error = ret;
-	}
-	return renderer;
-}
-
 
 static int playYUVFile(const char * filename, int width, int height, int framerate, bool loop = false){
 	std::string name_ = "player";
@@ -122,9 +108,9 @@ static int playYUVFile(const char * filename, int width, int height, int framera
         odbgi("yuv file: [%s]", filename);
         odbgi("video size: [%dx%d]", width, height);
         odbgi("framerate: [%d] (%d ms)", framerate, frameInterval);
-
-        // TODO: check result of creating renderer 
-		renderer = YUVRenderer::create("renderer1", width, height, &ret);
+ 
+		renderer = new YUVRenderer("renderer1", width, height);
+        renderer->open(); // TODO: check result
 
 		SDL_Event event;
 		bool quitLoop = false;
@@ -202,7 +188,7 @@ static int playYUVFile(const char * filename, int width, int height, int framera
 }
 
 static
-std::string getFilePath(const std::string& fname){
+std::string getAbsolutePath(const std::string& relativePath){
     static std::string path;
     static char div = '\0';
     if(!div){
@@ -218,7 +204,7 @@ std::string getFilePath(const std::string& fname){
             path = path.substr(0, p-srcpath) + div;
         }
     }
-    return path + fname;
+    return path + relativePath;
 }
 
 int main(int argc, char* argv[]){
@@ -228,8 +214,12 @@ int main(int argc, char* argv[]){
 		odbge( "Could not initialize SDL - %s\n", SDL_GetError()); 
 		return -1;
 	}
-    std::string filepath = getFilePath("../data/test_yuv420p_640x360.yuv");
-	playYUVFile(filepath.c_str(), 640, 360, 25, true);
+    
+    std::string filepath = getAbsolutePath("../data/test_yuv420p_640x360.yuv");
+    playYUVFile(filepath.c_str(), 640, 360, 25, true);
+    
+    // std::string filepath = getAbsolutePath("../data/camera_out_yuv420p_640x480.yuv");
+	// playYUVFile(filepath.c_str(), 640, 480, 30, true);
 
 	SDL_Quit();
 
