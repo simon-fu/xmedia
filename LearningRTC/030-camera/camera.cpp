@@ -133,13 +133,7 @@ public:
                 avFrameYUV_->width = codecCtx_->width;
                 avFrameYUV_->height = codecCtx_->height;
                 avFrameYUV_->format = outputFormat_;
-//                av_image_fill_arrays(avFrameYUV_->data, avFrameYUV_->linesize, imageBuffer_, outputFormat_, codecCtx_->width, codecCtx_->height, 1);
-                avFrameYUV_->data[0] = imageBuffer_;
-                avFrameYUV_->data[1] = imageBuffer_ + codecCtx_->width * codecCtx_->height;
-                avFrameYUV_->data[2] = imageBuffer_ + codecCtx_->width * codecCtx_->height * 5 / 4;
-                avFrameYUV_->linesize[0] = codecCtx_->width;
-                avFrameYUV_->linesize[1] = codecCtx_->width/2;
-                avFrameYUV_->linesize[2] = codecCtx_->width/2;
+                av_image_fill_arrays(avFrameYUV_->data, avFrameYUV_->linesize, imageBuffer_, outputFormat_, codecCtx_->width, codecCtx_->height, 1);
             }
             
             ret = 0;
