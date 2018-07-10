@@ -7,6 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F4655E7D20EE1BA200A2D842 /* libavcodec.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7A20ECA84A00B34AE0 /* libavcodec.a */; };
+		F4655E7E20EE1BA200A2D842 /* libavformat.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7B20ECA84A00B34AE0 /* libavformat.a */; };
+		F4655E7F20EE1BA200A2D842 /* libavutil.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7C20ECA84A00B34AE0 /* libavutil.a */; };
+		F4655E8020EE1BA200A2D842 /* libswscale.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7D20ECA84A00B34AE0 /* libswscale.a */; };
+		F4655E8120EE1BA200A2D842 /* libavfilter.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7E20ECA84A00B34AE0 /* libavfilter.a */; };
+		F4655E8220EE1BA200A2D842 /* libavdevice.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7F20ECA84A00B34AE0 /* libavdevice.a */; };
+		F4655E8320EE1BA200A2D842 /* libSDL2-2.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */; };
+		F4655E8420EE1BA200A2D842 /* libSDL2main.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */; };
+		F4655E8E20EE1C0900A2D842 /* microphone.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4655E8B20EE1BEF00A2D842 /* microphone.cpp */; };
+		F4655E9020F356FF00A2D842 /* libswresample.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4655E8F20F356FE00A2D842 /* libswresample.a */; };
 		F4829D2320EC7D2700B34AE0 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4829D2220EC7D2700B34AE0 /* main.cpp */; };
 		F4829D3820EC7DC700B34AE0 /* yuvplayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4829D3720EC7DC700B34AE0 /* yuvplayer.cpp */; };
 		F4829D3D20EC7F2A00B34AE0 /* libSDL2main.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */; };
@@ -26,6 +36,15 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		F4655E8520EE1BA200A2D842 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 		F4829D1D20EC7D2700B34AE0 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -65,6 +84,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F4655E8920EE1BA200A2D842 /* 040-Microphone */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "040-Microphone"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4655E8B20EE1BEF00A2D842 /* microphone.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = microphone.cpp; sourceTree = "<group>"; };
+		F4655E8C20EE1BEF00A2D842 /* build_and_run.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = build_and_run.sh; sourceTree = "<group>"; };
+		F4655E8F20F356FE00A2D842 /* libswresample.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libswresample.a; path = ../../../../../../../../../../usr/local/Cellar/ffmpeg/3.3/lib/libswresample.a; sourceTree = "<group>"; };
 		F4829D1F20EC7D2700B34AE0 /* LearningRTC */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = LearningRTC; sourceTree = BUILT_PRODUCTS_DIR; };
 		F4829D2220EC7D2700B34AE0 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		F4829D2D20EC7D8C00B34AE0 /* 010-YUVPlayer */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "010-YUVPlayer"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -88,6 +111,22 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		F4655E7C20EE1BA200A2D842 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4655E9020F356FF00A2D842 /* libswresample.a in Frameworks */,
+				F4655E7D20EE1BA200A2D842 /* libavcodec.a in Frameworks */,
+				F4655E7E20EE1BA200A2D842 /* libavformat.a in Frameworks */,
+				F4655E7F20EE1BA200A2D842 /* libavutil.a in Frameworks */,
+				F4655E8020EE1BA200A2D842 /* libswscale.a in Frameworks */,
+				F4655E8120EE1BA200A2D842 /* libavfilter.a in Frameworks */,
+				F4655E8220EE1BA200A2D842 /* libavdevice.a in Frameworks */,
+				F4655E8320EE1BA200A2D842 /* libSDL2-2.0.0.dylib in Frameworks */,
+				F4655E8420EE1BA200A2D842 /* libSDL2main.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F4829D1C20EC7D2700B34AE0 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -131,12 +170,23 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		F4655E8A20EE1BEF00A2D842 /* 040-microphone */ = {
+			isa = PBXGroup;
+			children = (
+				F4655E8B20EE1BEF00A2D842 /* microphone.cpp */,
+				F4655E8C20EE1BEF00A2D842 /* build_and_run.sh */,
+			);
+			name = "040-microphone";
+			path = "../040-microphone";
+			sourceTree = "<group>";
+		};
 		F4829D1620EC7D2700B34AE0 = {
 			isa = PBXGroup;
 			children = (
 				F4829D3420EC7DC700B34AE0 /* 010-yuvplayer */,
 				F4829D4920EC884700B34AE0 /* 020-pcmplayer */,
 				F4829D6A20ECA58A00B34AE0 /* 030-camera */,
+				F4655E8A20EE1BEF00A2D842 /* 040-microphone */,
 				F4829D3920EC7F2900B34AE0 /* Frameworks */,
 				F4829D2120EC7D2700B34AE0 /* LearningRTC */,
 				F4829D2020EC7D2700B34AE0 /* Products */,
@@ -150,6 +200,7 @@
 				F4829D2D20EC7D8C00B34AE0 /* 010-YUVPlayer */,
 				F4829D4220EC883600B34AE0 /* 020-PCMPlayer */,
 				F4829D7820ECA63300B34AE0 /* 030-Camera */,
+				F4655E8920EE1BA200A2D842 /* 040-Microphone */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -175,6 +226,7 @@
 		F4829D3920EC7F2900B34AE0 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				F4655E8F20F356FE00A2D842 /* libswresample.a */,
 				F4829D7A20ECA84A00B34AE0 /* libavcodec.a */,
 				F4829D7F20ECA84A00B34AE0 /* libavdevice.a */,
 				F4829D7E20ECA84A00B34AE0 /* libavfilter.a */,
@@ -211,6 +263,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		F4655E7920EE1BA200A2D842 /* 040-Microphone */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F4655E8620EE1BA200A2D842 /* Build configuration list for PBXNativeTarget "040-Microphone" */;
+			buildPhases = (
+				F4655E7A20EE1BA200A2D842 /* Sources */,
+				F4655E7C20EE1BA200A2D842 /* Frameworks */,
+				F4655E8520EE1BA200A2D842 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "040-Microphone";
+			productName = pcmplayer;
+			productReference = F4655E8920EE1BA200A2D842 /* 040-Microphone */;
+			productType = "com.apple.product-type.tool";
+		};
 		F4829D1E20EC7D2700B34AE0 /* LearningRTC */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F4829D2620EC7D2700B34AE0 /* Build configuration list for PBXNativeTarget "LearningRTC" */;
@@ -315,11 +384,20 @@
 				F4829D2C20EC7D8C00B34AE0 /* 010-YUVPlayer */,
 				F4829D4120EC883600B34AE0 /* 020-PCMPlayer */,
 				F4829D6E20ECA63300B34AE0 /* 030-Camera */,
+				F4655E7920EE1BA200A2D842 /* 040-Microphone */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
+		F4655E7A20EE1BA200A2D842 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4655E8E20EE1C0900A2D842 /* microphone.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F4829D1B20EC7D2700B34AE0 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -355,6 +433,32 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		F4655E8720EE1BA200A2D842 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/sdl2/2.0.5/lib,
+					/usr/local/Cellar/ffmpeg/3.3/lib,
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F4655E8820EE1BA200A2D842 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/sdl2/2.0.5/lib,
+					/usr/local/Cellar/ffmpeg/3.3/lib,
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 		F4829D2420EC7D2700B34AE0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -561,6 +665,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		F4655E8620EE1BA200A2D842 /* Build configuration list for PBXNativeTarget "040-Microphone" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4655E8720EE1BA200A2D842 /* Debug */,
+				F4655E8820EE1BA200A2D842 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F4829D1A20EC7D2700B34AE0 /* Build configuration list for PBXProject "LearningRTC" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
