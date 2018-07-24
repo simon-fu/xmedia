@@ -11,26 +11,27 @@ extern "C"{
 
 class YUVRenderer{
 protected:
-	int width_;
-	int height_;
-	std::string name_;
-	SDL_Window * window_ = NULL; 
-	SDL_Renderer* sdlRenderer_ = NULL;
-	SDL_Texture* sdlTexture_ = NULL;
-	SDL_Rect sdlRect_;
-
-public:
-	YUVRenderer(const std::string& name, int w, int h):name_(name), width_(w), height_(h){
-		sdlRect_.x = 0;
-		sdlRect_.y = 0;
-		sdlRect_.w = width_;
-		sdlRect_.h = height_;
-	}
+    int width_;
+    int height_;
+    std::string name_;
+    SDL_Window * window_ = NULL;
+    SDL_Renderer* sdlRenderer_ = NULL;
+    SDL_Texture* sdlTexture_ = NULL;
+    SDL_Rect sdlRect_;
+    bool texttureEmpty_ = true;
     
-	virtual ~YUVRenderer(){
-		this->close();
-	}
-
+public:
+    YUVRenderer(const std::string& name, int w, int h):name_(name), width_(w), height_(h){
+        sdlRect_.x = 0;
+        sdlRect_.y = 0;
+        sdlRect_.w = width_;
+        sdlRect_.h = height_;
+    }
+    
+    virtual ~YUVRenderer(){
+        this->close();
+    }
+    
     int open(){
         int ret = -1;
         do{
@@ -65,28 +66,33 @@ public:
             SDL_DestroyWindow(window_);
             window_ = NULL;
         }
+        texttureEmpty_ = true;
     }
     
-	void draw(const void * pixels, int linesize){
-		SDL_UpdateTexture( sdlTexture_, NULL, pixels, linesize);  
-		this->refresh();
-	}
+    void draw(const void * pixels, int linesize){
+        texttureEmpty_ = false;
+        SDL_UpdateTexture( sdlTexture_, NULL, pixels, linesize);
+        this->refresh();
+    }
     
     void drawYUV(const Uint8 *Yplane, int Ypitch,
                  const Uint8 *Uplane, int Upitch,
                  const Uint8 *Vplane, int Vpitch){
+        texttureEmpty_ = false;
         SDL_UpdateYUVTexture(sdlTexture_, NULL, Yplane, Ypitch, Uplane, Upitch, Vplane, Vpitch);
         this->refresh();
     }
-
-	void refresh(){
-		// refresh last image
-		SDL_RenderClear( sdlRenderer_ );  
-		//SDL_RenderCopy( sdlRenderer_, sdlTexture_, &sdlRect_, &sdlRect_ );  
-		SDL_RenderCopy( sdlRenderer_, sdlTexture_, NULL, NULL);  
-		SDL_RenderPresent( sdlRenderer_ ); 
-	}
-
+    
+    void refresh(){
+        // refresh last image
+        SDL_RenderClear( sdlRenderer_ );
+        if(!texttureEmpty_){
+            //SDL_RenderCopy( sdlRenderer_, sdlTexture_, &sdlRect_, &sdlRect_ );
+            SDL_RenderCopy( sdlRenderer_, sdlTexture_, NULL, NULL);
+        }
+        SDL_RenderPresent( sdlRenderer_ );
+    }
+    
 };
 
 static int playYUVFile(const char * filename, int width, int height, int framerate, bool loop = false){

@@ -33,6 +33,19 @@
 		F4829D8320ECA84A00B34AE0 /* libswscale.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7D20ECA84A00B34AE0 /* libswscale.a */; };
 		F4829D8420ECA84A00B34AE0 /* libavfilter.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7E20ECA84A00B34AE0 /* libavfilter.a */; };
 		F4829D8520ECA84A00B34AE0 /* libavdevice.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7F20ECA84A00B34AE0 /* libavdevice.a */; };
+		F4AA9B9A210095A7009F11DE /* simplevp8.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4AA9B98210095A6009F11DE /* simplevp8.cpp */; };
+		F4AA9B9E210095B2009F11DE /* libvpx.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4CB082720FDF1AC00E69690 /* libvpx.a */; };
+		F4AA9B9F210095B2009F11DE /* libswresample.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4655E8F20F356FE00A2D842 /* libswresample.a */; };
+		F4AA9BA0210095B2009F11DE /* libavcodec.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7A20ECA84A00B34AE0 /* libavcodec.a */; };
+		F4AA9BA1210095B2009F11DE /* libavformat.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7B20ECA84A00B34AE0 /* libavformat.a */; };
+		F4AA9BA2210095B2009F11DE /* libavutil.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7C20ECA84A00B34AE0 /* libavutil.a */; };
+		F4AA9BA3210095B2009F11DE /* libswscale.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7D20ECA84A00B34AE0 /* libswscale.a */; };
+		F4AA9BA4210095B2009F11DE /* libavfilter.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7E20ECA84A00B34AE0 /* libavfilter.a */; };
+		F4AA9BA5210095B2009F11DE /* libavdevice.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D7F20ECA84A00B34AE0 /* libavdevice.a */; };
+		F4AA9BA6210095B2009F11DE /* libSDL2-2.0.0.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D5020EC88BA00B34AE0 /* libSDL2-2.0.0.dylib */; };
+		F4AA9BA7210095B2009F11DE /* libSDL2main.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4829D3B20EC7F2A00B34AE0 /* libSDL2main.a */; };
+		F4AA9BAD210095FB009F11DE /* simplevp8.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F4AA9B98210095A6009F11DE /* simplevp8.cpp */; };
+		F4AA9BAF21019FFC009F11DE /* libSDL2_ttf.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F4AA9BAE21019FFC009F11DE /* libSDL2_ttf.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -81,6 +94,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 1;
 		};
+		F4AA9BA8210095B2009F11DE /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -108,6 +130,11 @@
 		F4829D7E20ECA84A00B34AE0 /* libavfilter.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavfilter.a; path = ../../../../../../../../../../usr/local/Cellar/ffmpeg/3.3/lib/libavfilter.a; sourceTree = "<group>"; };
 		F4829D7F20ECA84A00B34AE0 /* libavdevice.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavdevice.a; path = ../../../../../../../../../../usr/local/Cellar/ffmpeg/3.3/lib/libavdevice.a; sourceTree = "<group>"; };
 		F4829D8620EDF4FE00B34AE0 /* build_and_run.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = build_and_run.sh; sourceTree = "<group>"; };
+		F4AA9B98210095A6009F11DE /* simplevp8.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = simplevp8.cpp; sourceTree = "<group>"; };
+		F4AA9B99210095A6009F11DE /* build_and_run.sh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.script.sh; path = build_and_run.sh; sourceTree = "<group>"; };
+		F4AA9BAC210095B2009F11DE /* 050-SimpleVP8 */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "050-SimpleVP8"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4AA9BAE21019FFC009F11DE /* libSDL2_ttf.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libSDL2_ttf.a; path = ../../../../../../../../../../usr/local/Cellar/sdl2_ttf/2.0.14/lib/libSDL2_ttf.a; sourceTree = "<group>"; };
+		F4CB082720FDF1AC00E69690 /* libvpx.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libvpx.a; path = ../../../../../../../../../../usr/local/Cellar/libvpx/1.6.1/lib/libvpx.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -167,6 +194,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F4AA9B9D210095B2009F11DE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4AA9BAF21019FFC009F11DE /* libSDL2_ttf.a in Frameworks */,
+				F4AA9B9E210095B2009F11DE /* libvpx.a in Frameworks */,
+				F4AA9B9F210095B2009F11DE /* libswresample.a in Frameworks */,
+				F4AA9BA0210095B2009F11DE /* libavcodec.a in Frameworks */,
+				F4AA9BA1210095B2009F11DE /* libavformat.a in Frameworks */,
+				F4AA9BA2210095B2009F11DE /* libavutil.a in Frameworks */,
+				F4AA9BA3210095B2009F11DE /* libswscale.a in Frameworks */,
+				F4AA9BA4210095B2009F11DE /* libavfilter.a in Frameworks */,
+				F4AA9BA5210095B2009F11DE /* libavdevice.a in Frameworks */,
+				F4AA9BA6210095B2009F11DE /* libSDL2-2.0.0.dylib in Frameworks */,
+				F4AA9BA7210095B2009F11DE /* libSDL2main.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -187,6 +232,7 @@
 				F4829D4920EC884700B34AE0 /* 020-pcmplayer */,
 				F4829D6A20ECA58A00B34AE0 /* 030-camera */,
 				F4655E8A20EE1BEF00A2D842 /* 040-microphone */,
+				F4AA9B97210095A6009F11DE /* 050-simplevp8 */,
 				F4829D3920EC7F2900B34AE0 /* Frameworks */,
 				F4829D2120EC7D2700B34AE0 /* LearningRTC */,
 				F4829D2020EC7D2700B34AE0 /* Products */,
@@ -201,6 +247,7 @@
 				F4829D4220EC883600B34AE0 /* 020-PCMPlayer */,
 				F4829D7820ECA63300B34AE0 /* 030-Camera */,
 				F4655E8920EE1BA200A2D842 /* 040-Microphone */,
+				F4AA9BAC210095B2009F11DE /* 050-SimpleVP8 */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -226,6 +273,8 @@
 		F4829D3920EC7F2900B34AE0 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				F4AA9BAE21019FFC009F11DE /* libSDL2_ttf.a */,
+				F4CB082720FDF1AC00E69690 /* libvpx.a */,
 				F4655E8F20F356FE00A2D842 /* libswresample.a */,
 				F4829D7A20ECA84A00B34AE0 /* libavcodec.a */,
 				F4829D7F20ECA84A00B34AE0 /* libavdevice.a */,
@@ -258,6 +307,16 @@
 			);
 			name = "030-camera";
 			path = "../030-camera";
+			sourceTree = "<group>";
+		};
+		F4AA9B97210095A6009F11DE /* 050-simplevp8 */ = {
+			isa = PBXGroup;
+			children = (
+				F4AA9B98210095A6009F11DE /* simplevp8.cpp */,
+				F4AA9B99210095A6009F11DE /* build_and_run.sh */,
+			);
+			name = "050-simplevp8";
+			path = "../050-simplevp8";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -348,6 +407,23 @@
 			productReference = F4829D7820ECA63300B34AE0 /* 030-Camera */;
 			productType = "com.apple.product-type.tool";
 		};
+		F4AA9B9B210095B2009F11DE /* 050-SimpleVP8 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F4AA9BA9210095B2009F11DE /* Build configuration list for PBXNativeTarget "050-SimpleVP8" */;
+			buildPhases = (
+				F4AA9B9C210095B2009F11DE /* Sources */,
+				F4AA9B9D210095B2009F11DE /* Frameworks */,
+				F4AA9BA8210095B2009F11DE /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "050-SimpleVP8";
+			productName = pcmplayer;
+			productReference = F4AA9BAC210095B2009F11DE /* 050-SimpleVP8 */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -385,6 +461,7 @@
 				F4829D4120EC883600B34AE0 /* 020-PCMPlayer */,
 				F4829D6E20ECA63300B34AE0 /* 030-Camera */,
 				F4655E7920EE1BA200A2D842 /* 040-Microphone */,
+				F4AA9B9B210095B2009F11DE /* 050-SimpleVP8 */,
 			);
 		};
 /* End PBXProject section */
@@ -402,6 +479,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F4AA9B9A210095A7009F11DE /* simplevp8.cpp in Sources */,
 				F4829D2320EC7D2700B34AE0 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -427,6 +505,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				F4829D7920ECA65000B34AE0 /* camera.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4AA9B9C210095B2009F11DE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F4AA9BAD210095FB009F11DE /* simplevp8.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -662,6 +748,36 @@
 			};
 			name = Release;
 		};
+		F4AA9BAA210095B2009F11DE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/sdl2/2.0.5/lib,
+					/usr/local/Cellar/ffmpeg/3.3/lib,
+					/usr/local/Cellar/libvpx/1.6.1/lib,
+					/usr/local/Cellar/sdl2_ttf/2.0.14/lib,
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		F4AA9BAB210095B2009F11DE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					/usr/local/Cellar/sdl2/2.0.5/lib,
+					/usr/local/Cellar/ffmpeg/3.3/lib,
+					/usr/local/Cellar/libvpx/1.6.1/lib,
+					/usr/local/Cellar/sdl2_ttf/2.0.14/lib,
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -715,6 +831,15 @@
 			buildConfigurations = (
 				F4829D7620ECA63300B34AE0 /* Debug */,
 				F4829D7720ECA63300B34AE0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F4AA9BA9210095B2009F11DE /* Build configuration list for PBXNativeTarget "050-SimpleVP8" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4AA9BAA210095B2009F11DE /* Debug */,
+				F4AA9BAB210095B2009F11DE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
