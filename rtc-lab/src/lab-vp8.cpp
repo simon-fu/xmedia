@@ -248,15 +248,19 @@ class VP8Encoder{
     
 protected:
     vpx_codec_ctx_t encctx_;
+    vpx_codec_enc_cfg_t enccfg_;
     int width_ = 0;
     int height_ = 0;
     int framerate_ = 0;
     int bitrateKbps_ = 0;
-    vpx_codec_pts_t pts_ = 0;
     uint8_t * encodedBuf_ = NULL;
     size_t encodedBufSize_ = 0;
     size_t frameLength_ = 0;
     vpx_codec_frame_flags_t frameFlags_ = 0;
+    int numFrames_ = 0;
+    int flagsOfTLayer_[16];
+    int flagsOfTLayerLength_ = 0;
+    int flagIndex_ = 0;
     
     void freeEncodeBuf(){
         if(encodedBuf_){
@@ -297,39 +301,90 @@ public:
         this->close();
     }
     
-    int open(int width, int height, int framerate, int bitrateKbps){
-        vpx_codec_enc_cfg_t enccfg;
+    int open(int width, int height, int framerate, int bitrateKbps, int numTLayers = 1){
+        
         vpx_codec_flags_t encflags = 0;
         vpx_codec_err_t vpxret = VPX_CODEC_OK;
         int ret = 0;
         
         do{
             this->close();
-            
+            if(numTLayers < 1){
+                numTLayers = 1;
+            }
             width_ = width;
             height_ = height;
             bitrateKbps_ = bitrateKbps;
             framerate_ = framerate;
             
-            vpxret = vpx_codec_enc_config_default(vpx_codec_vp8_cx(), &enccfg, 0);
-            enccfg.g_w = width_;
-            enccfg.g_h = height_;
-            enccfg.rc_target_bitrate = bitrateKbps_; // in unit of kbps
+            vpxret = vpx_codec_enc_config_default(vpx_codec_vp8_cx(), &enccfg_, 0);
+            enccfg_.g_w = width_;
+            enccfg_.g_h = height_;
+            enccfg_.rc_target_bitrate = bitrateKbps_; // in unit of kbps
+//            enccfg_.kf_mode = VPX_KF_AUTO;
+            enccfg_.g_error_resilient = 1;
+            
+            if(numTLayers > 1){
+                enccfg_.ts_number_layers = numTLayers;
+                enccfg_.ts_periodicity = numTLayers;
+                int br = bitrateKbps / numTLayers;
+                for(int i = 0; i < numTLayers; ++i){
+                    enccfg_.ts_target_bitrate[i] = (i+1)*br;
+                    enccfg_.ts_layer_id[i] = i;
+                    enccfg_.ts_rate_decimator[i] = numTLayers-i;
+                }
+//                enccfg_.ts_target_bitrate[0] = 300;
+//                enccfg_.ts_target_bitrate[1] = 500;
+//                enccfg_.ts_rate_decimator[0] = 2;
+//                enccfg_.ts_rate_decimator[1] = 1;
+//                enccfg_.temporal_layering_mode = VP9E_TEMPORAL_LAYERING_MODE_BYPASS;
+                
+                flagsOfTLayerLength_ = 0;
+                flagsOfTLayer_[0] = VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_REF_GF; // kTemporalUpdateLastAndGoldenRefAltRef;
+                flagsOfTLayer_[1] = VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_REF_GF | VP8_EFLAG_NO_UPD_LAST; // kTemporalUpdateGoldenWithoutDependencyRefAltRef;
+                flagsOfTLayer_[2] = VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_REF_GF | VP8_EFLAG_NO_UPD_GF ; // kTemporalUpdateLastRefAltRef;
+                flagsOfTLayer_[3] = VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_UPD_LAST; //kTemporalUpdateGoldenRefAltRef;
+                flagsOfTLayer_[4] = VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_UPD_GF | VP8_EFLAG_NO_REF_GF; // kTemporalUpdateLastRefAltRef;
+                flagsOfTLayer_[5] = VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_UPD_LAST; //kTemporalUpdateGoldenRefAltRef;
+                flagsOfTLayer_[6] = VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_UPD_GF | VP8_EFLAG_NO_REF_GF; // kTemporalUpdateLastRefAltRef;
+                flagsOfTLayer_[7] = VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_UPD_GF  | VP8_EFLAG_NO_UPD_LAST | VP8_EFLAG_NO_UPD_ENTROPY; // kTemporalUpdateNone;
+                
+
+//                //enccfg_.rc_dropframe_thresh = (unsigned int)strtoul(argv[9], NULL, 0);
+//                enccfg_.rc_end_usage = VPX_CBR;
+//                enccfg_.rc_min_quantizer = 2;
+//                enccfg_.rc_max_quantizer = 56;
+//                // if (strncmp(encoder->name, "vp9", 3) == 0) enccfg_.rc_max_quantizer = 52;
+//                enccfg_.rc_undershoot_pct = 50;
+//                enccfg_.rc_overshoot_pct = 50;
+//                enccfg_.rc_buf_initial_sz = 600;
+//                enccfg_.rc_buf_optimal_sz = 600;
+//                enccfg_.rc_buf_sz = 1000;
+//                
+//                // Disable dynamic resizing by default.
+//                enccfg_.rc_resize_allowed = 0;
+                
+                // Use 1 thread as default.
+                //enccfg_.g_threads = 0;
+                
+            }
+            
             //        enccfg.g_timebase.num = info.time_base.numerator;
             //        enccfg.g_timebase.den = info.time_base.denominator;
             //        enccfg.g_error_resilient = (vpx_codec_er_flags_t)strtoul(argv[7], NULL, 0);
-            encflags |= VPX_CODEC_USE_OUTPUT_PARTITION;
+
+//            encflags |= VPX_CODEC_USE_OUTPUT_PARTITION;
             vpxret = vpx_codec_enc_init_ver(&encctx_,
                                             vpx_codec_vp8_cx(),
-                                            &enccfg,
+                                            &enccfg_,
                                             encflags, VPX_ENCODER_ABI_VERSION);
             if(vpxret != VPX_CODEC_OK){
+                odbge("vpx_codec_enc_init error with %d-[%s]", vpxret, vpx_codec_error(&encctx_));
                 ret = -1;
                 encctx_.name = NULL;
                 break;
             }
             
-            pts_  =0;
             ret = 0;
         }while(0);
         
@@ -346,22 +401,75 @@ public:
             encctx_.name = NULL;
         }
         this->freeEncodeBuf();
+        numFrames_ = 0;
+        flagsOfTLayerLength_ = 0;
+        flagIndex_ = 0;
     }
     
-    int encode(vpx_image_t * vpximg, bool forceKeyframe = false){
+    bool isTLayerEnabled(){
+        bool e = (enccfg_.ts_number_layers <= 1 || enccfg_.ts_periodicity == 0);
+        return !e;
+    }
+    int getTLayerId(){
+        if(!this->isTLayerEnabled() || numFrames_ == 0){
+            return 0;
+        }
+        int index = (numFrames_-1)%enccfg_.ts_periodicity;
+        unsigned int layerId = enccfg_.ts_layer_id[index];
+        return (int) layerId;
+    }
+    
+    int nextTLayerId(){
+        if(!this->isTLayerEnabled()){
+            return 0;
+        }
+        int index = (numFrames_)%enccfg_.ts_periodicity;
+        unsigned int layerId = enccfg_.ts_layer_id[index];
+        return (int) layerId;
+    }
+    
+    int nextTLayerFlag(){
+        if(!this->isTLayerEnabled()){
+            return 0;
+        }
+        if(flagsOfTLayerLength_ > 0){
+            int idx = flagIndex_ % flagsOfTLayerLength_;
+            ++flagIndex_;
+            return this->flagsOfTLayer_[idx];
+        }else{
+            int layer_flags[2] = {0, 0};
+            //layer_flags[0] |= VPX_EFLAG_FORCE_KF;
+            layer_flags[0] |= (VP8_EFLAG_NO_UPD_GF | VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_REF_GF | VP8_EFLAG_NO_REF_ARF );
+            //layer_flags[0] |= VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_REF_GF;
+            layer_flags[1] |= (VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_UPD_LAST | VP8_EFLAG_NO_REF_ARF);
+            int idx = this->nextTLayerId();
+            return layer_flags[idx];
+//            return 0;
+
+        }
+    }
+    
+    int encode(vpx_image_t * vpximg, vpx_codec_pts_t pts, uint32_t duration, vpx_enc_frame_flags_t encflags = 0, bool forceKeyframe = false){
         vpx_codec_err_t vpxret = VPX_CODEC_OK;
         int ret = -1;
         do{
             frameLength_ = 0;
             frameFlags_ = 0;
             
-            uint32_t duration = 90000 / framerate_;
-            vpx_enc_frame_flags_t frameflags = 0;
+            //uint32_t duration = 90000 / framerate_;
+            //vpx_enc_frame_flags_t encflags = 0;
             if (forceKeyframe){
-                frameflags |= VPX_EFLAG_FORCE_KF;
+                encflags |= VPX_EFLAG_FORCE_KF;
+            }
+            if(this->isTLayerEnabled()){
+                encflags |= this->nextTLayerFlag();
+                //vpx_codec_control(&encctx_, VP8E_SET_FRAME_FLAGS, (int)frameflags);
+                
+                int layerId = this->nextTLayerId();
+                vpx_codec_control(&encctx_, VP8E_SET_TEMPORAL_LAYER_ID, layerId);
             }
             
-            vpxret = vpx_codec_encode(&encctx_, vpximg, pts_, duration, frameflags, VPX_DL_REALTIME);
+            vpxret = vpx_codec_encode(&encctx_, vpximg, pts, duration, encflags, VPX_DL_REALTIME);
             if (vpxret != VPX_CODEC_OK) {
                 odbge("vpx_codec_encode fail with %d", vpxret);
                 ret = -1;
@@ -388,6 +496,9 @@ public:
                 }else{
                     odbgi("  non-frame-pkt, kind=%d", pkt->kind);
                 }
+            }
+            if(npkts > 0){
+                ++numFrames_;
             }
             
             ret = 0;
@@ -464,12 +575,19 @@ public:
     
     int decode(const uint8_t * frameData, size_t frameLength
                , int * pRefUpdate = NULL
-               , int * pCorrupted = NULL){
+               , int * pCorrupted = NULL
+               , int * pRefUsed = NULL){
         imageIter_ = NULL;
         vpx_codec_err_t vpxret = vpx_codec_decode(&decctx_, frameData, (unsigned int)frameLength, NULL, 0);
         if (vpxret != VPX_CODEC_OK) {
             odbge("vpx_codec_decode fail with %d", vpxret);
             return -1;
+        }
+        
+        int refused = 0;
+        vpxret = vpx_codec_control(&decctx_, VP8D_GET_LAST_REF_USED, &refused);
+        if (vpxret != VPX_CODEC_OK) {
+            odbge("vpx_codec_control VP8D_GET_LAST_REF_USED fail with %d", vpxret);
         }
         
         int refupdates = 0;
@@ -483,18 +601,16 @@ public:
         if (vpxret != VPX_CODEC_OK) {
             odbge("vpx_codec_control VP8D_GET_FRAME_CORRUPTED fail with %d", vpxret);
         }
-        odbgi("decode: ref=0x%02x, corrupted=%d", refupdates, corrupted);
-        if (((refupdates & VP8_GOLD_FRAME) ||
-             (refupdates & VP8_ALTR_FRAME)) &&
-            !corrupted) {
-            
-        }
+        //odbgi("decode: ref=0x%02x, corrupted=%d", refupdates, corrupted);
         
         if(pRefUpdate){
             *pRefUpdate = refupdates;
         }
         if(pCorrupted){
             *pCorrupted = corrupted;
+        }
+        if(pRefUsed){
+            *pRefUsed = refused;
         }
         
         return 0;
@@ -577,17 +693,147 @@ void dump_vp8_frame(uint8_t * frameData, size_t frameSize){
     
 }
 
+
+static
+int makeTextCommon(VP8Encoder * encoder, int numFrames, char * txt){
+    bool isKey = (encoder->getFrameFlags()&VPX_FRAME_IS_KEY)!=0;
+    return sprintf(txt, " Frame %d, type=%c", numFrames, isKey?'I':'P');
+}
+
+struct User{
+    SDLWindowImpl * window_ = NULL;
+    SDLVideoView * videoView_ = NULL;
+    SDLTextView * frameTxtView_ = NULL;
+    User(const std::string& name, int w, int h)
+    : window_(new SDLWindowImpl(name, w, h))
+    , videoView_(new SDLVideoView())
+    , frameTxtView_(new SDLTextView()){
+        window_->addView(videoView_);
+        window_->addView(frameTxtView_);
+    }
+    virtual ~User(){
+        if(window_){
+            delete window_;
+            window_ = NULL;
+        }
+    }
+};
+
+struct EncodeUser : public User{
+    VP8Encoder * encoder_ = NULL;
+    EncodeUser(const std::string& name, int w, int h)
+    : User(name, w, h)
+    , encoder_(new VP8Encoder()){
+        
+    }
+    virtual ~EncodeUser(){
+        if(encoder_){
+            delete encoder_;
+            encoder_ = NULL;
+        }
+    }
+};
+
+struct DecodeUser : public User {
+    VP8Decoder * decoder_ = NULL;
+    int layerId_ = 0;
+    int numFrames_ = 0;
+    vpx_codec_pts_t lastPTS4FPS_ = 0;
+    int lastNumFrames_  =0;
+    int fps_ = 0;
+    int64_t inputBytes_ = 0;
+    int64_t bitrate_ = 0;
+    DecodeUser(const std::string& name, int w, int h, int layerId = 0)
+    : User(name, w, h)
+    , decoder_(new VP8Decoder())
+    , layerId_(layerId){
+        
+    }
+    virtual ~DecodeUser(){
+        if(decoder_){
+            delete decoder_;
+            decoder_ = NULL;
+        }
+    }
+    
+    void decode(vpx_codec_pts_t pts, VP8Encoder * encoder, int frameNo, int layerId, bool drop){
+
+        if(layerId > layerId_){
+            return ;
+        }
+        
+        if(pts < lastPTS4FPS_){
+            lastPTS4FPS_ = pts;
+            lastNumFrames_ = 0;
+            fps_ = 0;
+            numFrames_ = 0;
+            inputBytes_ = 0;
+            bitrate_ = 0;
+        }
+        
+        int ret = 0;
+        int refupdate = 0;
+        int corrupted = 0;
+        int refUsed = 0;
+        const uint8_t * frameData = NULL;
+        size_t frameLength = 0;
+        if(!drop){
+            frameData = encoder->getEncodedFrame();
+            frameLength = encoder->getEncodedLength();
+        }
+        inputBytes_ += frameLength;
+        ret = decoder_->decode(frameData, frameLength, &refupdate, &corrupted, &refUsed);
+        if (ret == 0) {
+            vpx_image_t * decimg = NULL;
+            while ((decimg = decoder_->pullImage()) != NULL) {
+                ++numFrames_;
+                vpx_codec_pts_t duration = pts - lastPTS4FPS_;
+                int num = numFrames_ - lastNumFrames_;
+                if(duration >= 90000*2 && num > 0 && inputBytes_ > 0){
+                    fps_ = 90000* num / duration;
+                    bitrate_ = 90000 * inputBytes_*8 /duration/1000;
+                    lastNumFrames_ = numFrames_;
+                    lastPTS4FPS_ = pts;
+                    inputBytes_ = 0;
+                }
+                
+                videoView_->drawYUV(decimg->d_w, decimg->d_h
+                                            , decimg->planes[0], decimg->stride[0]
+                                            , decimg->planes[1], decimg->stride[1]
+                                            , decimg->planes[2], decimg->stride[2]);
+                char txt[128];
+                int txtlen = makeTextCommon(encoder, frameNo, txt+0);
+                txtlen += sprintf(txt+txtlen, ", TL=%d", layerId );
+                txtlen += sprintf(txt+txtlen, ", fps=%d", fps_ );
+                txtlen += sprintf(txt+txtlen, ", br=%lld", bitrate_ );
+                if(corrupted){
+                    txtlen += sprintf(txt+txtlen, ",corrupted" );
+                }
+                txtlen += sprintf(txt+txtlen, ", upd(%s %s %s)"
+                                  ,(refupdate & VP8_LAST_FRAME)?"LF":""
+                                  ,(refupdate & VP8_GOLD_FRAME)?"GF":""
+                                  ,(refupdate & VP8_ALTR_FRAME)?"ALF":"");
+                txtlen += sprintf(txt+txtlen, ", ref(%s %s %s)"
+                                  ,(refUsed & VP8_LAST_FRAME)?"LF":""
+                                  ,(refUsed & VP8_GOLD_FRAME)?"GF":""
+                                  ,(refUsed & VP8_ALTR_FRAME)?"ALF":"");
+                
+                frameTxtView_->draw(txt);
+                odbgi("  decode=[%s]", txt);
+            }
+        }
+    }
+};
+
+
 class AppDemo{
     vpx_image_t * vpximg_ = NULL;
-    SDLWindowImpl * window1_ = NULL;
-    SDLWindowImpl * window2_ = NULL;
-    SDLVideoView * videoView1_ = NULL;
-    SDLVideoView * videoView2_ = NULL;
-    SDLTextView * frameTxtView1_ = NULL;
-    SDLTextView * frameTxtView2_ = NULL;
     
-    VP8Encoder * encoder_ = NULL;
-    VP8Decoder * decoder_ = NULL;
+    EncodeUser * encodeUser_ = NULL;
+    DecodeUser * decodeUser1_ = NULL;
+    DecodeUser * decodeUser2_ = NULL;
+    
+    std::string fileName_;
     FILE * fp_ = NULL;
     int numFrames_ = 0;
     size_t numEncodeBytes_ = 0;
@@ -595,40 +841,65 @@ class AppDemo{
     int keyInterval_ = 0;
     uint32_t startTime_ = 0;
     bool drop_ = false;
+    vpx_codec_pts_t pts_ = 0;
+    uint32_t duration_ = 90000 / 30;
 public:
+    virtual ~AppDemo(){
+        this->close();
+    }
+    
+    int start(){
+        if(fileName_.empty()){
+            return -1;
+        }
+        if(fp_){
+            return 0;
+        }
+        int ret = 0;
+        fp_ = fopen(fileName_.c_str(), "rb");
+        if (!fp_) {
+            odbge("fail to open yuv file [%s]", fileName_.c_str());
+            ret = -1;
+        }
+        return ret;
+    }
+    
+    void stop(){
+        if(fp_){
+            fclose(fp_);
+            fp_ = NULL;
+            
+            uint32_t elapsed = SDL_GetTicks() - startTime_;
+            if(numFrames_ > 0 && elapsed > 0){
+                odbgi("final: elapsed=%d ms, frames=%d, encBytes=%zu, fps=%d, bps=%zu"
+                      , elapsed, numFrames_, numEncodeBytes_, 1000*numFrames_/elapsed, 8*numEncodeBytes_*framerate_/numFrames_);
+            }
+        }
+        numFrames_ = 0;
+        numEncodeBytes_ = 0;
+        drop_ = false;
+        pts_ = 0;
+    }
+    
     void close(){
-        uint32_t elapsed = SDL_GetTicks() - startTime_;
-        if(numFrames_ > 0 && elapsed > 0){
-            odbgi("final: elapsed=%d ms, frames=%d, encBytes=%zu, fps=%d, bps=%zu"
-                  , elapsed, numFrames_, numEncodeBytes_, 1000*numFrames_/elapsed, 8*numEncodeBytes_*framerate_/numFrames_);
+        this->stop();
+        if(encodeUser_){
+            delete encodeUser_;
+            encodeUser_ = NULL;
         }
-        if(window1_){
-            delete window1_;
-            window1_ = NULL;
+        if(decodeUser1_){
+            delete decodeUser1_;
+            decodeUser1_ = NULL;
         }
-        if(window2_){
-            delete window2_;
-            window2_ = NULL;
-        }
-        if(decoder_){
-            delete decoder_;
-            decoder_ = NULL;
-        }
-        if(encoder_){
-            delete encoder_;
-            encoder_ = NULL;
+        if(decodeUser2_){
+            delete decodeUser2_;
+            decodeUser2_ = NULL;
         }
         if(vpximg_){
             vpx_img_free(vpximg_);
             vpximg_ = NULL;
         }
-        if(fp_){
-            fclose(fp_);
-            fp_ = NULL;
-        }
-        numFrames_ = 0;
-        numEncodeBytes_ = 0;
-        drop_ = false;
+        fileName_.clear();
     }
     
     int open(const char * yuvfile, int width, int height, int framerate, int keyInterval = 0){
@@ -636,23 +907,23 @@ public:
         do{
             this->close();
             
+            fileName_ = yuvfile;
             framerate_ = framerate;
             keyInterval_ = keyInterval;
+            duration_ = 90000 / framerate;
             
-            encoder_ = new VP8Encoder();
-            decoder_ = new VP8Decoder();
-            window1_ = new SDLWindowImpl("raw", width, height);
-            window2_ = new SDLWindowImpl("decode", width, height);
-            videoView1_ = new SDLVideoView();
-            videoView2_ = new SDLVideoView();
-            frameTxtView1_ = new SDLTextView();
-            frameTxtView2_ = new SDLTextView();
+            encodeUser_ = new EncodeUser("raw", width, height);
+            decodeUser1_ = new DecodeUser("decode1", width, height, 1);
+            decodeUser2_ = new DecodeUser("decode2", width, height, 0);
             
             int bitrateKbps = 500;
-            ret = encoder_->open(width, height, framerate, bitrateKbps);
+            ret = encodeUser_->encoder_->open(width, height, framerate, bitrateKbps, 2);
             if(ret) break;
             
-            ret = decoder_->open();
+            ret = decodeUser1_->decoder_->open();
+            if(ret) break;
+            
+            ret = decodeUser2_->decoder_->open();
             if(ret) break;
             
             int x1 = -1;
@@ -668,33 +939,27 @@ public:
                 y = cy > height ? cy-height/2 : 0;
             }
 
-            window1_->open(x1, y);
+            encodeUser_->window_->open(x1, y);
             if(ret) break;
 
-            window2_->open(x2, y);
+            decodeUser1_->window_->open(x2, y-height/2);
             if(ret) break;
             
-            window1_->addView(videoView1_);
-            window1_->addView(frameTxtView1_);
-            window2_->addView(videoView2_);
-            window2_->addView(frameTxtView2_);
-            
-            frameTxtView1_->draw(" press 'i' -> Key Frame, press 'p' -> P Frame, 'ctrl+' -> drop");
-            frameTxtView2_->draw(" press 'q' -> Quit");
-            
-            fp_ = fopen(yuvfile, "rb");
-            if (!fp_) {
-                odbge("fail to open yuv file [%s]", yuvfile);
-                ret = -1;
-                break;
-            }
+            decodeUser2_->window_->open(x2, y+height/2);
+
+            encodeUser_->frameTxtView_->draw(" press 'i' -> Key Frame, press 'p' -> P Frame, 'ctrl+' -> drop");
+            decodeUser1_->frameTxtView_->draw(" press 'g' -> Play/Pause");
+            decodeUser2_->frameTxtView_->draw(" press 'q' -> Quit");
             
             vpximg_ = vpx_img_alloc(NULL, VPX_IMG_FMT_I420, width, height, 1);
             if(!vpximg_){
                 ret = -1;
                 break;
             }
-            startTime_ = SDL_GetTicks();
+            
+            ret = this->start();
+            if(ret) break;
+            
             ret = 0;
         }while(0);
         if(ret){
@@ -703,67 +968,75 @@ public:
         return ret;
     }
     
-    int makeTextCommon(char * txt){
-        bool isKey = (encoder_->getFrameFlags()&VPX_FRAME_IS_KEY)!=0;
-        return sprintf(txt, " Frame %d, type=%c", numFrames_, isKey?'I':'P');
+    bool isProcessing(){
+        return fp_?true : false;
     }
     
     int processOneFrame(bool enckey, bool drop){
         int ret = 0;
         do{
-            ret = vpx_img_read(vpximg_, fp_);
-            if(ret < 0){
+            if(!fp_){
                 break;
             }
-            videoView1_->drawYUV(vpximg_->d_w, vpximg_->d_h
+            ret = vpx_img_read(vpximg_, fp_);
+            if(ret < 0){
+                if(numFrames_ > 0){
+                    this->stop();
+                    ret = 0;
+                }
+                break;
+            }
+            if(numFrames_ == 0){
+                startTime_ = SDL_GetTicks();
+                pts_ = 0;
+            }else{
+                pts_ += duration_;
+            }
+            
+            odbgi("--- enc frame %d", numFrames_);
+            encodeUser_->videoView_->drawYUV(vpximg_->d_w, vpximg_->d_h
                                  , vpximg_->planes[0], vpximg_->stride[0]
                                  , vpximg_->planes[1], vpximg_->stride[1]
                                  , vpximg_->planes[2], vpximg_->stride[2]);
 
+            int layerId = 0;
+            vpx_enc_frame_flags_t encflags = 0;
+            if(!encodeUser_->encoder_->isTLayerEnabled()){
+                if(numFrames_ % 2 == 0){
+                    layerId = 0;
+                    //encflags |= VPX_EFLAG_FORCE_KF;
+                    encflags |= (VP8_EFLAG_NO_UPD_GF | VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_REF_GF | VP8_EFLAG_NO_REF_ARF );
+//                    encflags |= VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_REF_GF;
+                    
+                }else{
+                    layerId = 1;
+                    encflags |= (VP8_EFLAG_NO_UPD_ARF | VP8_EFLAG_NO_UPD_LAST | VP8_EFLAG_NO_REF_ARF);
+                }
+            }
             
-            odbgi("--- enc frame %d", numFrames_);
-            ret = encoder_->encode(vpximg_, enckey);
+            ret = encodeUser_->encoder_->encode(vpximg_, pts_, duration_, enckey, encflags);
             if(ret){
                 break;
             }
             ++numFrames_;
+            if(encodeUser_->encoder_->isTLayerEnabled()){
+                layerId = encodeUser_->encoder_->getTLayerId();
+            }
+            
+            
             char txt[128];
-            int txtlen = makeTextCommon(txt+0);
+            int txtlen = ::makeTextCommon(encodeUser_->encoder_, numFrames_, txt+0);
+            
             if(drop){
                 txtlen += sprintf(txt+txtlen, ", drop=%d", drop);
             }
-            frameTxtView1_->draw(txt);
+            encodeUser_->frameTxtView_->draw(txt);
 
-            numEncodeBytes_ += encoder_->getEncodedLength();
-            if(encoder_->getEncodedLength() > 0){
-                dump_vp8_frame(encoder_->getEncodedFrame(), encoder_->getEncodedLength());
-                int refupdate;
-                int corrupted;
-                if(drop){
-                    ret = decoder_->decode(NULL, 0, &refupdate, &corrupted);
-                }else{
-                    ret = decoder_->decode(encoder_->getEncodedFrame(), encoder_->getEncodedLength(), &refupdate, &corrupted);
-                }
-                if (ret == 0) {
-                    vpx_image_t * decimg = NULL;
-                    while ((decimg = decoder_->pullImage()) != NULL) {
-                        videoView2_->drawYUV(decimg->d_w, decimg->d_h
-                                             , decimg->planes[0], decimg->stride[0]
-                                             , decimg->planes[1], decimg->stride[1]
-                                             , decimg->planes[2], decimg->stride[2]);
-                        int txtlen = this->makeTextCommon(txt+0);
-                        if(corrupted){
-                            txtlen += sprintf(txt+txtlen, ", corrupted" );
-                        }
-                        if(refupdate & VP8_GOLD_FRAME){
-                            txtlen += sprintf(txt+txtlen, ", gold" );
-                        }
-                        if(refupdate & VP8_ALTR_FRAME){
-                            txtlen += sprintf(txt+txtlen, ", altr" );
-                        }
-                        frameTxtView2_->draw(txt);
-                    }
-                }
+            numEncodeBytes_ += encodeUser_->encoder_->getEncodedLength();
+            if(encodeUser_->encoder_->getEncodedLength() > 0){
+                dump_vp8_frame(encodeUser_->encoder_->getEncodedFrame(), encodeUser_->encoder_->getEncodedLength());
+                decodeUser1_->decode(pts_, encodeUser_->encoder_, numFrames_, layerId, drop);
+                decodeUser2_->decode(pts_, encodeUser_->encoder_, numFrames_, layerId, drop);
             }
             ret = 0;
         }while(0);
@@ -771,11 +1044,14 @@ public:
     }
     
     void refresh(){
-        if(window1_){
-            window1_->refresh();
+        if(encodeUser_){
+            encodeUser_->window_->refresh();
         }
-        if(window2_){
-            window2_->refresh();
+        if(decodeUser1_){
+            decodeUser1_->window_->refresh();
+        }
+        if(decodeUser2_){
+            decodeUser2_->window_->refresh();
         }
     }
 };
@@ -788,41 +1064,75 @@ int encode_file(const char * yuvfile, int width, int height, int framerate, int 
         ret = app->open(yuvfile, width, height, framerate, keyInterval);
         if(ret) break;
         
-        SDL_Event event;
+        int frameInterval = 1000 / framerate;
+        bool playing = false;
+        uint32_t nextDrawTime = SDL_GetTicks();
         bool quitLoop = false;
+        SDL_Event event;
         while(!quitLoop){
-            SDL_WaitEvent(&event);
-            if(event.type==SDL_QUIT){
-                odbgi("got QUIT event %d", event.type);
-                quitLoop = true;
-                break;
-            }else if(event.type == SDL_WINDOWEVENT){
-                if(event.window.event == SDL_WINDOWEVENT_CLOSE){
-                    odbgi("Window %d closed", event.window.windowID);
+            int timeout = 10;
+            uint32_t now_ms = SDL_GetTicks();
+            if(playing){
+                if(now_ms >= nextDrawTime){
+                    ret = app->processOneFrame(false, false);
+                    if(ret) break;
+                    nextDrawTime += frameInterval;
+                    if(!app->isProcessing()){
+                        playing = false;
+                    }
+                }
+                
+                now_ms = SDL_GetTicks();
+                if(now_ms < nextDrawTime){
+                    timeout = (int)(nextDrawTime - now_ms);
+                }
+                
+            }
+            if(timeout > 0){
+                SDL_WaitEventTimeout(NULL, timeout);
+            }
+            
+            while (SDL_PollEvent(&event)) {
+                if(event.type==SDL_QUIT){
+                    odbgi("got QUIT event %d", event.type);
                     quitLoop = true;
                     break;
-                }else if(event.window.event == SDL_WINDOWEVENT_RESIZED){
-                    odbgi("Window %d resized to %dx%d"
-                          , event.window.windowID
-                          , event.window.data1, event.window.data2);
-                    app->refresh();
-                }
-            }else if(event.type == SDL_KEYDOWN){
-                odbgi("got keydown event %d, win=%d, key=%d, scan=%d, mod=%d", event.type, event.key.windowID
-                      , event.key.keysym.sym, event.key.keysym.scancode, event.key.keysym.mod);
-                if(event.key.keysym.sym == SDLK_p){
-                    bool drop = (event.key.keysym.mod & KMOD_CTRL)!=0;
-                    ret = app->processOneFrame(false, drop);
-                }else if(event.key.keysym.sym == SDLK_i){
-                    bool drop = (event.key.keysym.mod & KMOD_CTRL)!=0;
-                    ret = app->processOneFrame(true, drop);
-                }else if(event.key.keysym.sym == SDLK_q){
-                    quitLoop = true;
-                }
-                if(ret){
-                    quitLoop = true;
+                }else if(event.type == SDL_WINDOWEVENT){
+                    if(event.window.event == SDL_WINDOWEVENT_CLOSE){
+                        odbgi("Window %d closed", event.window.windowID);
+                        quitLoop = true;
+                        break;
+                    }else if(event.window.event == SDL_WINDOWEVENT_RESIZED){
+                        odbgi("Window %d resized to %dx%d"
+                              , event.window.windowID
+                              , event.window.data1, event.window.data2);
+                        app->refresh();
+                    }
+                }else if(event.type == SDL_KEYDOWN){
+                    odbgi("got keydown event %d, win=%d, key=%d, scan=%d, mod=%d", event.type, event.key.windowID
+                          , event.key.keysym.sym, event.key.keysym.scancode, event.key.keysym.mod);
+                    if(event.key.keysym.sym == SDLK_p){
+                        bool drop = (event.key.keysym.mod & KMOD_CTRL)!=0;
+                        ret = app->processOneFrame(false, drop);
+                    }else if(event.key.keysym.sym == SDLK_i){
+                        bool drop = (event.key.keysym.mod & KMOD_CTRL)!=0;
+                        ret = app->processOneFrame(true, drop);
+                    }else if(event.key.keysym.sym == SDLK_g){
+                        playing = !playing;
+                        if(playing){
+                            app->start();
+                            nextDrawTime = SDL_GetTicks();
+                        }
+                    }else if(event.key.keysym.sym == SDLK_q){
+                        quitLoop = true;
+                    }
+                    if(ret){
+                        quitLoop = true;
+                    }
                 }
             }
+            
+            
         }// while(!quitLoop)
         ret = 0;
     }while(0);
