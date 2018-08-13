@@ -125,6 +125,124 @@ public:
     }
 };
 
+static
+int maximumInt( int x, int y, int z ){
+//    int max = ( a < b ) ? b : a;
+//    return ( ( max < c ) ? c : max );
+    return std::max(std::max(x, y), z);
+}
+
+static
+int minimumInt(int x, int y, int z){
+    return std::min(std::min(x, y), z);
+}
+
+static
+bool isSkin(int r, int g, int b){
+    if(r>95&&g>40&&b>20&&r>g&&r>b&&(maximumInt(r,g,b)-minimumInt(r,g,b)>15)&&abs(r-g)>15){
+        return true;
+    }else{
+        return false;
+    }
+}
+
+static
+void filterSkin(int width, int height, int bytesPerPixel
+                , uint8_t * srcData
+                , uint8_t * dstData){
+    for(int x = 0; x < width; ++x){
+        for(int y = 0; y < height; ++y){
+            int index = (y*width+x)*3;
+            int r = srcData[index+0];
+            int g = srcData[index+1];
+            int b = srcData[index+2];
+            if(isSkin(r, g, b)){
+                dstData[index+0] = 255;
+                dstData[index+1] = 255;
+                dstData[index+2] = 255;
+            }else{
+                dstData[index+0] = 0;
+                dstData[index+1] = 0;
+                dstData[index+2] = 0;
+            }
+            
+        }
+    }
+}
+
+#define IMAGE_INDEX(x, y, width) (((y)*(width)+(x))*3)
+
+static
+void blendBeauty(int width, int height, int bytesPerPixel
+                 , uint8_t * rawData
+                 , uint8_t * dstData){
+    for(int x = 0; x < width; ++x){
+        for(int y = 0; y < height; ++y){
+            int index = IMAGE_INDEX(x, y, width);  //(y*width+x)*3;
+            int r = rawData[index+0];
+            int g = rawData[index+1];
+            int b = rawData[index+2];
+            if(!isSkin(r, g, b)){
+                dstData[index+0] = rawData[index+0];
+                dstData[index+1] = rawData[index+1];
+                dstData[index+2] = rawData[index+2];
+
+
+            }else{
+                int alpha_Q8 = 51;
+                dstData[index+0] = (rawData[index+0] * alpha_Q8 + dstData[index+0]*(255-alpha_Q8)) >> 8;
+                dstData[index+1] = (rawData[index+1] * alpha_Q8 + dstData[index+1]*(255-alpha_Q8)) >> 8;
+                dstData[index+2] = (rawData[index+2] * alpha_Q8 + dstData[index+2]*(255-alpha_Q8)) >> 8;
+            }
+            
+//            // USM
+//            const float weight = 0.6f;
+//            dstData[index+0] = (int)((r-weight*dstData[index+0])/(1-weight));
+//            dstData[index+1] = (int)((g-weight*dstData[index+1])/(1-weight));
+//            dstData[index+2] = (int)((b-weight*dstData[index+2])/(1-weight));
+            
+        }
+    }
+    
+//    for(int x = 1; x < width-1; ++x){
+//        for(int y = 1; y < height-1; ++y){
+//            int index = IMAGE_INDEX(x, y, width); //(y*width+x)*3;
+//            int leftIdx   = IMAGE_INDEX(x-1, y, width);
+//            int rightIdx  = IMAGE_INDEX(x+1, y, width);
+//            int topIdx    = IMAGE_INDEX(x, y-1, width);
+//            int bottomIdx = IMAGE_INDEX(x, y+1, width);
+//            
+//            for(int k = 0; k < 3; ++k){
+//                dstData[index+k] -= dstData[leftIdx+k]
+//                + dstData[rightIdx+k]
+//                + dstData[topIdx+k]
+//                + dstData[bottomIdx+k]
+//                - 4*dstData[index+k];
+//            }
+//            
+//        }
+//    }
+}
+
+struct VideoWindow{
+    SDLWindowImpl * window_ = NULL;
+    SDLSurfaceView * surfaceView_ = NULL;
+    SDLTextView * textView_ = NULL;
+    VideoWindow(const std::string& name, int w, int h)
+    : window_(new SDLWindowImpl(name, w, h))
+    , surfaceView_(new SDLSurfaceView())
+    , textView_(new SDLTextView()){
+        window_->addView(surfaceView_);
+        window_->addView(textView_);
+    }
+    virtual ~VideoWindow(){
+        if(window_){
+            delete window_;
+            window_ = NULL;
+        }
+    }
+};
+
 class CameraBeauty{
     const std::string deviceName = "FaceTime HD Camera"; // or "2";
     const std::string optFormat = "avfoundation";
@@ -134,6 +252,7 @@ class CameraBeauty{
     int frameRate_ = 30;
     float sigma_spatial_ = 0.03f;
     float sigma_range_ = 0.05f; //0.1f;
+
     
 public:
     
@@ -145,8 +264,9 @@ public:
     int run(){
         int ret = -1;
         FFContainerReader * deviceReader = new FFContainerReader("dev");
-        SDLWindowImpl * window = NULL;
-        unsigned char * img_data_out = 0;
+        VideoWindow * window1 = NULL;
+        VideoWindow * window2 = NULL;
+        uint8_t * img_data_out = 0;
         do{
             deviceReader = new FFContainerReader("dev");
             deviceReader->setVideoOptions(width_, height_, frameRate_, optPixelFmt);
@@ -164,14 +284,11 @@ public:
             }
             
             bool isBeauty = true;
-            window = new SDLWindowImpl("camera beauty", width_, height_);
-            window->open();
-            SDLSurfaceView * surfaceView = NULL;
-            surfaceView = new SDLSurfaceView();
-            window->addView(surfaceView);
-            SDLTextView * textView = new SDLTextView();
-            window->addView(textView);
-            drawText(textView, isBeauty);
+            window1 = new VideoWindow("camera", width_, height_);
+            window1->window_->open();
+            drawText(window1->textView_, isBeauty);
+            window2 = new VideoWindow("beauty", width_, height_);
+            window2->window_->open();
             
             AVFrame * avframe = NULL;
             SDL_Event event;
@@ -186,42 +303,61 @@ public:
                     }
                     
                     int bytesPerPixel =  STBI_rgb ;
-                    unsigned char * imgData = avframe->data[0];
+                    SDL_Surface* surf1 = STBIMG_CreateSurface(avframe->data[0], avframe->width, avframe->height, bytesPerPixel, SDL_FALSE);
+                    window1->surfaceView_->draw(surf1);
+                    
+                    unsigned char * filterImgData = avframe->data[0];
                     if(isBeauty){
-                        
+                        if(!img_data_out){
+                            img_data_out = new unsigned char[avframe->width * avframe->height * bytesPerPixel];
+                        }
                         recursive_bf(avframe->data[0], img_data_out, sigma_spatial_, sigma_range_, avframe->width, avframe->height, bytesPerPixel);
-                        imgData = img_data_out;
+                        //filterSkin(avframe->width, avframe->height, bytesPerPixel, avframe->data[0], img_data_out);
+                        blendBeauty(avframe->width, avframe->height, bytesPerPixel, avframe->data[0], img_data_out);
+                        filterImgData = img_data_out;
                     }
                     
-                    SDL_Surface* surf = STBIMG_CreateSurface(imgData, avframe->width, avframe->height, bytesPerPixel, SDL_FALSE);
-                    surfaceView->draw(surf);
+                    SDL_Surface* surf2 = STBIMG_CreateSurface(filterImgData, avframe->width, avframe->height, bytesPerPixel, SDL_FALSE);
+                    window2->surfaceView_->draw(surf2);
                     
                 }
                 
                 while (SDL_PollEvent(&event)) {
-                    if(event.type==SDL_QUIT){
+                    if(event.type==SDL_QUIT || event.type==SDL_QUIT){
                         odbgi("got QUIT event %d", event.type);
                         quitLoop = true;
                         break;
+                    }else if(event.type==SDL_WINDOWEVENT){
+                        if(event.window.event == SDL_WINDOWEVENT_CLOSE){
+                            odbgi("Window %d closed", event.window.windowID);
+                            quitLoop = true;
+                            break;
+                        }else if(event.window.event == SDL_WINDOWEVENT_RESIZED){
+                            odbgi("Window %d resized to %dx%d",
+                                  event.window.windowID, event.window.data1,
+                                  event.window.data2);
+                            window1->window_->refresh();
+                            window2->window_->refresh();
+                        }
                     }else if(event.type == SDL_KEYDOWN){
                         odbgi("got keydown event %d, win=%d, key=%d, scan=%d, mod=%d", event.type, event.key.windowID, event.key.keysym.sym, event.key.keysym.scancode, event.key.keysym.mod);
                         if(event.key.keysym.sym == SDLK_SPACE){
                             isBeauty = !isBeauty;
-                            drawText(textView, isBeauty);
+                            drawText(window1->textView_, isBeauty);
                         }else if(event.key.keysym.sym == SDLK_s){
                             if(event.key.keysym.mod & KMOD_CTRL){
                                 sigma_spatial_ = sigma_spatial_ - 0.01f;
                             }else{
                                 sigma_spatial_ = sigma_spatial_ + 0.01f;
                             }
-                            drawText(textView, isBeauty);
+                            drawText(window1->textView_, isBeauty);
                         }else if(event.key.keysym.sym == SDLK_r){
                             if(event.key.keysym.mod & KMOD_CTRL){
                                 sigma_range_ = sigma_range_ - 0.01f;
                             }else{
                                 sigma_range_ = sigma_range_ + 0.01f;
                             }
-                            drawText(textView, isBeauty);
+                            drawText(window1->textView_, isBeauty);
                         }
                     }
                 }
@@ -229,6 +365,16 @@ public:
             }
             ret = 0;
         }while(0);
+        
+        if(window1){
+            delete window1;
+            window1 = NULL;
+        }
+        
+        if(window2){
+            delete window2;
+            window2 = NULL;
+        }
         
         if(deviceReader){
             delete deviceReader;
