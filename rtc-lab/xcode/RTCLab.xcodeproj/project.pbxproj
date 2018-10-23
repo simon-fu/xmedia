@@ -7,6 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F42A9E7C217715BD0081FA34 /* Lab000-Demo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F42A9E7A217715BD0081FA34 /* Lab000-Demo.cpp */; };
+		F42A9E83217719E50081FA34 /* XSocket.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F42A9E80217719E50081FA34 /* XSocket.cpp */; };
+		F42A9E85217720D30081FA34 /* libevent.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F42A9E84217720D30081FA34 /* libevent.a */; };
+		F42A9E87217985870081FA34 /* libopus.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F42A9E86217985870081FA34 /* libopus.a */; };
+		F42A9E8A2179BB5D0081FA34 /* xtlv_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F42A9E882179BB5D0081FA34 /* xtlv_file.cpp */; };
+		F42A9E8E2179DA0E0081FA34 /* BStreamProto.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F42A9E8D2179DA0E0081FA34 /* BStreamProto.cpp */; };
+		F42A9EBA217DB7E00081FA34 /* Lab041-BStreamTLVPlayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F42A9EB8217DB7E00081FA34 /* Lab041-BStreamTLVPlayer.cpp */; };
+		F42A9EBB217DB7E00081FA34 /* Lab040-BStreamDump.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F42A9EB9217DB7E00081FA34 /* Lab040-BStreamDump.cpp */; };
 		F44A0619216F7D9E00599788 /* srs_librtmp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44A0618216F7D9D00599788 /* srs_librtmp.cpp */; };
 		F44A061C216F7E1700599788 /* Lab030-RTMPPush.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44A061B216F7E1700599788 /* Lab030-RTMPPush.cpp */; };
 		F49B1D6621100AAA008CF7A8 /* SDLFramework.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F49B1D6421100AAA008CF7A8 /* SDLFramework.cpp */; };
@@ -41,6 +49,55 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F42A9E7A217715BD0081FA34 /* Lab000-Demo.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "Lab000-Demo.cpp"; sourceTree = "<group>"; };
+		F42A9E7B217715BD0081FA34 /* Lab000-Demo.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "Lab000-Demo.hpp"; sourceTree = "<group>"; };
+		F42A9E80217719E50081FA34 /* XSocket.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = XSocket.cpp; sourceTree = "<group>"; };
+		F42A9E81217719E50081FA34 /* XSocket.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = XSocket.h; sourceTree = "<group>"; };
+		F42A9E84217720D30081FA34 /* libevent.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libevent.a; path = ../../../../../../../../../../usr/local/Cellar/libevent/2.0.22/lib/libevent.a; sourceTree = "<group>"; };
+		F42A9E86217985870081FA34 /* libopus.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libopus.a; path = ../../../../../../../../../../usr/local/Cellar/opus/1.1.4/lib/libopus.a; sourceTree = "<group>"; };
+		F42A9E882179BB5D0081FA34 /* xtlv_file.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = xtlv_file.cpp; sourceTree = "<group>"; };
+		F42A9E892179BB5D0081FA34 /* xtlv_file.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = xtlv_file.h; sourceTree = "<group>"; };
+		F42A9E8C2179DA0E0081FA34 /* BStreamProto.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BStreamProto.h; sourceTree = "<group>"; };
+		F42A9E8D2179DA0E0081FA34 /* BStreamProto.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BStreamProto.cpp; sourceTree = "<group>"; };
+		F42A9E902179DC670081FA34 /* fwd.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = fwd.h; sourceTree = "<group>"; };
+		F42A9E912179DC670081FA34 /* memorystream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = memorystream.h; sourceTree = "<group>"; };
+		F42A9E922179DC670081FA34 /* reader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = reader.h; sourceTree = "<group>"; };
+		F42A9E932179DC670081FA34 /* prettywriter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = prettywriter.h; sourceTree = "<group>"; };
+		F42A9E942179DC670081FA34 /* ostreamwrapper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ostreamwrapper.h; sourceTree = "<group>"; };
+		F42A9E952179DC670081FA34 /* encodedstream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = encodedstream.h; sourceTree = "<group>"; };
+		F42A9E962179DC670081FA34 /* filereadstream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = filereadstream.h; sourceTree = "<group>"; };
+		F42A9E972179DC670081FA34 /* istreamwrapper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = istreamwrapper.h; sourceTree = "<group>"; };
+		F42A9E982179DC670081FA34 /* stringbuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = stringbuffer.h; sourceTree = "<group>"; };
+		F42A9E9A2179DC670081FA34 /* ieee754.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ieee754.h; sourceTree = "<group>"; };
+		F42A9E9B2179DC670081FA34 /* strtod.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = strtod.h; sourceTree = "<group>"; };
+		F42A9E9C2179DC670081FA34 /* swap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = swap.h; sourceTree = "<group>"; };
+		F42A9E9D2179DC670081FA34 /* regex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = regex.h; sourceTree = "<group>"; };
+		F42A9E9E2179DC670081FA34 /* diyfp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = diyfp.h; sourceTree = "<group>"; };
+		F42A9E9F2179DC670081FA34 /* biginteger.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = biginteger.h; sourceTree = "<group>"; };
+		F42A9EA02179DC670081FA34 /* strfunc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = strfunc.h; sourceTree = "<group>"; };
+		F42A9EA12179DC670081FA34 /* itoa.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = itoa.h; sourceTree = "<group>"; };
+		F42A9EA22179DC670081FA34 /* stack.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = stack.h; sourceTree = "<group>"; };
+		F42A9EA32179DC670081FA34 /* dtoa.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dtoa.h; sourceTree = "<group>"; };
+		F42A9EA42179DC670081FA34 /* meta.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = meta.h; sourceTree = "<group>"; };
+		F42A9EA52179DC670081FA34 /* pow10.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = pow10.h; sourceTree = "<group>"; };
+		F42A9EA62179DC670081FA34 /* encodings.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = encodings.h; sourceTree = "<group>"; };
+		F42A9EA72179DC670081FA34 /* schema.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = schema.h; sourceTree = "<group>"; };
+		F42A9EA82179DC670081FA34 /* stream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = stream.h; sourceTree = "<group>"; };
+		F42A9EA92179DC670081FA34 /* filewritestream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = filewritestream.h; sourceTree = "<group>"; };
+		F42A9EAA2179DC670081FA34 /* rapidjson.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = rapidjson.h; sourceTree = "<group>"; };
+		F42A9EAB2179DC670081FA34 /* document.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = document.h; sourceTree = "<group>"; };
+		F42A9EAC2179DC670081FA34 /* allocators.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = allocators.h; sourceTree = "<group>"; };
+		F42A9EAD2179DC670081FA34 /* writer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = writer.h; sourceTree = "<group>"; };
+		F42A9EAF2179DC670081FA34 /* error.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = error.h; sourceTree = "<group>"; };
+		F42A9EB02179DC670081FA34 /* en.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = en.h; sourceTree = "<group>"; };
+		F42A9EB12179DC670081FA34 /* memorybuffer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = memorybuffer.h; sourceTree = "<group>"; };
+		F42A9EB22179DC670081FA34 /* pointer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = pointer.h; sourceTree = "<group>"; };
+		F42A9EB42179DC670081FA34 /* inttypes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = inttypes.h; sourceTree = "<group>"; };
+		F42A9EB52179DC670081FA34 /* stdint.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = stdint.h; sourceTree = "<group>"; };
+		F42A9EB6217DB7E00081FA34 /* Lab040-BStreamDump.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "Lab040-BStreamDump.hpp"; sourceTree = "<group>"; };
+		F42A9EB7217DB7E00081FA34 /* Lab041-BStreamTLVPlayer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "Lab041-BStreamTLVPlayer.hpp"; sourceTree = "<group>"; };
+		F42A9EB8217DB7E00081FA34 /* Lab041-BStreamTLVPlayer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "Lab041-BStreamTLVPlayer.cpp"; sourceTree = "<group>"; };
+		F42A9EB9217DB7E00081FA34 /* Lab040-BStreamDump.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "Lab040-BStreamDump.cpp"; sourceTree = "<group>"; };
 		F44A0617216F7D9D00599788 /* srs_librtmp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = srs_librtmp.h; sourceTree = "<group>"; };
 		F44A0618216F7D9D00599788 /* srs_librtmp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = srs_librtmp.cpp; sourceTree = "<group>"; };
 		F44A061A216F7E1700599788 /* Lab030-RTMPPush.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "Lab030-RTMPPush.hpp"; sourceTree = "<group>"; };
@@ -78,6 +135,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F42A9E87217985870081FA34 /* libopus.a in Frameworks */,
+				F42A9E85217720D30081FA34 /* libevent.a in Frameworks */,
 				F49B1D822116B389008CF7A8 /* libswscale.a in Frameworks */,
 				F49B1D802116B365008CF7A8 /* libswresample.a in Frameworks */,
 				F49B1D792116B34E008CF7A8 /* libavcodec.a in Frameworks */,
@@ -96,6 +155,90 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		F42A9E7D217719E50081FA34 /* ev_socket */ = {
+			isa = PBXGroup;
+			children = (
+				F42A9E80217719E50081FA34 /* XSocket.cpp */,
+				F42A9E81217719E50081FA34 /* XSocket.h */,
+			);
+			path = ev_socket;
+			sourceTree = "<group>";
+		};
+		F42A9E8B2179DA0E0081FA34 /* branch_stream */ = {
+			isa = PBXGroup;
+			children = (
+				F42A9E8C2179DA0E0081FA34 /* BStreamProto.h */,
+				F42A9E8D2179DA0E0081FA34 /* BStreamProto.cpp */,
+			);
+			path = branch_stream;
+			sourceTree = "<group>";
+		};
+		F42A9E8F2179DC670081FA34 /* rapidjson */ = {
+			isa = PBXGroup;
+			children = (
+				F42A9E902179DC670081FA34 /* fwd.h */,
+				F42A9E912179DC670081FA34 /* memorystream.h */,
+				F42A9E922179DC670081FA34 /* reader.h */,
+				F42A9E932179DC670081FA34 /* prettywriter.h */,
+				F42A9E942179DC670081FA34 /* ostreamwrapper.h */,
+				F42A9E952179DC670081FA34 /* encodedstream.h */,
+				F42A9E962179DC670081FA34 /* filereadstream.h */,
+				F42A9E972179DC670081FA34 /* istreamwrapper.h */,
+				F42A9E982179DC670081FA34 /* stringbuffer.h */,
+				F42A9E992179DC670081FA34 /* internal */,
+				F42A9EA62179DC670081FA34 /* encodings.h */,
+				F42A9EA72179DC670081FA34 /* schema.h */,
+				F42A9EA82179DC670081FA34 /* stream.h */,
+				F42A9EA92179DC670081FA34 /* filewritestream.h */,
+				F42A9EAA2179DC670081FA34 /* rapidjson.h */,
+				F42A9EAB2179DC670081FA34 /* document.h */,
+				F42A9EAC2179DC670081FA34 /* allocators.h */,
+				F42A9EAD2179DC670081FA34 /* writer.h */,
+				F42A9EAE2179DC670081FA34 /* error */,
+				F42A9EB12179DC670081FA34 /* memorybuffer.h */,
+				F42A9EB22179DC670081FA34 /* pointer.h */,
+				F42A9EB32179DC670081FA34 /* msinttypes */,
+			);
+			path = rapidjson;
+			sourceTree = "<group>";
+		};
+		F42A9E992179DC670081FA34 /* internal */ = {
+			isa = PBXGroup;
+			children = (
+				F42A9E9A2179DC670081FA34 /* ieee754.h */,
+				F42A9E9B2179DC670081FA34 /* strtod.h */,
+				F42A9E9C2179DC670081FA34 /* swap.h */,
+				F42A9E9D2179DC670081FA34 /* regex.h */,
+				F42A9E9E2179DC670081FA34 /* diyfp.h */,
+				F42A9E9F2179DC670081FA34 /* biginteger.h */,
+				F42A9EA02179DC670081FA34 /* strfunc.h */,
+				F42A9EA12179DC670081FA34 /* itoa.h */,
+				F42A9EA22179DC670081FA34 /* stack.h */,
+				F42A9EA32179DC670081FA34 /* dtoa.h */,
+				F42A9EA42179DC670081FA34 /* meta.h */,
+				F42A9EA52179DC670081FA34 /* pow10.h */,
+			);
+			path = internal;
+			sourceTree = "<group>";
+		};
+		F42A9EAE2179DC670081FA34 /* error */ = {
+			isa = PBXGroup;
+			children = (
+				F42A9EAF2179DC670081FA34 /* error.h */,
+				F42A9EB02179DC670081FA34 /* en.h */,
+			);
+			path = error;
+			sourceTree = "<group>";
+		};
+		F42A9EB32179DC670081FA34 /* msinttypes */ = {
+			isa = PBXGroup;
+			children = (
+				F42A9EB42179DC670081FA34 /* inttypes.h */,
+				F42A9EB52179DC670081FA34 /* stdint.h */,
+			);
+			path = msinttypes;
+			sourceTree = "<group>";
+		};
 		F44A0616216F7D9D00599788 /* srs_librtmp */ = {
 			isa = PBXGroup;
 			children = (
@@ -151,20 +294,31 @@
 		F4AA9BC32107453E009F11DE /* src */ = {
 			isa = PBXGroup;
 			children = (
+				F42A9E8B2179DA0E0081FA34 /* branch_stream */,
+				F42A9E7D217719E50081FA34 /* ev_socket */,
 				F49B1D712116AF4C008CF7A8 /* FFMpegFramework.cpp */,
 				F49B1D702116AF4C008CF7A8 /* FFMpegFramework.hpp */,
+				F42A9E7A217715BD0081FA34 /* Lab000-Demo.cpp */,
+				F42A9E7B217715BD0081FA34 /* Lab000-Demo.hpp */,
 				F4AA9BC42107453E009F11DE /* Lab010-VP8.cpp */,
 				F49B1D83211820C4008CF7A8 /* Lab010-VP8.hpp */,
 				F49B1D6721101726008CF7A8 /* Lab020-Beauty.cpp */,
 				F49B1D6821101726008CF7A8 /* Lab020-Beauty.hpp */,
 				F44A061B216F7E1700599788 /* Lab030-RTMPPush.cpp */,
 				F44A061A216F7E1700599788 /* Lab030-RTMPPush.hpp */,
+				F42A9EB9217DB7E00081FA34 /* Lab040-BStreamDump.cpp */,
+				F42A9EB6217DB7E00081FA34 /* Lab040-BStreamDump.hpp */,
+				F42A9EB8217DB7E00081FA34 /* Lab041-BStreamTLVPlayer.cpp */,
+				F42A9EB7217DB7E00081FA34 /* Lab041-BStreamTLVPlayer.hpp */,
+				F42A9E8F2179DC670081FA34 /* rapidjson */,
 				F49B1D6A211030A5008CF7A8 /* rbf.hpp */,
 				F49B1D6E21105F72008CF7A8 /* SDL_stb */,
 				F49B1D6421100AAA008CF7A8 /* SDLFramework.cpp */,
 				F49B1D6521100AAA008CF7A8 /* SDLFramework.hpp */,
 				F44A0616216F7D9D00599788 /* srs_librtmp */,
 				F49B1D6B21103E4E008CF7A8 /* stb */,
+				F42A9E882179BB5D0081FA34 /* xtlv_file.cpp */,
+				F42A9E892179BB5D0081FA34 /* xtlv_file.h */,
 			);
 			name = src;
 			path = ../src;
@@ -173,6 +327,8 @@
 		F4AA9BC621074673009F11DE /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				F42A9E86217985870081FA34 /* libopus.a */,
+				F42A9E84217720D30081FA34 /* libevent.a */,
 				F49B1D812116B388008CF7A8 /* libswscale.a */,
 				F49B1D7F2116B365008CF7A8 /* libswresample.a */,
 				F49B1D732116B34D008CF7A8 /* libavcodec.a */,
@@ -245,13 +401,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F42A9EBA217DB7E00081FA34 /* Lab041-BStreamTLVPlayer.cpp in Sources */,
 				F49B1D722116AF4C008CF7A8 /* FFMpegFramework.cpp in Sources */,
+				F42A9EBB217DB7E00081FA34 /* Lab040-BStreamDump.cpp in Sources */,
+				F42A9E7C217715BD0081FA34 /* Lab000-Demo.cpp in Sources */,
+				F42A9E8E2179DA0E0081FA34 /* BStreamProto.cpp in Sources */,
+				F42A9E83217719E50081FA34 /* XSocket.cpp in Sources */,
 				F44A0619216F7D9E00599788 /* srs_librtmp.cpp in Sources */,
 				F4AA9BC52107453E009F11DE /* Lab010-VP8.cpp in Sources */,
 				F49B1D6621100AAA008CF7A8 /* SDLFramework.cpp in Sources */,
 				F44A061C216F7E1700599788 /* Lab030-RTMPPush.cpp in Sources */,
 				F49B1D6921101726008CF7A8 /* Lab020-Beauty.cpp in Sources */,
 				F4AA9BBD2106CA7A009F11DE /* main.cpp in Sources */,
+				F42A9E8A2179BB5D0081FA34 /* xtlv_file.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -371,13 +533,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				HEADER_SEARCH_PATHS = /usr/local/include;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include,
+					"$(SRCROOT)/../src",
+				);
 				LIBRARY_SEARCH_PATHS = (
 					/usr/local/lib,
 					/usr/local/Cellar/sdl2/2.0.8/lib,
 					/usr/local/Cellar/sdl2_ttf/2.0.14/lib,
 					/usr/local/Cellar/libvpx/1.6.1/lib,
 					/usr/local/Cellar/ffmpeg/3.3/lib,
+					/usr/local/Cellar/libevent/2.0.22/lib,
+					/usr/local/Cellar/opus/1.1.4/lib,
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -387,13 +554,18 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				HEADER_SEARCH_PATHS = /usr/local/include;
+				HEADER_SEARCH_PATHS = (
+					/usr/local/include,
+					"$(SRCROOT)/../src",
+				);
 				LIBRARY_SEARCH_PATHS = (
 					/usr/local/lib,
 					/usr/local/Cellar/sdl2/2.0.8/lib,
 					/usr/local/Cellar/sdl2_ttf/2.0.14/lib,
 					/usr/local/Cellar/libvpx/1.6.1/lib,
 					/usr/local/Cellar/ffmpeg/3.3/lib,
+					/usr/local/Cellar/libevent/2.0.22/lib,
+					/usr/local/Cellar/opus/1.1.4/lib,
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};

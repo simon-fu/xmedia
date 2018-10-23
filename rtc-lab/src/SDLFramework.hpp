@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string>
 #include <list>
+#include <chrono>
+#include <thread>
 //#include <map>
 //#include <vector>
 
@@ -298,5 +300,84 @@ public:
         }
     }
 };
+
+class SDLAudioPlayer{
+    SDL_AudioSpec audioSpec_;
+    SDL_AudioDeviceID devId_ = 0;
+public:
+    virtual ~SDLAudioPlayer(){
+        this->close();
+    }
+    
+    int getFrameSize(){
+        return audioSpec_.samples;
+    }
+    
+    int getChannels(){
+        return audioSpec_.channels;
+    }
+    
+    int64_t getTimeMsOfSamples(int64_t samplesPerCh){
+        return 1000*samplesPerCh/audioSpec_.freq;
+    }
+    
+    int open(int samplerate, int channels, int samplesPerCh){
+        int ret = -1;
+        do {
+            this->close();
+            SDL_AudioSpec& wanted_spec = audioSpec_;
+            wanted_spec.freq = samplerate;
+            wanted_spec.format = AUDIO_S16SYS;
+            wanted_spec.channels = channels;
+            wanted_spec.silence = 0;
+            wanted_spec.samples = samplesPerCh;
+            wanted_spec.callback = NULL;
+            wanted_spec.userdata = NULL;
+            
+            // 打开音频播放设备
+            devId_ = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, NULL, 0);
+            if(devId_ == 0){
+                //odbge("can't open SDL audio");
+                ret = -11;
+                break;
+            }
+            ret = 0;
+        } while (0);
+        if(ret){
+            this->close();
+        }
+        return ret;
+    }
+    
+    void close(){
+        if(devId_ > 0){
+            SDL_CloseAudioDevice(devId_);
+            devId_ = 0;
+        }
+    }
+    
+    int play(bool playing){
+        SDL_PauseAudioDevice(devId_, playing?0:1);
+        return 0;
+    }
+    
+    int queueSamples(int16_t sampleData[], int sampleCount){
+        return SDL_QueueAudio(devId_, sampleData, sampleCount*sizeof(int16_t));
+    }
+    
+    int64_t getRemainTimeMs(){
+        uint32_t remains = SDL_GetQueuedAudioSize(devId_);
+        return this->getTimeMsOfSamples(remains/sizeof(int16_t)/this->getChannels());
+    }
+    
+    void waitForComplete(){
+        int64_t ms = this->getRemainTimeMs();
+        while(ms > 0){
+            std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+            ms = this->getRemainTimeMs();
+        }
+    }
+};
+
 
 #endif /* SDLFramework_hpp */
