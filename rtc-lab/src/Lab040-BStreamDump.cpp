@@ -81,11 +81,19 @@ int64_t get_now_ms(){
 
 
 struct AppConfig{
-    std::string httpLocalIp = "172.17.1.216";
+    std::string httpLocalIp; // = "172.17.1.216";
     int httpLocalPort = 8800;
-    std::string httServiceUrl = "http://172.17.1.216:8800/";
-    std::string mediaLocalIp = "172.17.1.216";
-    std::string workPath = "/Users/simon/Downloads";
+    std::string httServiceUrl; // = "http://172.17.1.216:8800/";
+    std::string mediaLocalIp ; // = "172.17.1.216";
+    std::string workPath = "/tmp";
+    void initWithIp(const std::string& ip){
+        httpLocalIp = ip;
+        char buf[512];
+        sprintf(buf, "http://%s:%d/", ip.c_str(), httpLocalPort);
+        httServiceUrl = buf;
+        mediaLocalIp = ip;
+        
+    }
 };
 
 #define MAX_SSRCS 6
@@ -143,7 +151,7 @@ struct Session{
     XSockAddress * remoteAddr_ = NULL;
     
     Session(){
-        this->heartBeat();
+        this->extendLife();
     }
     
     virtual ~Session(){
@@ -157,7 +165,7 @@ struct Session{
         }
     }
     
-    void heartBeat(){
+    void extendLife(){
         lastActiveTime_ = get_now_ms();
     }
     
@@ -254,7 +262,7 @@ public:
             gotUDP = true;
         }
         if(gotUDP){
-            session->heartBeat();
+            session->extendLife();
         }
     }
     
@@ -857,6 +865,7 @@ int lab_bstream_dump_main(int argc, char* argv[]){
     
     
     AppConfig cfg;
+    cfg.initWithIp("172.17.1.216");
     EventApp app(cfg);
     app.run();
     

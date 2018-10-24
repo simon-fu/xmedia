@@ -13,8 +13,8 @@ int main(int argc, char * argv[]) {
     //ret = lab_vp8_main(argc, argv);
     //ret = lab020_beauty_main(argc, argv);
     //ret = lab030_rtmp_push_main(argc, argv);
-//    ret = lab_bstream_dump_main(argc, argv);
-    ret = lab_bstream_tlv_player_main(argc, argv);
+    ret = lab_bstream_dump_main(argc, argv);
+//    ret = lab_bstream_tlv_player_main(argc, argv);
     //ret = lab_demo_main(argc, argv);
     return 0;
 }
