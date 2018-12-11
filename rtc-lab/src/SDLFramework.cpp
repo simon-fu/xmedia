@@ -120,3 +120,9 @@ int playPCMFile(const char * filename, int samplerate, int channels){
     return ret;
 }
 
+void SDL::FlushEvent(){
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+    }
+}
+

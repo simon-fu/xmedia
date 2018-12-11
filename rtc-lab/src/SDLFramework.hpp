@@ -379,5 +379,9 @@ public:
     }
 };
 
+class SDL{
+public:
+    static void FlushEvent();
+};
 
 #endif /* SDLFramework_hpp */
