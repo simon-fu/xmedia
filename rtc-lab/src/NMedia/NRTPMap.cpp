@@ -1557,5 +1557,263 @@ void NRTPHeaderExtension::Dump(const std::string& prefix, std::list<std::string>
 
 
 
+size_t NRTPData::serialize(uint8_t* datap, const size_t size, NRTPData& other) const{
+    size_t sz = serialize(datap, size);
+    if(!sz){
+        return 0;
+    }
+    
+    other = * this;
+    
+    other.data = datap;
+    other.size = sz;
+    
+    if(other.extLength > 0){
+        other.extPtr = datap + 12 + (csrcs.size() * 4);
+    }else{
+        other.extPtr = nullptr;
+    }
+    
+    other.payloadPtr = datap + getHeadSize();
+    
+    return sz;
+}
+
+size_t NRTPData::serialize(uint8_t* data,const size_t size) const{
+    if(size < getHeadSize()){
+        return 0;
+    }
+    
+    size_t pos = 0;
+    auto sz = header.Serialize(data+pos, size);
+    pos += sz;
+    
+    for (auto it=csrcs.begin(); it!=csrcs.end(); ++it){
+        NUtil::set4(data, pos, *it);
+        pos += 4;
+    }
+    
+    if(extLength > 0){
+        memcpy(data+pos, extPtr, extLength);
+        pos += extLength;
+    }
+    
+    if(payloadLen > 0){
+        if(size < (pos + payloadLen)){
+            return 0;
+        }
+        memcpy(data+pos, payloadPtr, payloadLen);
+        pos += payloadLen;
+    }
+    
+    return pos;
+}
+
+size_t NRTPData::parse(const uint8_t* data, size_t size, bool remove_padding){
+    
+    // fixed header
+    auto pos = header.Parse(data, size);
+    if (!pos){
+        return 0;
+    }
+    
+    // csrcs
+    if (size < (pos+header.cc*4)){
+        return 0;
+    }
+    for (uint8_t i=0; i < header.cc; ++i){
+        csrcs.emplace_back(NUtil::get4(data, pos+i*4));
+    }
+    pos += header.cc*4;
+    
+    
+    if(header.extension){
+        
+        if ((size - pos) < 4){
+            return 0;
+        }
+        
+        uint16_t length = NUtil::get2(data, pos+2)*4;
+        
+        if ((size - pos) < (length+4)){
+            return 0;
+        }
+        
+        this->extPtr = data + pos;
+        this->extLength =  4+length;
+        pos += this->extLength;
+    }else{
+        this->extPtr = nullptr;
+        this->extLength = 0;
+    }
+    
+    size_t payload_len = size-pos;
+    setPayload(data + pos,  payload_len);
+    
+    if(remove_padding){
+        if(removePadding() < 0){
+            return 0;
+        }
+    }
+    
+    this->data = data;
+    this->size = size;
+    
+    return pos;
+}
+
+int NRTPData::removePadding(){
+    if (header.padding){
+        uint16_t padding = NUtil::get1(data,size-1);
+        if (this->payloadLen < padding){
+            return -1;
+        }
+        this->payloadLen -= padding;
+        header.padding = false;
+        return padding;
+    }
+    return 0;
+}
+
+size_t NRTPData::RecoverOSN(NRTPPayloadType pltype){
+    /*
+     The format of a retransmission packet is shown below:
+     0                   1                   2                   3
+     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                         RTP Header                            |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |            OSN                |                               |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               |
+     |                  Original RTP Packet Payload                  |
+     |                                                               |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     */
+    // Ensure we have enought data
+    if (payloadLen < 2){
+        return 0;
+    }
+    
+    // Get original sequence number
+    uint16_t osn = NUtil::get2(payloadPtr,0);
+    payloadPtr += 2;
+    payloadLen -= 2;
+    
+    header.sequenceNumber = osn;
+    header.payloadType = pltype;
+    
+    return 2;
+}
+
+int NRTPData::demuxRED(std::vector<REDBlock>& blocks) const{
+    return demuxRED([&blocks](REDBlock& block){
+        blocks.emplace_back(block);
+    });
+}
+
+int NRTPData::demuxRED(const std::function<void(NRTPData& rtpd)> &func) const{
+    NRTPData newrtpd = *this;
+    return demuxRED([this, &newrtpd, &func](REDBlock& block){
+        newrtpd.header.payloadType = block.pt;
+        newrtpd.header.timestamp = this->header.timestamp + block.tsOffset;
+        newrtpd.setPayload(block.data, block.length);
+        func(newrtpd);
+    });
+}
+
+int NRTPData::demuxRED(const std::function<void(REDBlock& block)> &func) const{
+    
+    if(payloadLen < 1){
+        return -1;
+    }
+    
+    REDBlock block;
+    
+    // Index of payloadPtr
+    uint16_t i = 0;
+    
+    // Check if it is the last
+    bool last = !(payloadPtr[i]>>7);
+    
+    // Read redundant headers
+    while(!last){
+        
+        // TODO: webrtc never reach here
+        
+        if((payloadLen - i) < 4){
+            return -2;
+        }
+        
+        /*
+         0                   1                    2                   3
+         0 1 2 3 4 5 6 7 8 9 0 1 2 3  4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+         |1|   block PT  |  timestamp offset         |   block length    |
+         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+         F: 1 bit First bit in header indicates whether another header block
+         follows.  If 1 further header blocks follow, if 0 this is the
+         last header block.
+         
+         block PT: 7 bits RTP payload type for this block.
+         
+         timestamp offset:  14 bits Unsigned offset of timestamp of this block
+         relative to timestamp given in RTP header.  The use of an unsigned
+         offset implies that redundant payload must be sent after the primary
+         payload, and is hence a time to be subtracted from the current
+         timestamp to determine the timestamp of the payload for which this
+         block is the redundancy.
+         
+         block length:  10 bits Length in bytes of the corresponding payload
+         block excluding header.
+         
+         */
+        
+        // Get block PT
+        block.pt = payloadPtr[i] & 0x7F;
+        i++;
+        
+        // Get timestamp offset
+        block.tsOffset = payloadPtr[i++];
+        block.tsOffset = block.tsOffset <<6 | (payloadPtr[i] >> 2);
+        
+        // Get block length
+        block.length = payloadPtr[i++] & 0x03;
+        block.length = block.length << 6 | payloadPtr[i++];
+        
+        block.data = payloadPtr+i;
+        
+        //blocks.emplace_back(block);
+        func(block);
+        
+        // Skip the block data
+        i += block.length;
+        
+        if((payloadLen - i) < 1){
+            return -3;
+        }
+        
+        //Check if it is the last
+        last = !(payloadPtr[i]>>7);
+    }
+    
+    /*
+     *  0 1 2 3 4 5 6 7
+     +-+-+-+-+-+-+-+-+
+     |0|   Block PT  |
+     +-+-+-+-+-+-+-+-+
+     */
+    
+    block.pt = payloadPtr[i++] & 0x7F;
+    block.tsOffset = 0;
+    block.data = payloadPtr+i;
+    block.length = payloadLen - i;
+    //blocks.emplace_back(block);
+    func(block);
+    
+    return 0;
+}
+
+
+
 
 

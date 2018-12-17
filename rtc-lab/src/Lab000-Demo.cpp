@@ -13,6 +13,8 @@
 #include <vector>
 #include <array>
 #include <string>
+#include <iostream>
+
 
 #include "Lab010-VP8.hpp"
 #include "VP8Framework.hpp"
@@ -20,13 +22,24 @@
 #include "NRTPMap.hpp"
 #include "NRTPReceiver.hpp"
 #include "Lab000-Demo.hpp"
-#include <iostream>
 
-static NObjDumper maindumper(std::cout, "|   main|I| ");
-#define odbgd(FMT, ARGS...) do{  printf("|%7s|D| " FMT, "main", ##ARGS); printf("\n"); fflush(stdout); }while(0)
-#define odbgi(FMT, ARGS...) do{  printf("|%7s|I| " FMT, "main", ##ARGS); printf("\n"); fflush(stdout); }while(0)
-#define odbge(FMT, ARGS...) do{  printf("|%7s|E| " FMT, "main", ##ARGS); printf("\n"); fflush(stdout); }while(0)
-//#define DUMPER(x) NCoutDumper::get("|   main|I| " x)
+
+//#include "spdlog/spdlog.h"
+//#include "spdlog/sinks/stdout_color_sinks.h"
+//#include "spdlog/fmt/bin_to_hex.h"
+
+
+//static NObjDumperOStream maindumper(std::cout, "|   main|I| ");
+//#define odbgd(FMT, ARGS...) do{  printf("|%7s|D| " FMT, "main", ##ARGS); printf("\n"); fflush(stdout); }while(0)
+//#define odbgi(FMT, ARGS...) do{  printf("|%7s|I| " FMT, "main", ##ARGS); printf("\n"); fflush(stdout); }while(0)
+//#define odbge(FMT, ARGS...) do{  printf("|%7s|E| " FMT, "main", ##ARGS); printf("\n"); fflush(stdout); }while(0)
+//#define DUMPER() maindumper
+
+static auto main_logger = spdlog::stdout_logger_mt("main");
+static NObjDumperLog maindumper(*main_logger);
+#define odbgd(FMT, ARGS...) main_logger->debug(FMT, ##ARGS)
+#define odbgi(FMT, ARGS...) main_logger->info(FMT, ##ARGS)
+#define odbge(FMT, ARGS...) main_logger->error(FMT, ##ARGS)
 #define DUMPER() maindumper
 
 
@@ -148,6 +161,19 @@ struct User{
         window_->addView(videoView_);
         window_->addView(frameTxtView_);
     }
+    
+    User(User&& other)
+    : window_(other.window_)
+    , videoView_(other.videoView_)
+    , frameTxtView_(other.frameTxtView_)
+    {
+        other.window_ = nullptr;
+        other.videoView_ = nullptr;
+        other.frameTxtView_ = nullptr;
+    }
+    
+    User(User& other) = delete ;
+    
     virtual ~User(){
         if(window_){
             delete window_;
@@ -162,7 +188,7 @@ struct User{
 };
 
 struct TLVDecodeUser : public User {
-    VP8Decoder * decoder_ = NULL;
+    VP8Decoder * decoder_ = nullptr;
     int layerId_ = 0;
     TLVDecodeUser(const std::string& name, int w, int h, const vpx_rational& timebase, int layerId = 0)
     : User(name, w, h, timebase)
@@ -170,6 +196,18 @@ struct TLVDecodeUser : public User {
     , layerId_(layerId){
         
     }
+    
+    TLVDecodeUser()
+    : User("", 640, 480, {1, 90000}){
+        
+    }
+    
+    TLVDecodeUser(TLVDecodeUser&& other):User((User&&)other), decoder_(other.decoder_), layerId_(other.layerId_){
+        other.decoder_ = nullptr;
+    }
+    
+    TLVDecodeUser(TLVDecodeUser& other) = delete;
+    
     virtual ~TLVDecodeUser(){
         if(decoder_){
             delete decoder_;
@@ -177,10 +215,10 @@ struct TLVDecodeUser : public User {
         }
     }
     
-    void decode(vpx_codec_pts_t pts, const uint8_t * frameData, size_t frameLength, int frameNo, int layerId, bool skip){
+    int decode(vpx_codec_pts_t pts, const uint8_t * frameData, size_t frameLength, int frameNo, int layerId, bool skip){
         
         if(layerId > layerId_){
-            return ;
+            return 0;
         }
         
         int ret = 0;
@@ -224,9 +262,10 @@ struct TLVDecodeUser : public User {
                                   ,(refUsed & VP8_ALTR_FRAME)?"ALF":"");
                 
                 frameTxtView_->draw(txt);
-                odbgi("  decode=[%s]", txt);
+                odbgi("  decode=[{}]", txt);
             }
         }
+        return ret;
     }
 };
 
@@ -234,15 +273,58 @@ struct TLVDecodeUser : public User {
 class XSWTLVPlayer{
     class RecordFlow{
     public:
-        NRTPFlow rtpFlow;
-        NRTPUlpfecWindow packetWin;
+        RecordFlow(){
+        }
+        
+        RecordFlow(RecordFlow &&other)
+        :rtpFlow(other.rtpFlow)
+        , decodeUser_(other.decodeUser_)
+        , depacker(other.depacker){
+            other.rtpFlow = nullptr;
+            other.decodeUser_ = nullptr;
+        }
+        
+        RecordFlow(RecordFlow &other) = delete;
+        
+        virtual ~RecordFlow(){
+            close();
+        }
+        
+        NRTPIncomingFlow * rtpFlow = nullptr;
+        NRTPTime rtptime;
+        TLVDecodeUser * decodeUser_ = nullptr;
+        int64_t lastPTS = -1;
+        int64_t lastRenderTime = -1;
         NRTPDepackVP8 depacker;
+        
+        int open(){
+            close();
+            decodeUser_ = new TLVDecodeUser("decode1", 640, 480, {1, 90000}, 0);
+            int ret = decodeUser_->window_->open();
+            if(ret){
+                odbge("error: open decode windows, ret=%d", ret);
+                return ret;
+            }
+            
+            ret = decodeUser_->decoder_->open();
+            if(ret){
+                odbge("error: open decoder , ret=%d", ret);
+                return ret;
+            }
+            return ret;
+        }
+        void close(){
+            if(decodeUser_){
+                delete decodeUser_;
+                decodeUser_ = nullptr;
+            }
+        }
     };
     
     NSDP remoteSDP_;
     NRTPReceiver receiver_;
     std::vector<RecordFlow> flows_;
-    TLVDecodeUser decodeUser_;
+    int audioFlowIndex_ = -1;
     int64_t  firstTime_ = -1;
     
     const char * RAW_RTP_STR    = "  raw RTP   : ";
@@ -251,138 +333,131 @@ class XSWTLVPlayer{
     #define  RAW_RTCP_STR         "  raw RTCP  : "
     
 public:
-    XSWTLVPlayer():decodeUser_("decode1", 640, 480, {1, 90000}, 0){
-        int ret = decodeUser_.window_->open();
-        if(ret){
-            odbge("error: open decode windows, ret=%d", ret);
-        }
-        ret = decodeUser_.decoder_->open();
-        if(ret){
-            odbge("error: open decoder , ret=%d", ret);
-        }
+    XSWTLVPlayer(){
+        odbgi("flows_.size()={}", flows_.size());
+        odbgi("flows_.capacity()={}", flows_.capacity());
     }
     
-    void dump(const std::string& prefix
-              , const NRTPData* rtpd
-              , const NRTPMediaBrief* brief
-              , const NRTPFlow * flow){
-        odbgi("%s%s-%s-[%zu]"
-              , prefix.c_str()
-              , rtpd->header.Dump("").c_str()
-              , brief->Dump("").c_str()
-              , rtpd->payloadLen);
-    }
-    
-    void dump(const std::string& prefix
-              , const NRTPData* rtpd){
-        odbgi("%s%s-[%zu]"
-              , prefix.c_str()
-              , rtpd->header.Dump("").c_str()
-              , rtpd->payloadLen);
-    }
     
     static void dump(const NSDP& sdp){
         std::list<std::string> lines;
         sdp.dump("", lines);
         for(auto line : lines){
-            odbgi("%s", line.c_str());
+            odbgi("{}", line.c_str());
         }
     }
     
-    void decode(NMediaFrame * frame){
+    void decode(RecordFlow& rec_flow, NMediaFrame * frame, const NRTPTime & rtptime){
+        uint32_t rtpts = rtptime.rtpTimestamp();
+        int64_t pts = NNtp::NTP2Milliseconds(rtptime.localNTP());
+        if(rec_flow.lastRenderTime < 0){
+            rec_flow.lastPTS = pts;
+            rec_flow.lastRenderTime = NUtil::get_now_ms();
+        }else{
+            int64_t now_ms = NUtil::get_now_ms();
+            int64_t elapsed = now_ms - rec_flow.lastRenderTime;
+            int64_t duration = pts - rec_flow.lastPTS;
+            if(duration > elapsed){
+                NUtil::sleep_ms(duration-elapsed);
+            }
+            rec_flow.lastPTS = pts;
+            rec_flow.lastRenderTime = now_ms;
+        }
+        
         int frameNo = 1;
         int layerId = 0;
-        decodeUser_.decode(frame->getTime()
+        int ret = rec_flow.decodeUser_->decode(rtpts
                            , frame->data()
                            , frame->size()
                            , frameNo, layerId, false);
         SDL::FlushEvent();
-        usleep(33*1000);
+        if(ret == 0){
+            //NUtil::sleep_ms(33);
+        }else{
+            odbge("error: decode fail with {}", ret);
+        }
+    }
+    
+    void pullAndDecode(RecordFlow& rec_flow){
+        NVP8PLDescriptor desc;
+        const NRTPData * rtpd = rec_flow.rtpFlow->pullRTPInOrder();
+        while(rtpd){
+            auto ret = rec_flow.depacker.AddPacketVP8(*rtpd, desc);
+            odbgi("{}", desc.Dump("  VP8-desc=").c_str());
+            if(ret < 0){
+                odbge("error VP8 packet with [{}]-[{}] =================", ret
+                      , NRTPDepackVP8::getNameForState(ret).c_str());
+            }else{
+                if(ret == NRTPDepackVP8::kComplete){
+                    auto frame = rec_flow.depacker.getFrame();
+                    
+                    auto& remoteNTP = rec_flow.rtpFlow->remoteNTP;
+                    uint32_t rtpts = (uint32_t)frame->getTime();
+                    uint64_t ntpts = remoteNTP.convert(rtpts, 90000);
+                    uint64_t local_ntpts = rec_flow.rtptime.input(rec_flow.depacker.firtTimeMS(),
+                                                                  rtpts,
+                                                                  90000,
+                                                                  ntpts);
+                    int64_t diff = 0;
+                    if(audioFlowIndex_ >= 0){
+                        auto& audioFlow = flows_[audioFlowIndex_];
+                        rec_flow.rtptime.estimate(audioFlow.rtptime, diff);
+                    }
+                    
+                    odbgi("video ntpts: remote={}, local={}, est={}, diff_audio={}ms",
+                          NNtp::toHuman2String(ntpts),
+                          NNtp::toHuman2String(local_ntpts),
+                          NNtp::toHuman2String(rec_flow.rtptime.localNTP()),
+                          NNtp::DeltaNTP2Milliseconds(diff) );
+                    this->decode(rec_flow, frame, rec_flow.rtptime);
+                }
+            }
+            rtpd = rec_flow.rtpFlow->pullRTPInOrder();
+        }
+    }
+    
+    RecordFlow& checkFlow(NRTPIncomingFlow * rtp_flow){
+        // check add record flow
+        while(flows_.size() <= rtp_flow->index){
+            flows_.emplace_back();
+        }
+        RecordFlow& rec_flow = flows_[rtp_flow->index];
+        if(!rec_flow.rtpFlow){
+            odbgi("add flow [{}]-[{}]", rtp_flow->index, NMedia::GetNameFor(rtp_flow->type));
+            rec_flow.rtpFlow = rtp_flow;
+            
+            if(rec_flow.rtpFlow->type == NMedia::Video){
+                rec_flow.open();
+            }else if(rec_flow.rtpFlow->type == NMedia::Audio){
+                audioFlowIndex_ = rtp_flow->index;
+            }
+        }
+        return rec_flow;
     }
     
     int processRTP(int64_t&          recv_ts,
                    const uint8_t *   data_ptr,
                    size_t            data_len){
         
-        //receiver.inputRTP(recv_ts, -1, data_ptr, data_len, dumpRTPFuncObj);
+        RecordFlow * prec_flow = nullptr;
         
-        NRTPData rtpd;
-        
-        //Parse RTP header and get payload
-        auto pos = rtpd.parse(data_ptr, data_len);
-        if (!pos){
-            odbge("fail to parse rtp");
-            return -1;
-        }
-        rtpd.timeMS = recv_ts;
-        dump(RAW_RTP_STR, &rtpd);
-        
-        NRTPMediaDetail detail;
-        NRTPMediaBrief brief;
-        int ret = receiver_.bindMedia(-1, rtpd, detail, brief);
-        if(ret < 0){
-            //dump(RAW_RTP_STR, &rtpd);
-            odbge("fail to bindMedia");
-            return -1;
-        }
-        
-        while(flows_.size() <= detail.source->flow->index){
-            flows_.emplace_back();
-        }
-        
-        RecordFlow& rec_flow = flows_[detail.source->flow->index];
-        if(rec_flow.rtpFlow.index < 0){
-            rec_flow.rtpFlow = *detail.source->flow;
-            odbgi("add flow [%d]-[%s]", rec_flow.rtpFlow.index, NMedia::GetNameFor(rec_flow.rtpFlow.type));
-        }
-        
-//        receiver_.demuxRTX(detail, brief, rtpd);
-//        if(rec_flow.rtpFlow.type == NMedia::Video){
-//            rec_flow.packetWin.insertPacket(rtpd, brief.codecType, detail.desc->codecs);
-//        }
-        
-        
-        dump(BIND_STR, &rtpd, &brief, detail.source->flow);
-            
-        ret = receiver_.demuxRTP(detail, rtpd, brief
-                                 , [this, &rec_flow, &brief](const NRTPData* rtpd
-                                          , const NRTPCodec* codec
-                                          , const NRTPFlow * flow){
-                                     brief.codecType = codec->type;
-                                     dump(DEMUX_STR, rtpd, &brief, flow);
-                                     if(rec_flow.rtpFlow.type == NMedia::Video){
-                                         rec_flow.packetWin.insertPacket(*rtpd, *codec);
+        int ret = receiver_.inputRTP(recv_ts, -1, data_ptr, data_len
+                                 , [this, &prec_flow](const NRTPReceiver::IncomingRTPInfo * info){
+                                     auto rtpd = info->rtpd;
+                                     RecordFlow& rec_flow = checkFlow(info->flow);
+                                     if(audioFlowIndex_ == rec_flow.rtpFlow->index){
+                                         uint64_t remote_ntp = rec_flow.rtpFlow->remoteNTP.convert(rtpd->header.timestamp, info->codec->clockrate);
+                                         rec_flow.rtptime.input(rtpd->timeMS,
+                                                                rtpd->header.timestamp,
+                                                                info->codec->clockrate,
+                                                                remote_ntp);
                                      }
-                                     if(codec->type != NCodec::VP8){
-                                         return;
-                                     }
-                                     
-                                     
+                                     prec_flow = &rec_flow;
                                  });
-        if(ret == 0 && rec_flow.rtpFlow.type == NMedia::Video){
-            NRTPSeq from_seq = rec_flow.depacker.nextSeq();
-            if(rec_flow.depacker.startPhase()){
-                from_seq = rec_flow.packetWin.packetWin().startSeq();
+        if(prec_flow){
+            if(prec_flow->decodeUser_){
+                pullAndDecode(*prec_flow);
             }
-            rec_flow.packetWin.packetWin()
-            .traverseUntilEmpty(from_seq
-                                , [this, &rec_flow] (NCircularBufferSizeT n, NRTPPacketWindow::reference slot) -> int{
-                                    NVP8PLDescriptor desc;
-                                    auto ret = rec_flow.depacker.AddPacketVP8(slot.rtpd, desc);
-                                    odbgi("%s", desc.Dump("  VP8-desc=").c_str());
-                                    if(ret < 0){
-                                        odbge("error VP8 packet with [%d]-[%s] =================", ret
-                                              , NRTPDepackVP8::getNameForState(ret).c_str());
-                                    }else{
-                                        
-                                        if(ret == NRTPDepackVP8::kComplete){
-                                            auto frame = rec_flow.depacker.getFrame();
-                                            odbgi("frame=[time=%lld, size=%zu]", frame->getTime(), frame->size());
-                                            this->decode(frame);
-                                        }
-                                    }
-                                    return 0;
-            });
         }
         return ret;
     }// processRTP
@@ -390,10 +465,10 @@ public:
     int processRTCP(int64_t&          recv_ts,
                    const uint8_t *   data_ptr,
                    size_t            data_len){
-        auto state = NRtcp::Parser::DumpPackets(data_ptr, data_len, DUMPER());
-        if(state != NRtcp::Parser::kNoError){
-            odbge("error RTCP with [%d]-[%s]", state, NRtcp::Parser::getNameForState(state).c_str());
-        }
+//        auto state = NRtcp::Parser::DumpPackets(data_ptr, data_len, DUMPER());
+//        if(state != NRtcp::Parser::kNoError){
+//            odbge("error RTCP with [{}]-[{}]", state, NRtcp::Parser::getNameForState(state).c_str());
+//        }
         return receiver_.inputRTCP(recv_ts, -1, data_ptr, data_len);
     }
     
@@ -403,14 +478,15 @@ public:
               size_t            data_len){
         int ret = 0;
         if(dtype == TLV_TYPE_CODEC) {
-            odbgi("packet[%lld]: codec=[size=%zu]", packet_num, data_len);
+            odbgi("packet[{}]: codec=[size={}]", packet_num, data_len);
             
         } else if(dtype == TLV_TYPE_SDP) {
             std::ostringstream oss;
             int ret = remoteSDP_.parse(data_ptr, data_len, oss);
             if(ret){
-                odbgi("packet[%lld]: SDP=[%.*s]", packet_num, (int)data_len, data_ptr);
-                odbge("fail to parse remote SDP, ret=[%d]-[%s]", ret, oss.str().c_str());
+                //odbgi("packet[%lld]: SDP=[%.*s]", packet_num, (int)data_len, data_ptr);
+                odbgi("packet[{}]: SDP=[{}]", packet_num, data_ptr);
+                odbge("fail to parse remote SDP, ret=[{}]-[{}]", ret, oss.str().c_str());
             }else{
                 odbgi("parsed remote SDP OK");
                 dump(remoteSDP_);
@@ -419,25 +495,25 @@ public:
             
         } else if(dtype == TLV_TYPE_RTP) {
             if(data_len < 8){
-                odbge("too short of RTP, size=%zu", data_len);
+                odbge("too short of RTP, size={}", data_len);
             }else{
                 int64_t recv_ts = NUtil::get8(data_ptr, 0);
                 if(firstTime_ < 0){
                     firstTime_ = recv_ts;
                 }
-                odbgi("packet[%lld]: RTP=[time=%lld(%lld ms), size=%zu]", packet_num, recv_ts, recv_ts-firstTime_, data_len-8);
+                odbgi("packet[{}]: RTP=[time={}({} ms), size={}]", packet_num, recv_ts, recv_ts-firstTime_, data_len-8);
                 processRTP(recv_ts, data_ptr+8, data_len-8);
             }
             
         } else if (dtype == TLV_TYPE_RTCP) {
             if(data_len < 8){
-                odbge("too short of RTCP, size=%zu", data_len);
+                odbge("too short of RTCP, size={}", data_len);
             }else{
                 int64_t recv_ts = NUtil::get8(data_ptr, 0);
                 if(firstTime_ < 0){
                     firstTime_ = recv_ts;
                 }
-                odbgi("packet[%lld]: RTCP=[time=%lld(%lld ms), size=%zu]", packet_num
+                odbgi("packet[{}]: RTCP=[time={}({} ms), size={}]", packet_num
                       , recv_ts
                       , recv_ts-firstTime_
                       , data_len-8);
@@ -445,11 +521,11 @@ public:
             }
             
         } else if (dtype == TLV_TYPE_END) {
-            odbgi("packet[%lld]: END", packet_num);
+            odbgi("packet[{}]: END", packet_num);
             return 0;
             
         } else {
-            odbgi("packet[%lld]: unknown type=[%d]", packet_num, dtype);
+            odbgi("packet[{}]: unknown type=[{}]", packet_num, dtype);
         }
         return ret;
     }
@@ -467,7 +543,7 @@ public:
             return this->onData(packet_num, dtype, data_ptr, data_len);
         });
         if(ret < 0){
-            odbge("process tlv ret=[%d]-[%s]", ret, oss.str().c_str());
+            odbge("process tlv ret=[{}]-[{}]", ret, oss.str().c_str());
         }
         
         return ret;
@@ -477,17 +553,18 @@ public:
 };
 
 int lab_xswtlv_player_main(int argc, char* argv[]){
+    spdlog::set_pattern("|%H:%M:%S.%e|%n|%L| %v");
+    spdlog::set_level(spdlog::level::debug);
+    
     int ret = SDL_Init(SDL_INIT_VIDEO) ;
     if(ret){
-        odbge( "Could not initialize SDL - %s\n", SDL_GetError());
+        odbge( "Could not initialize SDL - {}\n", SDL_GetError());
         return -1;
     }
     ret = TTF_Init();
     
     {
         XSWTLVPlayer player;
-        SDL::FlushEvent();
-        //usleep(10*1000*1000);
         //muxer.process("/Users/simon/Downloads/tmp/tmp/raw-tlv/rtx-fec-01.tlv");
         player.process("/Users/simon/Downloads/tmp/tmp/raw-tlv/rtx-fec-02-nodrop.tlv");
     }
@@ -497,11 +574,71 @@ int lab_xswtlv_player_main(int argc, char* argv[]){
     return ret;
 }
 
+int test_logger(){
+    auto console = spdlog::stdout_logger_mt("console");
+    console->info("Welcome to spdlog!");
+    console->info("logger: spdlog-{}.{}.{}", SPDLOG_VER_MAJOR, SPDLOG_VER_MINOR, SPDLOG_VER_PATCH);
+    
+    std::array<char, 40> buf;
+    for(size_t i = 0; i < buf.size(); ++i){
+        buf[i] = i;
+    }
+    //console->info("Binary example: {}", spdlog::to_hex(buf));
+    for(size_t i = 0; i < buf.size(); ){
+        auto len = std::min((size_t)16, buf.size()-i);
+        //console->info("Another binary example:{:n}", spdlog::to_hex(std::begin(buf)+i, std::begin(buf) + i+len));
+        console->info("Another binary example:{}", spdlog::to_hex(std::begin(buf)+i, std::begin(buf) + i+len));
+        i+=len;
+    }
+    
+    int i = 0;
+    fmt::memory_buffer raw;
+    fmt::format_to(raw, "i1={}", i);
+    fmt::format_to(raw, ",i2={}{{", i);
+    char c = 'c';
+    raw.append(&c, (&c)+1);
+
+    //std::string s1 = format(fmt("{}"), 42);  // good
+    //std::string s2 = format(fmt("{2}"), 42); // error
+    //std::string s3 = format(fmt("{"), 42); // error
+    
+    console->log(spdlog::level::info, raw.data());
+    raw.clear();
+    fmt::format_to(raw, "n={}", 10);
+    c = '\0';
+    raw.append(&c, (&c)+1);
+    console->log(spdlog::level::info, raw.data());
+    return 0;
+}
+
+inline void print_time(int64_t time_ms){
+    odbgi("time_ms={}, seconds={}, days={}, months={}, years={}"
+          , time_ms
+          , time_ms/1000
+          , time_ms/1000/60/60/24
+          , time_ms/1000/60/60/24/30
+          , time_ms/1000/60/60/24/365);
+}
+
+int test_time(){
+    print_time(NUtil::get_ms_monotonic());
+    int64_t start = NUtil::get_now_ms();
+    print_time(start);
+    NUtil::sleep_ms(1200);
+    int64_t elapsed = NUtil::get_now_ms() - start;
+    print_time(elapsed);
+    return 0;
+}
+
 int lab_demo_main(int argc, char* argv[]){
 
     //return lab_vp8_main(argc, argv);
     
     //return NObjDumperTester().test();
+
+    //return  test_logger();
+    
+    //return test_time();
     
     return lab_xswtlv_player_main(argc, argv);
 

@@ -3,6 +3,8 @@
 #ifndef NRTPMAP_H
 #define NRTPMAP_H
 
+#include "NRTPTime.hpp"
+#include "NLogger.hpp"
 #include "NUtil.hpp"
 #include <map>
 #include <set>
@@ -1056,136 +1058,10 @@ public:
     }
 };
 
-class NRTPFlow{
-public:
-    int index = -1;
-    NMedia::Type type = NMedia::Unknown;
-    std::set<uint32_t> ssrcs;
-    
-    //std::vector<int> mlineIndexes;
-    
-    //    bool containMLine(int mlineIndex){
-    //        for(auto& o : mlineIndexes){
-    //            if(o == mlineIndex){
-    //                return true;
-    //            }
-    //        }
-    //        return false;
-    //    }
-};
-
-class NRTPSource{
-public:
-    const NRTPFlow * flow;
-    int         mlineIndex;
-    uint32_t    ssrc;
-    uint32_t    extSeq;
-    uint32_t    cycles;
-    uint64_t    numPackets;
-    uint64_t    numRTCPPackets;
-    uint64_t    totalBytes;
-    uint64_t    totalRTCPBytes;
-    uint32_t    jitter;
-    uint32_t    bitrate;
-    
-    NRTPSource(){
-        flow            = nullptr;
-        mlineIndex      = -1;
-        ssrc            = 0;
-        extSeq          = 0;
-        cycles          = 0;
-        numPackets      = 0;
-        numRTCPPackets  = 0;
-        totalBytes      = 0;
-        totalRTCPBytes  = 0;
-        jitter          = 0;
-        bitrate         = 0;
-    }
-    
-    virtual ~NRTPSource(){
-        
-    }
-};
 
 
 
-class NRTPIncomingFlow : public NRTPFlow{
-public:
-    // NAck History
-};
-
-class NRTPIncomingSource : public NRTPSource{
-public:
-    
-    uint32_t    lostPackets;
-    uint32_t    dropPackets;
-    uint32_t    totalPacketsSinceLastSR;
-    uint32_t    totalBytesSinceLastSR;
-    uint32_t    minExtSeqNumSinceLastSR ;
-    uint32_t    lostPacketsSinceLastSR;
-    uint64_t    lastReceivedSenderNTPTimestamp;
-    uint64_t    lastReceivedSenderReport;
-    uint64_t    lastReport;
-    uint64_t    lastPLI;
-    uint32_t    totalPLIs;
-    uint32_t    totalNACKs;
-    uint64_t    lastNACKed;
-    
-    NRTPIncomingSource() : NRTPSource(){
-        lostPackets         = 0;
-        dropPackets         = 0;
-        totalPacketsSinceLastSR     = 0;
-        totalBytesSinceLastSR     = 0;
-        lostPacketsSinceLastSR   = 0;
-        lastReceivedSenderNTPTimestamp = 0;
-        lastReceivedSenderReport = 0;
-        lastReport         = 0;
-        lastPLI             = 0;
-        totalPLIs         = 0;
-        totalNACKs         = 0;
-        lastNACKed         = 0;
-        minExtSeqNumSinceLastSR  = NRTP::MaxExtSeqNum;
-    }
-    
-    virtual ~NRTPIncomingSource() = default;
-    
-public:
-    using shared = std::shared_ptr<NRTPIncomingSource>;
-    typedef std::map<uint32_t, NRTPIncomingSource *> Map;
-};
-
-class NRTPMediaBrief{
-public:
-    NRTPHeaderExtension     extension;
-    bool                    isRTX = false;  // recover from RTX packet
-    bool                    isFEC = false;  // recover from FEC packet
-    NCodec::Type            codecType = NCodec::UNKNOWN;
-    int                     mlineIndex = -1;
-    
-    std::string Dump(const std::string& prefix) const {
-        std::ostringstream oss;
-        oss << prefix << "[" << NCodec::GetNameFor(codecType)
-        << ", mline=" << mlineIndex;
-        if (isRTX){
-            oss << ", rtx";
-        }
-        if (isFEC){
-            oss << ", fec";
-        }
-        oss << "]";
-        return oss.str();
-    }
-    
-};
-
-class NRTPMediaDetail{
-public:
-    const NSDP::MediaDesc * desc = nullptr;
-    const NRTPCodec *       codec = nullptr;
-    const NRTPSource *      source = nullptr;
-};
-
-class NRTPHeader{
+class NRTPHeader : public NObjDumper::Dumpable{
 public:
     NRTPHeader() = default;
     
@@ -1194,6 +1070,26 @@ public:
     //size_t GetSize() const;
     void Dump(const std::string& prefix, std::list<std::string>& lines) const;
     std::string Dump(const std::string& prefix) const;
+    virtual inline NObjDumper& dump(NObjDumper& dumper) const override{
+        dumper.objB();
+        dumpFields(dumper);
+        dumper.objE();
+        return dumper;
+    }
+    
+    inline NObjDumper& dumpFields(NObjDumper& dumper) const{
+        return dumper
+        .kv("v", version)
+        .kv("p", (int)padding)
+        .kv("x", (int)extension)
+        .kv("cc", (unsigned)cc)
+        .kv("m", (int)mark)
+        .kv("pt", payloadType)
+        .kv("seq", sequenceNumber)
+        .kv("ts", timestamp)
+        .kv("ssrc", ssrc);
+    }
+    
 public:
     uint8_t     version         = 2;
     uint8_t     cc              = 0;
@@ -1208,7 +1104,7 @@ public:
     //
 };
 
-class NRTPData{
+class NRTPData : public NObjDumper::Dumpable{
 public:
     
     struct REDBlock{
@@ -1219,7 +1115,7 @@ public:
     };
     
 public:
-
+    NCodec::Type            codecType = NCodec::UNKNOWN;
     int64_t                 timeMS = 0;
     NRTPHeader              header;
     std::vector<uint32_t>   csrcs;
@@ -1238,6 +1134,21 @@ public:
         return oss.str();
     }
     
+    virtual inline NObjDumper& dump(NObjDumper& dumper) const override{
+        dumper.objB();
+        dumpFields(dumper);
+        dumper.objE();
+        return dumper;
+    }
+    
+    inline NObjDumper& dumpFields(NObjDumper& dumper) const{
+        header.dumpFields(dumper);
+        dumper.kv("elen", extLength);
+        dumper.kv("plen", payloadLen);
+        dumper.kv("codec", NCodec::GetNameFor(codecType));
+        return dumper;
+    }
+    
     const uint8_t * getExtData() const{
         return extPtr;
     }
@@ -1246,866 +1157,26 @@ public:
         return  12 + (csrcs.size() * 4) + extLength;
     }
     
-    size_t serialize(uint8_t* datap, const size_t size, NRTPData& other) const{
-        size_t sz = serialize(datap, size);
-        if(!sz){
-            return 0;
-        }
-        
-        other = * this;
-        
-        other.data = datap;
-        other.size = sz;
-        
-        if(other.extLength > 0){
-            other.extPtr = datap + 12 + (csrcs.size() * 4);
-        }else{
-            other.extPtr = nullptr;
-        }
-        
-        other.payloadPtr = datap + getHeadSize();
-        
-        return sz;
-    }
+    size_t serialize(uint8_t* datap, const size_t size, NRTPData& other) const;
     
-    size_t serialize(uint8_t* data,const size_t size) const{
-        if(size < getHeadSize()){
-            return 0;
-        }
-        
-        size_t pos = 0;
-        auto sz = header.Serialize(data+pos, size);
-        pos += sz;
-        
-        for (auto it=csrcs.begin(); it!=csrcs.end(); ++it){
-            NUtil::set4(data, pos, *it);
-            pos += 4;
-        }
-
-        if(extLength > 0){
-            memcpy(data+pos, extPtr, extLength);
-            pos += extLength;
-        }
-        
-        if(payloadLen > 0){
-            if(size < (pos + payloadLen)){
-                return 0;
-            }
-            memcpy(data+pos, payloadPtr, payloadLen);
-            pos += payloadLen;
-        }
-        
-        return pos;
-    }
+    size_t serialize(uint8_t* data,const size_t size) const ;
     
-    size_t parse(const uint8_t* data, size_t size, bool remove_padding = true){
-        
-        // fixed header
-        auto pos = header.Parse(data, size);
-        if (!pos){
-            return 0;
-        }
-        
-        // csrcs
-        if (size < (pos+header.cc*4)){
-            return 0;
-        }
-        for (uint8_t i=0; i < header.cc; ++i){
-            csrcs.emplace_back(NUtil::get4(data, pos+i*4));
-        }
-        pos += header.cc*4;
-        
-        
-        if(header.extension){
-            
-            if ((size - pos) < 4){
-                return 0;
-            }
-            
-            uint16_t length = NUtil::get2(data, pos+2)*4;
-            
-            if ((size - pos) < (length+4)){
-                return 0;
-            }
-            
-            this->extPtr = data + pos;
-            this->extLength =  4+length;
-            pos += this->extLength;
-        }else{
-            this->extPtr = nullptr;
-            this->extLength = 0;
-        }
-        
-        size_t payload_len = size-pos;
-        setPayload(data + pos,  payload_len);
-        
-        if(remove_padding){
-            if(removePadding() < 0){
-                return 0;
-            }
-        }
-        
-        this->data = data;
-        this->size = size;
-        
-        return pos;
-    }
+    size_t parse(const uint8_t* data, size_t size, bool remove_padding = true);
     
     void setPayload(const uint8_t * ptr, size_t length){
         payloadPtr = ptr;
         payloadLen = length;
     }
     
-    int removePadding(){
-        if (header.padding){
-            uint16_t padding = NUtil::get1(data,size-1);
-            if (this->payloadLen < padding){
-                return -1;
-            }
-            this->payloadLen -= padding;
-            header.padding = false;
-            return padding;
-        }
-        return 0;
-    }
+    int removePadding();
     
-    size_t RecoverOSN(NRTPPayloadType pltype){
-        /*
-         The format of a retransmission packet is shown below:
-         0                   1                   2                   3
-         0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-         |                         RTP Header                            |
-         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-         |            OSN                |                               |
-         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+                               |
-         |                  Original RTP Packet Payload                  |
-         |                                                               |
-         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-         */
-        // Ensure we have enought data
-        if (payloadLen < 2){
-            return 0;
-        }
-
-        // Get original sequence number
-        uint16_t osn = NUtil::get2(payloadPtr,0);
-        payloadPtr += 2;
-        payloadLen -= 2;
-        
-        header.sequenceNumber = osn;
-        header.payloadType = pltype;
-        
-        return 2;
-    }
+    size_t RecoverOSN(NRTPPayloadType pltype);
     
-    int demuxRED(std::vector<REDBlock>& blocks) const{
-        return demuxRED([&blocks](REDBlock& block){
-            blocks.emplace_back(block);
-        });
-    }
+    int demuxRED(std::vector<REDBlock>& blocks) const;
     
-    int demuxRED(const std::function<void(NRTPData& rtpd)> &func) const{
-        NRTPData newrtpd = *this;
-        return demuxRED([this, &newrtpd, &func](REDBlock& block){
-            newrtpd.header.payloadType = block.pt;
-            newrtpd.header.timestamp = this->header.timestamp + block.tsOffset;
-            newrtpd.setPayload(block.data, block.length);
-            func(newrtpd);
-        });
-    }
+    int demuxRED(const std::function<void(NRTPData& rtpd)> &func) const;
     
-    int demuxRED(const std::function<void(REDBlock& block)> &func) const{
-        
-        if(payloadLen < 1){
-            return -1;
-        }
-        
-        REDBlock block;
-        
-        // Index of payloadPtr
-        uint16_t i = 0;
-        
-        // Check if it is the last
-        bool last = !(payloadPtr[i]>>7);
-        
-        // Read redundant headers
-        while(!last){
-            
-            // TODO: webrtc never reach here
-            
-            if((payloadLen - i) < 4){
-                return -2;
-            }
-            
-            /*
-             0                   1                    2                   3
-             0 1 2 3 4 5 6 7 8 9 0 1 2 3  4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-             +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-             |1|   block PT  |  timestamp offset         |   block length    |
-             +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-             F: 1 bit First bit in header indicates whether another header block
-             follows.  If 1 further header blocks follow, if 0 this is the
-             last header block.
-             
-             block PT: 7 bits RTP payload type for this block.
-             
-             timestamp offset:  14 bits Unsigned offset of timestamp of this block
-             relative to timestamp given in RTP header.  The use of an unsigned
-             offset implies that redundant payload must be sent after the primary
-             payload, and is hence a time to be subtracted from the current
-             timestamp to determine the timestamp of the payload for which this
-             block is the redundancy.
-             
-             block length:  10 bits Length in bytes of the corresponding payload
-             block excluding header.
-             
-             */
-            
-            // Get block PT
-            block.pt = payloadPtr[i] & 0x7F;
-            i++;
-            
-            // Get timestamp offset
-            block.tsOffset = payloadPtr[i++];
-            block.tsOffset = block.tsOffset <<6 | (payloadPtr[i] >> 2);
-            
-            // Get block length
-            block.length = payloadPtr[i++] & 0x03;
-            block.length = block.length << 6 | payloadPtr[i++];
-            
-            block.data = payloadPtr+i;
-            
-            //blocks.emplace_back(block);
-            func(block);
-                
-            // Skip the block data
-            i += block.length;
-            
-            if((payloadLen - i) < 1){
-                return -3;
-            }
-            
-            //Check if it is the last
-            last = !(payloadPtr[i]>>7);
-        }
-
-        /*
-        *  0 1 2 3 4 5 6 7
-        +-+-+-+-+-+-+-+-+
-        |0|   Block PT  |
-        +-+-+-+-+-+-+-+-+
-        */
-
-        block.pt = payloadPtr[i++] & 0x7F;
-        block.tsOffset = 0;
-        block.data = payloadPtr+i;
-        block.length = payloadLen - i;
-        //blocks.emplace_back(block);
-        func(block);
-        
-        return 0;
-    }
-};
-
-//class NRTPPacket{
-//public:
-//    static const size_t SIZE = 1700;
-//    static const size_t PREFIX = 200;
-//    uint8_t     buffer[SIZE+PREFIX];
-//    NRTPData    rtpd;
-//    //NRTPMediaBrief brief;
-//public:
-//
-//    size_t reset(const NRTPData& d){
-//        size_t sz = d.serialize(buffer+PREFIX, SIZE, this->rtpd);
-//        if(!sz){
-//            return 0;
-//        }
-//        return sz;
-//    }
-//
-//    bool valid(uint16_t seq){
-//        return (seq == rtpd.header.sequenceNumber && rtpd.payloadPtr);
-//    }
-//};
-
-
-class NRTPPacketSlot{
-public:
-    static const size_t SIZE = 1700;
-    static const size_t PREFIX = 200;
-    uint8_t     buffer[SIZE+PREFIX];
-    NRTPData    rtpd;
-    //NRTPMediaBrief brief;
-public:
-    
-    size_t reset(const NRTPData& d){
-        size_t sz = d.serialize(buffer+PREFIX, SIZE, this->rtpd);
-        if(!sz){
-            return 0;
-        }
-        return sz;
-    }
-    
-    bool valid(uint16_t seq){
-        return (seq == rtpd.header.sequenceNumber && rtpd.payloadPtr);
-    }
-    NCircularBufferSizeT index;
-};
-
-
-class NRTPPacketWindow : public NCircularVector<NRTPPacketSlot>
-{
-public:
-    typedef NCircularVector<NRTPPacketSlot> Parent;
-    enum State {
-        kReachEmptySlot = -5,
-        kOutOfRange = -4,
-        kUnknownData = -3,
-        kDuplicatePacket = -2,
-        kOutOfDatePacket = -1,
-        kNoError = 0,
-        kFirstPacket ,
-        kPrepend,
-        kAppend,
-        kOutOfOrderReset,
-        kDisorderPacket,
-    };
-
-public:
-    NRTPPacketWindow(NCircularBufferSizeT cap = 128)
-    : NCircularVector<NRTPPacketSlot>(cap) //packets_(cap)
-    , startSeq_(0u)
-    , lastSlot_(&back()){
-        auto& packets_ = *this;
-        for(NCircularBufferSizeT i = 0; i < packets_.capacity(); ++i){
-            packets_[i].index = i;
-        }
-    }
-    
-    State insertPacket(const NRTPData& rtpd){
-        
-        auto& packets_ = *this;
-        auto& circular = packets_;
-        
-        if(packets_.isEmpty()){
-            reset(rtpd);
-            return kFirstPacket;
-        }
-        
-        
-        auto dist = startSeq_.distance(rtpd.header.sequenceNumber);
-        RTPSeqDistance high = circular.capacity() *2;
-        RTPSeqDistance low = -high;
-        if(dist < low || dist > high){
-            reset(rtpd);
-            return kOutOfOrderReset;
-        }
-        
-        if(dist < 0){
-            auto abs_dist = 0-dist;
-
-            if(circular.isFull()){
-                // running phase
-                return kOutOfDatePacket;
-            }
-            
-            // start phase: out of date packet
-            if((abs_dist + circular.size()) < circular.capacity()){
-                return kOutOfDatePacket;
-            }
-            
-            // start phase: prepend for older seq;
-            circular.unshiftFront(abs_dist);
-            startSeq_ = rtpd.header.sequenceNumber;
-            return checkPlaceSlot(rtpd, circular.front(), kPrepend);
-        }
-        
-        auto abs_dist = dist;
-        if(abs_dist < circular.size()){
-            // in window
-            return checkPlaceSlot(rtpd, circular[abs_dist], kDisorderPacket);
-            
-        }else if(abs_dist == circular.size()){
-            // next expect seq
-            auto over_num = circular.shiftBack();
-            startSeq_ = startSeq_ + over_num;
-            return checkPlaceSlot(rtpd, circular.back(), kNoError);
-            
-        }else if(abs_dist < 2*circular.size()){
-            // newer packet
-            auto num = circular.size() - abs_dist + 1;
-            auto over_num = circular.shiftBack(num);
-            startSeq_ = startSeq_ + over_num;
-            return checkPlaceSlot(rtpd, circular.back(), kAppend);
-            
-        }else {
-            // too newer packet, never reach here
-            reset(rtpd);
-            return kOutOfOrderReset;
-        }
-    }
-    
-    NRTPPacketSlot * getSlotInWindow(const NRTPSeq& seq) {
-        auto& packets_ = *this;
-        auto dist = startSeq_.distance(seq);
-        if(dist >= 0 && dist < packets_.size()){
-            return &packets_[dist];
-        }else{
-            return nullptr;
-        }
-    }
-    
-    State checkPlaceSlot(const NRTPData& rtpd, NRTPPacketSlot& slot, State state_normal){
-        if(rtpd.header.sequenceNumber == slot.rtpd.header.sequenceNumber
-           && slot.rtpd.payloadPtr){
-            return kDuplicatePacket;
-        }
-        emplaceSlot(rtpd, slot);
-        return state_normal;
-    }
-    
-    void emplaceSlot(const NRTPData& rtpd, NRTPPacketSlot& slot){
-        slot.reset(rtpd);
-        lastSlot_ = &slot;
-    }
-    
-    void reset(const NRTPData& rtpd){
-        auto& packets_ = *this;
-        packets_.clear();
-        packets_.shiftBack();
-        emplaceSlot(rtpd, packets_.back());
-        startSeq_ = rtpd.header.sequenceNumber;
-    }
-    
-    NRTPPacketSlot& lastSlot() const{
-        return *lastSlot_;
-    }
-    
-    const NRTPSeq& startSeq() const{
-        return startSeq_;
-    }
-    
-    bool distance(const NRTPSeq& seq, RTPSeqDistance& dist) const{
-        auto& packets_ = *this;
-        dist = startSeq_.distance(seq);
-        return(dist >= 0 && dist < packets_.size());
-    }
-    
-    RTPSeqDistance distance(const NRTPSeq& seq) const{
-        return startSeq_.distance(seq);
-    }
-    
-    int traverseUntilEmpty (const NRTPSeq& from_seq
-                             , const TraverseFuncT& func) {
-        RTPSeqDistance dist = startSeq_.distance(from_seq);
-        if(dist < 0){
-            return kOutOfRange;
-        }
-        
-        return Parent::traverse((NCircularBufferSizeT)dist,
-                                [&from_seq, &func](NCircularBufferSizeT n , reference slot) -> int{
-                                    NRTPSeq expect_seq = from_seq + n;
-                                    if(!slot.valid(expect_seq.value())){
-                                        return kReachEmptySlot;
-                                    }
-                                    func(n, slot);
-                                    return kNoError;
-                                });
-    }
-    
-private:
-    //NCircularVector<NRTPPacketSlot> packets_;
-    
-    NRTPSeq startSeq_;
-    NRTPPacketSlot* lastSlot_;
-};
-
-
-class NULPFecData{
-public:
-    struct FECHeader{
-        uint8_t reoveryH8[8];
-        uint16_t recoveryLength = 0;
-    };
-    
-    struct Level{
-        const uint8_t* data;
-        uint16_t length;
-        uint64_t maskCover = 0;
-        uint64_t maskRecv = 0;
-        
-        void clear(){
-            data = nullptr;
-            length = 0;
-            maskCover = 0;
-            maskRecv = 0;
-        }
-        
-        void setMask(const uint8_t * m, uint16_t len){
-            maskCover = 0;
-            for(uint16_t i = 0; i < len; ++i){
-                uint16_t shift = (7-i) << 3;
-                uint64_t b = m[i];
-                maskCover |= b << shift;
-            }
-            maskRecv = maskCover;
-        }
-        
-        bool checkSet(uint16_t offset){
-            uint64_t m = (uint64_t)1 << (63-offset);
-            if((maskCover&m) && (maskRecv&m)){
-                maskRecv &= ~m;
-                return true;
-            }
-            return false;
-        }
-        
-        bool checkClear(uint16_t offset){
-            uint64_t m = (uint64_t)1 << (63-offset);
-            if((maskCover&m) && !(maskRecv&m)){
-                maskRecv |= m;
-                return true;
-            }
-            return false;
-        }
-        
-        bool isCover(uint16_t offset)const{
-            uint64_t m = (uint64_t)1 << (63-offset);
-            return (maskCover&m) != 0;
-        }
-        
-        bool isAllRecv()const{
-            return maskRecv == 0;
-        }
-        
-        bool isMissOne()const{
-            return (maskRecv & (maskRecv-1)) == 0;
-        }
-        
-        uint16_t firstMissOffset() const{
-            return NUtil::count_leading_0bits(maskRecv);
-        }
-        
-        uint16_t firstCoverOffset() const{
-            return NUtil::count_leading_0bits(maskCover);
-        }
-    };
-    
-public:
-    
-    uint16_t maxProtectLength = 0;
-    uint16_t maskLength = 0;
-    NRTPSeq snBase = 0u;
-    FECHeader header;
-    //std::vector<Level> levels;
-    Level level0; // only support level 0 for now
-    
-    bool valid(){
-        return maskLength > 0;
-    }
-    
-    void clear(){
-        maxProtectLength = 0;
-        maskLength = 0;
-        level0.clear();
-    }
-    
-    size_t parse(const uint8_t* data, size_t size) {
-        clear();
-        if(size < 10){
-            return 0;
-        }
-        memcpy(header.reoveryH8, data, 8);
-        snBase = NUtil::get2(data, 2);
-        header.recoveryLength = NUtil::get2(data, 8);
-        maskLength = (data[0] & 0x40) == 0 ? 2 : 6;
-        
-        size_t pos = 10;
-        while(pos < size){
-            auto remains = size - pos;
-            if (remains < (maskLength+2)) {
-                return 0;
-            }
-            
-            Level& level = level0;
-            
-            level.length = NUtil::get2(data, pos);
-            pos += 2;
-            
-            level.setMask(data + pos, maskLength);
-            pos += maskLength;
-            
-            level.data = data + pos;
-            pos += level.length;
-            
-            if(pos > size){
-                return 0;
-            }
-            
-            if(level.length > maxProtectLength){
-                maxProtectLength = level.length;
-            }
-            break;
-        }
-        
-        return pos;
-    }
-    
-    bool checkSet(uint16_t seq){
-        auto dist = snBase.distance(seq);
-        if(dist < 0 || dist >= (maskLength<<3)){
-            return false;
-        }
-        
-        if(level0.checkSet(dist)){
-            return true;
-        }
-        return false;
-    }
-    
-    void recoveryBegin(const Level& level, NRTPPacketSlot& outpkt){
-        uint8_t * data = outpkt.buffer + NRTPPacketSlot::PREFIX;
-        memset(data, 0, maxProtectLength+12);
-        outpkt.rtpd.size = 0;
-    }
-    
-    bool recoveryAdd(const Level& level, const NRTPPacketSlot& inpkt, NRTPPacketSlot& outpkt){
-        auto dist = snBase.distance(inpkt.rtpd.header.sequenceNumber);
-        if(dist < 0 || dist >= (maskLength<<3)){
-            return false;
-        }
-        
-        if(!level.isCover(dist)){
-            return false;
-        }
-        uint8_t * data = outpkt.buffer + NRTPPacketSlot::PREFIX;
-        for(size_t i = 0; i < (level.length+12); ++i){
-            data[i] ^= inpkt.rtpd.data[i];
-        }
-        outpkt.rtpd.size ^= (inpkt.rtpd.size-12);
-        return true;
-    }
-    
-    void recoveryEnd(const Level& level, uint16_t seq, NRTPPacketSlot& outpkt){
-        uint8_t * data = outpkt.buffer + NRTPPacketSlot::PREFIX;
-        
-        for(size_t i = 0; i < level.length; ++i){
-            data[12+i] ^= level.data[i];
-        }
-        
-        // recover length
-        outpkt.rtpd.size ^= header.recoveryLength;
-        outpkt.rtpd.size &= 0x0FFFF;
-        outpkt.rtpd.size += 12;
-        
-        // recover header
-        for(size_t i = 0; i < 8; ++i){
-            data[i] ^= header.reoveryH8[i];
-        }
-        data[0] = (data[0] & 0x3F) | 0x80;
-        NUtil::set2(data, 2, seq);
-        // TODO: recover ssrc
-        
-        outpkt.rtpd.parse(data, outpkt.rtpd.size);
-    }
-    
-    bool isAllReceived() const{
-        return level0.isAllRecv();
-    }
-    
-    NRTPSeq missSeq(const Level& level){
-        RTPSeqDistance dist = level.firstMissOffset();
-        return snBase + dist;
-    }
-};
-
-class NRTPUlpfecWindow {
-public:
-    NRTPUlpfecWindow(NCircularBufferSizeT cap = 128)
-    : packetWin_(cap), feclist_(cap/2){
-        
-    }
-    
-    void reset(){
-        feclist_.clear();
-    }
-    
-    NRTPPacketWindow::State insertPacket(const NRTPData& rtpd_in, const NRTPCodec& codec, const NRTPCodec::Map& codecs){
-        if(codec.type == NCodec::RED){
-            NRTPPacketWindow::State ret = NRTPPacketWindow::kNoError;
-            rtpd_in.demuxRED([this, &ret, &codecs](NRTPData& newrtpd){
-                auto it = codecs.find(newrtpd.header.payloadType);
-                if(it != codecs.end() && it->second->type == NCodec::ULPFEC){
-                    addFEC(newrtpd);
-                    NRTPPacketWindow::State state = insertPacket(newrtpd, *it->second);
-                    if(state < 0){
-                        ret = state;
-                    }
-                }
-            });
-            return ret;
-        }else{
-            return insertPacket(rtpd_in, codec);
-        }
-    }
-    
-    NRTPPacketWindow::State insertPacket(const NRTPData& rtpd_in, const NRTPCodec& codec){
-        if(codec.type != NCodec::ULPFEC&& !codec.isNative()){
-            return NRTPPacketWindow::kUnknownData;
-        }
-        
-        NRTPPacketWindow::State state = packetWin_.insertPacket(rtpd_in);
-        //printf("insertPacket: state=%d, start=%u, pkt=%s\n", state, packetWin_.startSeq().value(), rtpd_in.Dump("").c_str());
-        if(state < 0){
-            return state;
-        }
-        
-        if(state == NRTPPacketWindow::kOutOfOrderReset){
-            reset();
-        }
-        
-        NRTPData& rtpd = packetWin_.lastSlot().rtpd;
-        
-         if(codec.type == NCodec::ULPFEC){
-            addFEC(rtpd);
-            
-        }else if(codec.isNative()){
-            for(NCircularBufferSizeT i = 0; i < feclist_.size(); ++i){
-                auto fecd = feclist_[i];
-                fecd.checkSet(rtpd.header.sequenceNumber);
-            }
-        }
-        
-        this->processFEC();
-        
-        return state;
-    }
-    
-    bool recoverULPFEC(NULPFecData& fecd){
-        RTPSeqDistance offset = fecd.level0.firstMissOffset();
-        NRTPSeq miss_seq = fecd.snBase + offset;
-        auto miss_slot = packetWin_.getSlotInWindow(miss_seq);
-        if(!miss_slot || miss_seq == miss_slot->rtpd.header.sequenceNumber){
-            return false;
-        }
-        return recoverULPFEC(fecd, offset, miss_seq, *miss_slot);
-    }
-    
-    bool recoverULPFEC(NULPFecData& fecd
-                       , RTPSeqDistance offset
-                       , const NRTPSeq& miss_seq
-                       , NRTPPacketSlot& miss_slot) {
-        
-        RTPSeqDistance dist;
-        if(!packetWin_.distance(fecd.snBase, dist)){
-            return false;
-        }
-        
-        NCircularBufferSizeT num = fecd.maskLength << 8;
-        fecd.recoveryBegin(fecd.level0, miss_slot);
-        packetWin_.traverse(dist, num, [&fecd, &offset, &miss_slot](auto n, NRTPPacketSlot& slot)-> int{
-            if(n != offset){
-                fecd.recoveryAdd(fecd.level0, slot, miss_slot);
-            }
-            return 0;
-        });
-        fecd.recoveryEnd(fecd.level0, miss_seq.value(), miss_slot);
-        fecd.level0.checkSet(offset);
-        return true;
-    }
-    
-    bool verifyFEC(NULPFecData& fecd_in) {
-        NULPFecData fecd = fecd_in;
-        NCircularBufferSizeT num = fecd.maskLength << 8;
-        for(RTPSeqDistance offset = 0; offset < num; ++offset){
-            if(fecd.level0.checkClear(offset)){
-                NRTPSeq miss_seq = fecd.snBase + offset;
-                auto exist_slot = packetWin_.getSlotInWindow(miss_seq);
-                if(!exist_slot) continue;
-                
-                NRTPPacketSlot * miss_slot = new NRTPPacketSlot();
-                recoverULPFEC(fecd, offset, miss_seq, *miss_slot);
-                
-                if(miss_slot->rtpd.header.extension != exist_slot->rtpd.header.extension
-                   || miss_slot->rtpd.header.mark != exist_slot->rtpd.header.mark
-                   || miss_slot->rtpd.header.cc != exist_slot->rtpd.header.cc
-                   || miss_slot->rtpd.header.payloadType != exist_slot->rtpd.header.payloadType
-                   || miss_slot->rtpd.header.sequenceNumber != exist_slot->rtpd.header.sequenceNumber
-                   || miss_slot->rtpd.header.timestamp != exist_slot->rtpd.header.timestamp
-                   ){
-                    return false;
-                }
-                
-                if(miss_slot->rtpd.payloadLen != exist_slot->rtpd.payloadLen){
-                    return false;
-                }
-                size_t len = miss_slot->rtpd.payloadLen;
-                
-                auto equ = memcmp(miss_slot->rtpd.payloadPtr, exist_slot->rtpd.payloadPtr, len);
-                if(equ != 0){
-                    return false;
-                }
-                
-                delete miss_slot;
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    bool addFEC(const NRTPData& rtpd){
-        feclist_.shiftBack();
-        auto& fecd = feclist_.back();
-        auto last_slot = packetWin_.lastSlot();
-        auto sz = fecd.parse(rtpd.payloadPtr, rtpd.payloadLen);
-        if(sz == 0){
-            fecd.clear();
-            feclist_.unshiftBack();
-            return false;
-        }
-        
-        RTPSeqDistance dist;
-        if(!packetWin_.distance(fecd.snBase, dist)){
-            fecd.clear();
-            feclist_.unshiftBack();
-            return false;
-        }
-        
-        NCircularBufferSizeT num = fecd.maskLength << 3;
-        packetWin_.traverse(dist, num, [&fecd] (auto n, NRTPPacketSlot& slot) -> int{
-            fecd.checkSet(slot.rtpd.header.sequenceNumber);
-            return 0;
-        });
-        
-        return true;
-    }
-    
-    void processFEC(){
-        while(!feclist_.isEmpty()){
-            NULPFecData& fecd = feclist_.front();
-            if(!fecd.level0.isAllRecv() && fecd.level0.isMissOne()){
-                this->recoverULPFEC(fecd);
-            }
-            
-            if(fecd.isAllReceived() || packetWin_.distance(fecd.snBase) < 0){
-                //bool ok = verifyFEC(fecd);
-                fecd.clear();
-                feclist_.popFront();
-            }else {
-                break;
-            }
-        }
-    }
-    
-    NRTPPacketWindow& packetWin(){
-        return packetWin_;
-    }
-    
-private:
-    NRTPPacketWindow packetWin_;
-    NCircularVector<NULPFecData> feclist_;
+    int demuxRED(const std::function<void(REDBlock& block)> &func) const;
 };
 
 

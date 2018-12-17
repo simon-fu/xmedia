@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include "NUtil.hpp"
+#include "NLogger.hpp"
 
 namespace  NRtcp{
     
@@ -516,7 +517,8 @@ namespace  NRtcp{
     public:
         
     public:
-        SDES() : Packet(kSDES){}
+        SDES() : Packet(kSDES){
+        }
         
         virtual ~SDES() = default;
         
@@ -545,6 +547,7 @@ namespace  NRtcp{
         }
         
         virtual size_t Parse(const Header &header, const uint8_t* data, size_t size) override{
+            descriptions.clear();
             
             //Get packet size
             size_t packetSize = header.length;
@@ -702,11 +705,11 @@ namespace  NRtcp{
                         
                 }
                 
-//                if(sz == 0){
-//                    return kWrongData;
-//                }
-//                
-                if (pkt && pkt->Parse(header, buffer, header.length) > 0){
+                if (pkt){
+                    sz = pkt->Parse(header, buffer, header.length);
+                    if(sz == 0){
+                        return kWrongData;
+                    }
                     func(*pkt);
                 }
                 
@@ -721,58 +724,5 @@ namespace  NRtcp{
     
 }; // NRtcp
 
-
-
-
-
-
-//class NRtcpParser{
-//public:
-//
-//    /*
-//     0                   1                   2                   3
-//     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-//     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//     |V=2|P|    RC   |   PT          |             length            |
-//     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-//     */
-//    class Header{
-//    public:
-//        uint8_t  count       = 0;    /* varies by packet type :5*/
-//        bool     padding     = 0;    /* padding flag */
-//        uint8_t  version     = 2;    /* protocol version :2 */
-//        uint8_t  packetType  = 0;    /* RTCP packet type */
-//        uint16_t length      = 0;    /* pkt len in words, w/o this word */
-//
-//        size_t Parse(const uint8_t* data, size_t size){
-//            if (size<4) return 0;
-//
-//            version     = data[0] >> 6;
-//            padding     = (data[0] >> 4 ) & 0x01;
-//            count       = data[0] & 0x1F;
-//            packetType  = data[1];
-//            length      = (NUtil::get2(data,2)+1)*4;
-//
-//            return 4; //Return size
-//        }
-//
-//        size_t Serialize(uint8_t* data, size_t size) const{
-//            if (size<4) return 0;
-//
-//            data[0] = (padding ? 0xA0 : 0x80) | (count & 0x1F);
-//            data[1] = packetType;
-//            NUtil::set2(data,2, (length/4)-1);
-//
-//            return 4; //Return size
-//        }
-//    };
-//
-//
-//public:
-//
-//
-//
-//
-//};
 
 #endif /* NRTCPPacket_hpp */

@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include "NRTPMap.hpp"
 #include "NRTCPPacket.hpp"
+#include "NRTPPacketWindow.hpp"
+#include "NRTPIncomingSource.hpp"
 
 struct NData{
     const uint8_t *     data;
@@ -585,11 +587,12 @@ public:
         
         // Check new frame
         if(frame_.getTime() != rtpd.header.timestamp){
-            first_ = true;
+            firstPacket_ = true;
             frame_.SetSize(0);
         }
         
-        if(first_){
+        if(firstPacket_){
+            firtTimeMS_ = rtpd.timeMS;
             frame_.setTime(rtpd.header.timestamp);
             nextSeq_ = rtpd.header.sequenceNumber;
         }
@@ -598,50 +601,86 @@ public:
             return kDisorder;
         }
 
-        // Decode payload descriptr
-        auto descLen = desc.Parse(rtpd.payloadPtr, (uint32_t)rtpd.payloadLen);
-        
-        // Check size
-        if (!descLen || rtpd.payloadLen < descLen){
-            return kDescriptorSize;
+        if(rtpd.codecType == NCodec::VP8){
+            // Decode payload descriptr
+            auto descLen = desc.Parse(rtpd.payloadPtr, (uint32_t)rtpd.payloadLen);
+            
+            // Check size
+            if (!descLen || rtpd.payloadLen < descLen){
+                return kDescriptorSize;
+            }
+            
+            if(firstPacket_ && (!desc.startOfPartition || desc.partitionIndex != 0)){
+                return kNotFirst;
+            }
+            
+            frame_.AppendData(rtpd.payloadPtr+descLen, rtpd.payloadLen-descLen);
         }
-        
-        if(first_ && (!desc.startOfPartition || desc.partitionIndex != 0)){
-            return kNotFirst;
-        }
-        
-        frame_.AppendData(rtpd.payloadPtr+descLen, rtpd.payloadLen-descLen);
-        
+
         nextSeq_ = nextSeq_+1;
-        first_ = false;
-        startPhase_ = false;
         
-        return rtpd.header.mark ? kComplete : kNoError;
+        if(rtpd.header.mark){
+            firstPacket_ = true;
+            return kComplete;
+        }else{
+            firstPacket_ = false;
+            return kNoError;
+        }
     }
     
     virtual NMediaFrame* getFrame() {
         return &frame_;
     }
     
-    virtual bool startPhase() const {
-        return startPhase_;
-    }
-    
     virtual const NRTPSeq& nextSeq() const {
         return nextSeq_;
     }
     
+    int64_t firtTimeMS() const{
+        return firtTimeMS_;
+    }
+    
 private:
-    bool            startPhase_ = true;
-    bool            first_      = true;
-    NRTPSeq         nextSeq_    = 0u;
+    bool            firstPacket_    = true;
+    int64_t         firtTimeMS_ = 0;
+    NRTPSeq         nextSeq_        = 0u;
     NVideoFrame     frame_;
 };
 
 
-class NRTPReceiver{
+class NRTPReceiver {
+public:
+    class IncomingRTPInfo : public NObjDumper::Dumpable{
+    public:
+        // bind info
+        const NRTPData  *       rtpd = nullptr;
+        NSDP::MediaDesc *       desc = nullptr;
+        NRTPCodec *             codec = nullptr;
+        NRTPIncomingSource *    source = nullptr;
+        NRTPIncomingFlow *      flow = nullptr;
+        
+        // demux info
+        NRTPHeaderExtension     extension;
+        bool                    isRTX = false;  // recover from RTX packet
+        bool                    isRED = false;  // demux from RED packet
+        
+        virtual inline NObjDumper& dump(NObjDumper& dumper) const override{
+            dumper.objB();
+            rtpd->dumpFields(dumper);
+            if(isRTX){
+                dumper.kv("rtx", 1);
+            }
+            if(isRED){
+                dumper.kv("red", 1);
+            }
+            // TODO: dump extension
+            dumper.objE();
+            return dumper;
+        }
+    };
     
 private:
+    NLogger::shared logger_;
     NSDP::shared remoteSDP_;
     int flowIndex_ = 0;
     std::vector<NRTPIncomingFlow *> sourceGroupFlows;
@@ -649,9 +688,9 @@ private:
     NRTPIncomingSource::Map sourceMap; // ssrc -> source
     NRtcp::Parser rtcpParser;
     
-    NRTPIncomingSource * addSource(const uint32_t ssrc
-                                   , const NSDP::MediaDesc& media
-                                   , NRTPFlow* flow){
+    NRTPIncomingSource * addSource(const uint32_t ssrc,
+                                   const NSDP::MediaDesc& media,
+                                   NRTPFlow* flow){
         if(!flow){
             flow = mediaFlows[media.mlineIndex];
         }
@@ -676,7 +715,7 @@ private:
                     continue;
                 }
                 
-                auto flow = new NRTPIncomingFlow();
+                auto flow = new NRTPIncomingFlow(media.type == NMedia::Video);
                 flow->index = this->flowIndex_++;
                 flow->type = media.type;
                 sourceGroupFlows.emplace_back(flow);
@@ -688,7 +727,7 @@ private:
             } // for media.ssrcGroups
             
             // media flow
-            auto mflow = new NRTPIncomingFlow();
+            auto mflow = new NRTPIncomingFlow(media.type == NMedia::Video);
             mflow->index = this->flowIndex_++;
             mflow->type = media.type;
             mediaFlows.emplace_back(mflow);
@@ -704,11 +743,10 @@ private:
         }// for sdp->medias
     }
     
-    
 public:
     
     NRTPReceiver(){
-        
+        logger_ = NLogger::Get("recv");
     }
     
     virtual ~NRTPReceiver(){
@@ -740,11 +778,12 @@ public:
     
     int checkFindMedia(int mlineIndex
                        , const NRTPHeader& rtphdr
-                       , NRTPMediaDetail& detail){
+                       , IncomingRTPInfo& detail){
         do{
             auto src_it = sourceMap.find(rtphdr.ssrc);
             if(src_it != sourceMap.end()){
                 detail.source = src_it->second;
+                detail.flow = static_cast<NRTPIncomingFlow*>(src_it->second->flow);
                 mlineIndex = detail.source->mlineIndex;
             }
             
@@ -778,16 +817,15 @@ public:
         return -1;
     }
     
-    typedef std::function<void(const NRTPData *, const NRTPCodec*, const NRTPFlow * flow )> RTPDataFunc;
+    typedef std::function<void(const IncomingRTPInfo *)> RTPDataFunc;
     
-    int demuxRTP(const NRTPMediaDetail& detail
-                 , NRTPData& rtpd
-                 , NRTPMediaBrief& brief
-                 , const RTPDataFunc& func){
+    int demuxRTP(IncomingRTPInfo& detail,
+                 NRTPData& rtpd,
+                 const RTPDataFunc& func){
         int ret = 0;
         
         auto& codecs = detail.desc->codecs;
-        const NRTPCodec * mcodec = detail.codec;
+        NRTPCodec * &mcodec = detail.codec;
         
         if(mcodec->type == NCodec::RTX){
             // recover payload type
@@ -806,8 +844,8 @@ public:
                 return -1;
             }
             mcodec = acodec_it->second.get();
-            brief.codecType = mcodec->type;
-            brief.isRTX = true;
+            rtpd.codecType = mcodec->type;
+            detail.isRTX = true;
             
             // TODO: recover ssrc
             
@@ -827,21 +865,15 @@ public:
                 if(acodec_it != codecs.end()){
                     
                     // TODO: recover ssrc of media ?
+                    mcodec = acodec_it->second.get();
                     newrtpd.header.payloadType = block.pt;
                     newrtpd.header.timestamp = rtpd.header.timestamp + block.tsOffset;
                     newrtpd.setPayload(block.data, block.length);
-                    //brief.codecType = acodec_it->second->type;
-                    func(&newrtpd, acodec_it->second.get(), detail.source->flow);
+                    newrtpd.codecType = acodec_it->second->type;
+                    detail.isRED = true;
+                    detail.rtpd = &newrtpd;
+                    func(&detail);
                     
-                    //                    if(acodec_it->second->isNative()){
-                    //
-                    //                        func(&newrtpd, &brief, detail.source->flow);
-                    //                    }else{
-                    //                        // TODO: recover packets
-                    //                        printf("  block=[pt=%u, tsoffset=%u, len=%u, name=%s]\n"
-                    //                               , block.pt, block.tsOffset, block.length, acodec_it->second->name.c_str());
-                    //                        brief.isFEC = true;
-                    //                    }
                 }else{
                     printf("  block=[pt=%u, tsoffset=%u, len=%u, name=unknown]\n"
                            , block.pt, block.tsOffset, block.length);
@@ -849,33 +881,33 @@ public:
             }
             
         }else {
-            if(mcodec->isNative()){
-                //func(&rtpd, &brief, detail.source->flow);
-            }
-            func(&rtpd, detail.codec, detail.source->flow);
+            func(&detail);
         }
         
         return 0;
     }
     
     int bindMedia(int mline_index
-                  , const NRTPData& rtpData
-                  , NRTPMediaDetail& detail
-                  , NRTPMediaBrief& brief){
+                  , NRTPData& rtpData
+                  , IncomingRTPInfo& detail){
         int ret = 0;
         ret = checkFindMedia(mline_index, rtpData.header, detail);
         if(ret < 0){
             return ret;
         }
         
-        brief.codecType = detail.codec->type;
-        brief.mlineIndex = detail.desc->mlineIndex;
+        detail.rtpd = &rtpData;
+        rtpData.codecType = detail.codec->type;
         
+        return 0;
+    }
+    
+    int inputRTP(NRTPData& rtpData,
+                 IncomingRTPInfo& detail,
+                 const RTPDataFunc& func){
         auto& header = rtpData.header;
-        
-        // parse RTP header extensions
         if (header.extension){
-            auto extlen = brief.extension.Parse(detail.desc->extensions
+            auto extlen = detail.extension.Parse(detail.desc->extensions
                                                 , rtpData.getExtData()
                                                 , rtpData.extLength);
             if (!extlen){
@@ -883,18 +915,29 @@ public:
             }
         }
         
-        return 0;
+        int ret = demuxRTP(detail, rtpData,
+                           [this, &detail, &func](const IncomingRTPInfo * info){
+                               NRTPIncomingFlow * inflow = detail.flow ;
+                               NObjDumperLog(*logger_, NLogger::Level::debug).dump("demux RTP", *info);
+                               if(inflow->packetWin.capacity() > 0){
+                                   inflow->packetWin.insertPacket(*info->rtpd, *detail.codec);
+                               }
+                               func(info);
+                           });
+        
+        return ret;
     }
     
     int inputRTP(int mline_index, NRTPData& rtpd, const RTPDataFunc& func){
-        NRTPMediaDetail detail;
-        NRTPMediaBrief  brief;
-        int ret = bindMedia(mline_index, rtpd, detail, brief);
+        IncomingRTPInfo detail;
+        int ret = bindMedia(mline_index, rtpd, detail);
         if(ret < 0){
             return ret;
         }
         
-        ret = demuxRTP(detail, rtpd, brief, func);
+        NObjDumperLog(*logger_, NLogger::Level::debug).dump("bind RTP", detail);
+        
+        ret = inputRTP(rtpd, detail, func);
         return ret;
     }
     
@@ -905,6 +948,8 @@ public:
         NRTPData rtpData;
         auto pos = rtpData.parse(data, size);
         if (!pos){
+            logger_->warn("fail to parse RTP, size={}", size);
+            // TODO: dump data
             return -1;
         }
         rtpData.timeMS = time_ms;
@@ -913,8 +958,17 @@ public:
     }
     
     int inputRTCP(int64_t time_ms, int mline_index, const uint8_t * data, size_t size){
-        rtcpParser.Parse(data, size, [](NRtcp::Packet &pkt ){
-            //pkt.Dump(NCoutDumper::get("RTCP: "));
+        rtcpParser.Parse(data, size, [this](NRtcp::Packet &pkt ){
+            NObjDumperLog(*logger_, NLogger::Level::debug).dump("RTCP", pkt);
+            if(pkt.type == NRtcp::kSenderReport){
+                NRtcp::SenderReport& sr = (NRtcp::SenderReport&) pkt;
+                
+                auto src_it = sourceMap.find(sr.ssrc);
+                if(src_it != sourceMap.end()){
+                    NRTPIncomingFlow * flow = static_cast<NRTPIncomingFlow*>(src_it->second->flow);
+                    flow->remoteNTP.updateNTP(sr.ntpSec, sr.ntpFrac, sr.rtpTimestamp);
+                }
+            }
             
         });
         return 0;
