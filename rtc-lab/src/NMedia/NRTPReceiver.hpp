@@ -4,6 +4,7 @@
 #define NRTPReceiver_hpp
 
 #include <stdio.h>
+#include <deque>
 #include "NRTPMap.hpp"
 #include "NRTCPPacket.hpp"
 #include "NRTPPacketWindow.hpp"
@@ -157,6 +158,9 @@ protected:
 
 class NMediaFrame : public NBuffer<uint8_t>{
 public:
+    using Unique = NObjectPool<NMediaFrame>::Unique;
+    
+public:
 
     NMediaFrame(size_t capacity, size_t step_capacity=1024
                 , NMedia::Type mtype = NMedia::Unknown, NCodec::Type ctype = NCodec::UNKNOWN)
@@ -174,6 +178,18 @@ public:
         return time_;
     }
     
+    void setCodecType(NCodec::Type codec_type, NMedia::Type media_type){
+        codecType_ = codec_type;
+        mediaType_ = media_type;
+    }
+    
+    NCodec::Type getCodecType() const{
+        return codecType_;
+    }
+    
+    NMedia::Type getMediaType() const{
+        return mediaType_;
+    }
     
 protected:
     NMedia::Type    mediaType_;
@@ -182,20 +198,86 @@ protected:
 
 };
 
+//class NMediaFramePool {
+//public:
+//    NMediaFramePool(NCodec::Type codec_type, size_t start_capacity=1)
+//    : codecType_(codec_type), mediaType_(NCodec::GetMediaForCodec(codec_type)){
+//        if(mediaType_ == NMedia::Video){
+//            frameStartSize_ = 30*1024;
+//            frameStepSize_ = 30*1024;
+//        }else{
+//            frameStartSize_ = 1700;
+//            frameStepSize_ = 1024;
+//        }
+//        for(size_t n = 0; n < start_capacity; ++n){
+//            freeQ_.emplace_back(new NMediaFrame(frameStartSize_, frameStepSize_, mediaType_, codecType_));
+//        }
+//
+//    }
+//
+//    virtual ~NMediaFramePool(){
+//        for(auto& frame : freeQ_){
+//            delete frame;
+//        }
+//    }
+//
+//    virtual NMediaFrame * alloc() {
+//        if(freeQ_.empty()){
+//            return new NMediaFrame(frameStartSize_, frameStepSize_, mediaType_, codecType_);
+//        }else{
+//            NMediaFrame * frame = freeQ_.back();
+//            freeQ_.pop_back();
+//            return frame;
+//        }
+//    }
+//
+//    virtual void free(NMediaFrame *frame){
+//        freeQ_.emplace_back(frame);
+//    }
+//
+//protected:
+//    NCodec::Type codecType_;
+//    NMedia::Type mediaType_ ;
+//    std::deque<NMediaFrame *> freeQ_;
+//    size_t frameStartSize_;
+//    size_t frameStepSize_;
+//};
+
+
+class NAudioFrame : public NMediaFrame{
+public:
+    static const size_t kStartCapacity = 1700;
+    static const size_t kStepCapacity = 1*1024;
+    class Pool : public NPool<NAudioFrame, NMediaFrame>{
+        
+    };
+public:
+    NAudioFrame():NAudioFrame(NCodec::UNKNOWN){}
+    NAudioFrame(NCodec::Type ctype) : NMediaFrame(kStartCapacity, kStepCapacity, NMedia::Audio){
+        
+    }
+};
+
 class NVideoFrame : public NMediaFrame{
 public:
     static const size_t kStartCapacity = 30*1024;
     static const size_t kStepCapacity = 30*1024;
+    class Pool : public NPool<NVideoFrame, NMediaFrame>{
+        
+    };
 public:
+    NVideoFrame():NVideoFrame(NCodec::UNKNOWN){}
     NVideoFrame(NCodec::Type ctype) : NMediaFrame(kStartCapacity, kStepCapacity, NMedia::Video){
         
     }
-
+    
+    virtual bool isKeyframe() const = 0;
+    
+    virtual const NVideoSize& videoSize() const  = 0;
 };
 
 
-
-struct NVP8PLDescriptor
+struct NVP8PLDescriptor : public NObjDumper::Dumpable
 {
     bool extendedControlBitsPresent;
     bool nonReferencePicture;
@@ -285,10 +367,10 @@ struct NVP8PLDescriptor
         uint32_t len = 1;
         
         //Read first
-        extendedControlBitsPresent    = data[0] >> 7;
-        nonReferencePicture        = data[0] >> 5 & 0x01;
-        startOfPartition        = data[0] >> 4 & 0x01;
-        partitionIndex            = data[0] & 0x0F;
+        extendedControlBitsPresent  = data[0] >> 7;
+        nonReferencePicture         = data[0] >> 5 & 0x01;
+        startOfPartition            = data[0] >> 4 & 0x01;
+        partitionIndex              = data[0] & 0x0F; // TODO: why partitionIndex is always 0
         
         //check if more
         if (extendedControlBitsPresent)
@@ -447,42 +529,42 @@ struct NVP8PLDescriptor
         return len;
     }
     
-    std::string Dump(const std::string& prefix){
-        std::ostringstream oss;
-        oss << prefix << "[N=" << nonReferencePicture
-        << ", S=" << startOfPartition
-        << ", PartID=" << (unsigned)partitionIndex;
+    virtual inline NObjDumper& dump(NObjDumper& dumper) const override{
+        dumper.objB();
+        dumper.kv("N", (int)nonReferencePicture);
+        dumper.kv("S", (int)startOfPartition);
+        dumper.kv("PartIdx", (unsigned)partitionIndex);
         
         if(extendedControlBitsPresent){
             if(pictureIdPresent){
-                oss << ", PicID(" << (unsigned)pictureIdLength << ")=" << pictureId;
+                dumper.kv(fmt::format("PicID({})", (unsigned)pictureIdLength), pictureId);
             }
             
             if(temporalLevelZeroIndexPresent){
-                oss << ", TL0PICIDX=" << temporalLevelZeroIndex;
+                dumper.kv("TL0PICIDX", temporalLevelZeroIndex);
             }
             
             if (temporalLayerIndexPresent || keyIndexPresent){
-                oss << ", TID=" << temporalLayerIndex;
-                oss << ", Y=" << layerSync;
-                oss << ", KEYIDX=" << keyIndex;
+                dumper.kv("TID", temporalLayerIndex);
+                dumper.kv("Y", layerSync);
+                dumper.kv("KEYIDX", keyIndex);
             }
             
         }
-        oss << "]";
-        
-        return oss.str();
+        dumper.objE();
+        return dumper;
     }
 };
 
-struct VP8PayloadHeader
+struct VP8PayloadHeader : public NObjDumper::Dumpable
 {
     bool showFrame = 0;
     bool isKeyFrame = 0;
     uint8_t version = 0;
     uint32_t firstPartitionSize = 0;
-    uint16_t width = 0;
-    uint16_t height = 0;
+//    uint16_t width = 0;
+//    uint16_t height = 0;
+    NVideoSize videoSize;
     uint8_t horizontalScale = 0;
     uint8_t verticalScale = 0;
     
@@ -493,7 +575,6 @@ struct VP8PayloadHeader
             //Invalid
             return 0;
         
-        //Read comon 3 bytes
         //   0 1 2 3 4 5 6 7
         //  +-+-+-+-+-+-+-+-+
         //  |Size0|H| VER |P|
@@ -502,38 +583,40 @@ struct VP8PayloadHeader
         //  +-+-+-+-+-+-+-+-+
         //  |     Size2     |
         //  +-+-+-+-+-+-+-+-+
-        firstPartitionSize    = data[0] >> 5;
-        showFrame        = data[0] >> 4 & 0x01;
-        version            = data[0] >> 1 & 0x07;
-        isKeyFrame        = (data[0] & 0x0F) == 0;
         
-        //check if more
-        if (isKeyFrame)
-        {
-            //Check size
-            if (size<10){
-                // Invalid
-                return 0;
-            }
-            
-            //Check Start code
-            if (NUtil::get3(data,3)!=0x9d012a){
-                // Invalid
-                return 0;
-            }
-            //Get size
-            uint16_t hor = NUtil::get2(data,6);
-            uint16_t ver = NUtil::get2(data,8);
-            //Get dimensions and scale
-            width        = hor & 0xC0;
-            horizontalScale = hor >> 14;
-            height        = ver & 0xC0;
-            verticalScale    = ver >> 14;
-            //Key frame
-            return 10;
+        uint8_t firstByte = data[0];
+        isKeyFrame = (firstByte >> 0 & 0x1) == 0;
+        version = firstByte >> 1 & 0x7;
+        showFrame = (firstByte >> 4 & 0x1) ;
+        firstPartitionSize = (((firstByte >> 5) & 0x7) << 0) | (data[1] << 3) | (data[2] << 11);
+        
+        if (!isKeyFrame){
+            //No key frame
+            return 3;
         }
-        //No key frame
-        return 3;
+        
+        //Check size
+        if (size<10){
+            // Invalid
+            return 0;
+        }
+        
+        // Check Start code
+        if (data[3]!=0x9d || data[4] != 0x01 || data[5] != 0x2a){
+            // Invalid
+            return 0;
+        }
+        
+        uint16_t wordH = NUtil::le_get2(data, 6);
+        uint16_t wordV = NUtil::le_get2(data, 8);
+        horizontalScale = (wordH >> 14) & 0x3;
+        verticalScale = (wordV >> 14) & 0x3;
+        videoSize.width = wordH & 0x3FFF;
+        videoSize.height = wordV & 0x3FFF;
+//        width = wordH & 0x3FFF;
+//        height = wordV & 0x3FFF;
+        
+        return 10;
     }
     
     uint32_t GetSize()
@@ -541,83 +624,220 @@ struct VP8PayloadHeader
         return isKeyFrame ? 10 : 3;
     }
     
-//    void Dump()
-//    {
-//        Debug("[VP8PayloadHeader \n");
-//        Debug("\t isKeyFrame=%d\n"        , isKeyFrame);
-//        Debug("\t version=%d\n"            , version);
-//        Debug("\t showFrame=%d\n"        , showFrame);
-//        Debug("\t firtPartitionSize=%d\n"    , firstPartitionSize);
-//        if (isKeyFrame)
-//        {
-//            Debug("\t width=%d\n"        , width);
-//            Debug("\t horizontalScale=%d\n"    , horizontalScale);
-//            Debug("\t height=%d\n"        , height);
-//            Debug("\t verticalScale=%d\n"    , verticalScale);
-//        }
-//        Debug("/]\n");
-//    }
+    virtual inline NObjDumper& dump(NObjDumper& dumper) const override{
+        dumper.objB();
+        dumper.kv("kfrm", (unsigned)isKeyFrame);
+        dumper.kv("ver", (unsigned)version);
+        dumper.kv("show", (unsigned)showFrame);
+        dumper.kv("part0SZ", (unsigned)firstPartitionSize);
+        if(isKeyFrame){
+            dumper.kv("w", (unsigned)videoSize.width);
+            if(horizontalScale != 0){
+                dumper.kv("scaleH", (unsigned)horizontalScale);
+            }
+            dumper.kv("h", (unsigned)videoSize.height);
+            if(verticalScale != 0){
+                dumper.kv("scaleV", (unsigned)verticalScale);
+            }
+        }
+        dumper.objE();
+        return dumper;
+    }
 };
 
-class NRTPDepackVP8{
+class NVP8Frame : public NVideoFrame{
 public:
-    DECLARE_CLASS_ENUM(State,
-                       kNotFirst = -4,
-                       kDisorder = -3,
-                       kDescriptorSize = -2,
-                       kZeroLength = -1,
-                       kNoError = 0,
-                       kComplete,
-                       );
-    
+    class Pool : public NPool<NVP8Frame, NMediaFrame>{
+        
+    };
 public:
-    NRTPDepackVP8():frame_(NCodec::VP8){}
-    virtual ~NRTPDepackVP8(){}
-
-    virtual int AddPacket(const NRTPData& rtpd) {
-        NVP8PLDescriptor desc;
-        return AddPacketVP8(rtpd, desc);
+    NVP8Frame() : NVideoFrame(NCodec::VP8){
+        
     }
     
-    virtual int AddPacketVP8(const NRTPData& rtpd, NVP8PLDescriptor &desc) {
-        //Check lenght
-        if (!rtpd.payloadLen){
-            return kZeroLength;
-        }
-        
-        // Check new frame
-        if(frame_.getTime() != rtpd.header.timestamp){
-            firstPacket_ = true;
-            frame_.SetSize(0);
-        }
-        
-        if(firstPacket_){
-            firtTimeMS_ = rtpd.timeMS;
-            frame_.setTime(rtpd.header.timestamp);
-            nextSeq_ = rtpd.header.sequenceNumber;
-        }
-        
-        if(nextSeq_ != rtpd.header.sequenceNumber){
-            return kDisorder;
-        }
+    virtual bool isKeyframe() const override{
+        return vp8Header_.isKeyFrame;
+    }
+    
+    virtual const NVideoSize& videoSize() const override{
+        return vp8Header_.videoSize;
+    }
+//    virtual int width() const override{
+//        return vp8Header_.width;
+//    }
+//
+//    virtual int height() const override{
+//        return vp8Header_.height;
+//    }
+    
+    const VP8PayloadHeader& getHeader() const{
+        return vp8Header_;
+    }
+    
+    void setHeader(const VP8PayloadHeader &header){
+        vp8Header_ = header;
+    }
+    
+private:
+    VP8PayloadHeader vp8Header_;
+};
 
-        if(rtpd.codecType == NCodec::VP8){
-            // Decode payload descriptr
-            auto descLen = desc.Parse(rtpd.payloadPtr, (uint32_t)rtpd.payloadLen);
-            
-            // Check size
-            if (!descLen || rtpd.payloadLen < descLen){
-                return kDescriptorSize;
+
+#define NRTPDEPACK_NO_ERROR 0
+#define NRTPDEPACK_COMPLETE 1
+class NRTPDepacker : public NObjDumper::Dumpable{
+public:
+    DECLARE_CLASS_ENUM(ErrorCode,
+                       kNoError = NRTPDEPACK_NO_ERROR,
+                       kComplete = NRTPDEPACK_COMPLETE,
+                       );
+    typedef std::function<void(NMediaFrame::Unique& frame)> FrameFunc;
+    
+    NRTPDepacker() {
+    }
+    
+    virtual ~NRTPDepacker(){
+    }
+    
+    virtual const char * getErrorStr(int errorCode) const {
+        return getNameForErrorCode((ErrorCode)errorCode).c_str();
+    }
+    
+    virtual const NRTPSeq& nextSeq() const{
+        return nextSeq_;
+    }
+    
+    virtual int64_t firstTimeMS() const{
+        return firtTimeMS_;
+    }
+    
+    virtual int depack(const NRTPData& rtpd, bool add_payload, const FrameFunc& func) = 0;
+    
+    virtual int nextDecodable(const NRTPData& rtpd) = 0;
+    
+public:
+    static NRTPDepacker* CreateDepacker(const NRTPCodec * codec);
+    
+protected:
+    bool                startPhase_     = true;
+    int64_t             firtTimeMS_     = 0;
+    NRTPSeq             nextSeq_        = 0u;
+
+};
+
+class NRTPDepackVP8 : public NRTPDepacker{
+public:
+    DECLARE_CLASS_ENUM(ErrorCode,
+                       kErrorTimestamp = -7,
+                       kNoPictureID = -6,
+                       kNotDecodable = -5,
+                       kNotFirst = -4,
+                       kPictureDisorder = -3,
+                       kSeqDisorder = -3,
+                       kErrorHeaderSize = -2,
+                       kErrorDescriptorSize = -2,
+                       kZeroLength = -1,
+                       kNoError = NRTPDEPACK_NO_ERROR,
+                       kComplete = NRTPDEPACK_COMPLETE,
+                       );
+    const int16_t kNoPictureId = -1;
+public:
+    NRTPDepackVP8(std::shared_ptr<NVP8Frame::Pool>& pool)
+    :NRTPDepacker(),
+    pool_(pool),
+    frame_(pool_->get())
+    {
+        frame_->Clear();
+    }
+    
+    virtual ~NRTPDepackVP8(){
+    }
+    
+    virtual const char * getErrorStr(int errorCode) const override{
+        return getNameForErrorCode((ErrorCode)errorCode).c_str();
+    }
+    
+    virtual int depack(const NRTPData& rtpd, bool add_payload, const FrameFunc& func) override{
+        ErrorCode state = (ErrorCode) nextDecodable(rtpd);
+        if(state < 0){
+            expectKeyFrame_ = true;
+            return state;
+        }
+        
+        expectKeyFrame_ = false;
+        
+        if(descLen_ > 0){
+            if(add_payload){
+                frame_->AppendData(rtpd.payloadPtr+descLen_, rtpd.payloadLen-descLen_);
             }
+            if(firstPacket_){
+                firtTimeMS_ = rtpd.timeMS;
+                frame_->setTime(rtpd.header.timestamp);
+                firstPacket_ = false;
+            }
+            startPhase_ = false;
+        }
+        
+        nextSeq_ = NRTPSeq(rtpd.header.sequenceNumber) + 1;
+        
+        if(rtpd.header.mark){
+            firstPacket_ = true;
+            frame_->setCodecType(NCodec::VP8, NMedia::Video);
+            NVP8Frame * vp8_frame = (NVP8Frame *) frame_.get();
+            vp8_frame->setHeader(this->vp8header_);
             
-            if(firstPacket_ && (!desc.startOfPartition || desc.partitionIndex != 0)){
+            func(frame_);
+            
+            if(!frame_){
+                frame_ = pool_->get();
+            }else{
+                frame_->Clear();
+            }
+            return kComplete;
+        }else{
+            return kNoError;
+        }
+    }
+    
+    
+    // TODO: aaa add TLayer support
+    virtual int nextDecodable(const NRTPData& rtpd) override{
+        ErrorCode state = (ErrorCode) parsePacket(rtpd);
+        if(state < 0) return state;
+        
+        if(!expectKeyFrame_){
+            state = (ErrorCode)continuousPacket(rtpd);
+            if(state < 0){
+                return state;
+            }
+        }else{
+            if(descLen_ == 0 || !vp8desc_.startOfPartition || vp8desc_.partitionIndex != 0){
                 return kNotFirst;
             }
             
-            frame_.AppendData(rtpd.payloadPtr+descLen, rtpd.payloadLen-descLen);
+            if(!vp8header_.isKeyFrame){
+                return kNotDecodable;
+            }
         }
-
-        nextSeq_ = nextSeq_+1;
+        return kNoError;
+    }
+    
+    int addContinuousPacket(const NRTPData& rtpd, bool add_payload = true){
+        ErrorCode state = (ErrorCode) parsePacket(rtpd);
+        if(state < 0) return state;
+        
+        state = (ErrorCode)continuousPacket(rtpd);
+        if(state < 0){
+            return state;
+        }
+        
+        if(descLen_ > 0 && add_payload){
+            frame_->AppendData(rtpd.payloadPtr+descLen_, rtpd.payloadLen-descLen_);
+        }
+        
+        startPhase_ = false;
+        nextSeq_ = NRTPSeq(rtpd.header.sequenceNumber) + 1;
+        frame_->setTime(rtpd.header.timestamp);
         
         if(rtpd.header.mark){
             firstPacket_ = true;
@@ -628,23 +848,156 @@ public:
         }
     }
     
-    virtual NMediaFrame* getFrame() {
-        return &frame_;
+    int parsePacket(const NRTPData& rtpd){
+        descLen_ = 0;
+        headerLen_ = 0;
+        
+        // check lenght
+        if (!rtpd.payloadLen){
+            return kZeroLength;
+        }
+        
+        if(rtpd.codecType == NCodec::VP8){
+            // decode payload descriptr
+            descLen_ = vp8desc_.Parse(rtpd.payloadPtr, (uint32_t)rtpd.payloadLen);
+            // check size
+            if (!descLen_ || rtpd.payloadLen < descLen_){
+                descLen_ = 0;
+                return kErrorDescriptorSize;
+            }
+            
+            if(vp8desc_.startOfPartition && vp8desc_.partitionIndex == 0){
+                headerLen_ = (size_t)vp8header_.Parse(rtpd.payloadPtr+descLen_,
+                                                      (uint32_t) (rtpd.payloadLen-descLen_));
+                if(!headerLen_){
+                    return kErrorHeaderSize;
+                }
+            }
+        }
+        return kNoError;
     }
     
-    virtual const NRTPSeq& nextSeq() const {
-        return nextSeq_;
+    int continuousPacket(const NRTPData& rtpd){
+        if(rtpd.codecType != NCodec::VP8){
+            if(startPhase_){
+                return kNotFirst;
+            }
+            return continuousSeq(rtpd);
+        }
+        
+        if(frame_->getTime() != rtpd.header.timestamp){
+            if(!firstPacket_){
+                return kErrorTimestamp;
+            }
+            frame_->Clear();
+        }
+        
+        if(firstPacket_ && (!vp8desc_.startOfPartition || vp8desc_.partitionIndex != 0)){
+            return kNotFirst;
+        }
+        
+        if(lastPicId_ == kNoPictureId){
+            return continuousSeq(rtpd);
+        }
+        
+        // here lastPicId_ exist
+        
+        if(!vp8desc_.pictureIdPresent){
+            return kNoPictureID;
+        }
+        
+        return continuousPictureId(vp8desc_.pictureId);
     }
     
-    int64_t firtTimeMS() const{
-        return firtTimeMS_;
+    int continuousPictureId(int picture_id) const {
+        int next_picture_id = lastPicId_ + 1;
+        if (picture_id < lastPicId_) {
+            // Wrap
+            if (lastPicId_ >= 0x80) {
+                // 15 bits used for picture id
+                if((next_picture_id & 0x7FFF) == picture_id){
+                    return kNoError;
+                }
+            } else {
+                // 7 bits used for picture id
+                if((next_picture_id & 0x7F) == picture_id){
+                    return kNoError;
+                }
+            }
+        }else {
+            // No wrap
+            if(next_picture_id == picture_id){
+                return kNoError;
+            }
+        }
+        
+        return kPictureDisorder;
+    }
+    
+    int continuousSeq(const NRTPData& rtpd){
+        return (startPhase_ || nextSeq_ == rtpd.header.sequenceNumber) ?
+        kNoError : kSeqDisorder;
+    }
+    
+    virtual inline NObjDumper& dump(NObjDumper& dumper) const override{
+        dumper.objB();
+        dumper.kv("needkey", (unsigned)expectKeyFrame_);
+        if(descLen_ > 0){
+            dumper.dump("desc", vp8desc_);
+        }
+        
+        if(headerLen_ > 0){
+            dumper.dump("hdr", vp8header_);
+        }
+        
+        dumper.objE();
+        return dumper;
+    }
+    
+    static
+    void dump_vp8_frame(uint8_t * frameData, size_t frameSize, NLogger::shared& logger){
+        uint8_t firstByte = frameData[0];
+        int frmtype = (firstByte >> 0 & 0x1);
+        int ver = firstByte >> 1 & 0x7;
+        int disp = (firstByte >> 4 & 0x1) ;
+        int part1Len = (((firstByte >> 5) & 0x7) << 0) | (frameData[1] << 3) | (frameData[2] << 11);
+        logger->info("  frame: type={}, ver={}, disp={}, part1={}", frmtype, ver, disp, part1Len);
+        if(frmtype == 0){
+            // startcode=[9d 01 2a]
+            // Horizontal 16 bits      :     (2 bits Horizontal Scale << 14) | Width (14 bits)
+            // Vertical   16 bits      :     (2 bits Vertical Scale << 14) | Height (14 bits)
+            uint8_t * ptr = frameData + 3;
+            uint16_t wordH = ptr[4] << 8 | ptr[3];
+            uint16_t wordV = ptr[6] << 8 | ptr[5];
+            int scaleH = (wordH >> 14) & 0x3;
+            int width = wordH & 0x3FFF;
+            int scaleV = (wordV >> 14) & 0x3;
+            int height = wordV & 0x3FFF;
+            
+            uint8_t * part1Data = (frameData+10);
+            int color = part1Data[0] & 0x1;
+            int pixel = (part1Data[0]>>1) & 0x1;
+            
+            logger->info(
+                         //"         startcode=[%02x %02x %02x], horiz=[%d, %d], vert=[%d, %d], color=%d, pixel=%d"
+                         "         startcode=[{:02x} {:02x} {:02x}], horiz=[{}, {}], vert=[{}, {}], color={}, pixel={}"
+                         , ptr[0], ptr[1], ptr[2]
+                         , scaleH, width, scaleV, height
+                         , color, pixel);
+        }
+        
     }
     
 private:
-    bool            firstPacket_    = true;
-    int64_t         firtTimeMS_ = 0;
-    NRTPSeq         nextSeq_        = 0u;
-    NVideoFrame     frame_;
+    std::shared_ptr<NVP8Frame::Pool> pool_;
+    NMediaFrame::Unique frame_;
+    bool                expectKeyFrame_ = true;
+    bool                firstPacket_    = true;
+    NVP8PLDescriptor    vp8desc_;
+    VP8PayloadHeader    vp8header_;
+    size_t              descLen_ = 0;
+    size_t              headerLen_ = 0;
+    int                 lastPicId_ = kNoPictureId;
 };
 
 
@@ -715,7 +1068,7 @@ private:
                     continue;
                 }
                 
-                auto flow = new NRTPIncomingFlow(media.type == NMedia::Video);
+                auto flow = new NRTPIncomingFlow(true);
                 flow->index = this->flowIndex_++;
                 flow->type = media.type;
                 sourceGroupFlows.emplace_back(flow);
@@ -727,7 +1080,7 @@ private:
             } // for media.ssrcGroups
             
             // media flow
-            auto mflow = new NRTPIncomingFlow(media.type == NMedia::Video);
+            auto mflow = new NRTPIncomingFlow(true);
             mflow->index = this->flowIndex_++;
             mflow->type = media.type;
             mediaFlows.emplace_back(mflow);
@@ -921,6 +1274,10 @@ public:
                                NObjDumperLog(*logger_, NLogger::Level::debug).dump("demux RTP", *info);
                                if(inflow->packetWin.capacity() > 0){
                                    inflow->packetWin.insertPacket(*info->rtpd, *detail.codec);
+                               }
+                               if(!inflow->mainCodec && info->codec->isNative()){
+                                   // TODO: remove cast
+                                   inflow->mainCodec = info->codec;
                                }
                                func(info);
                            });

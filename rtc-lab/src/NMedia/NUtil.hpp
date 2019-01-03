@@ -416,6 +416,11 @@ public:
         data[i]   = (uint8_t)(val>>56);
     }
     
+    static inline uint16_t le_get2(const uint8_t *data,size_t i) {
+        return (uint16_t)(data[i+0])
+        | ((uint16_t)(data[i+1]))<<8;
+    }
+    
     static inline uint32_t le_get4(const uint8_t *data,size_t i) {
         return (uint32_t)(data[i+0])
         | ((uint32_t)(data[i+1]))<<8
@@ -501,8 +506,102 @@ enum E                              \
 
 
 
+// see https://swarminglogic.com/jotting/2015_05_smartpool
+template <class T, class D = std::default_delete<T>>
+class NObjectPool
+{
+private:
+    using PoolType = NObjectPool<T, D>;
+    struct ReturnToPool_Deleter {
+        explicit ReturnToPool_Deleter(std::weak_ptr<PoolType* > pool)
+        : pool_(pool) {}
+        
+        void operator()(T* ptr) {
+            if (auto pool_ptr = pool_.lock()){
+                (*pool_ptr.get())->put(std::unique_ptr<T, D>{ptr});
+            }else{
+                D{}(ptr);
+            }
+            
+        }
+    private:
+        std::weak_ptr<PoolType* > pool_;
+    };
+    
+public:
+    using Unique = std::unique_ptr<T, ReturnToPool_Deleter >;
+    using CreateType = std::function<T *()>;
+    
+    static inline Unique MakeNullPtr(){
+        return Unique(nullptr,
+                      ReturnToPool_Deleter{
+                          std::weak_ptr<PoolType*>{std::shared_ptr<PoolType* >(nullptr)}});
+    }
+public:
+    NObjectPool()
+    : this_ptr_(new PoolType*(this)) {}
+    NObjectPool(const CreateType& creator)
+    : this_ptr_(new PoolType*(this)), creator_(creator) {}
+    
+    virtual ~NObjectPool(){}
+    
+    void put(std::unique_ptr<T, D> t) {
+        pool_.push(std::move(t));
+    }
+    
+    Unique get() {
+        if (pool_.empty()){
+            auto t = std::unique_ptr<T>(creator_());
+            pool_.push(std::move(t));
+        }
+        
+        Unique tmp(pool_.top().release(),
+                   ReturnToPool_Deleter{
+                       std::weak_ptr<PoolType*>{this_ptr_}});
+        pool_.pop();
+        return std::move(tmp);
+    }
+    
+    bool empty() const {
+        return pool_.empty();
+    }
+    
+    size_t size() const {
+        return pool_.size();
+    }
+    
+private:
+    std::shared_ptr<PoolType* > this_ptr_;
+    std::stack<std::unique_ptr<T, D> > pool_;
+    const CreateType creator_ = []()->T *{
+        return new T();
+    };
+};
 
+template <class T, class BaseType=T>
+class NPool : public NObjectPool<BaseType>{
+public:
+    using Parent = NObjectPool<BaseType>;
+public:
+    NPool():NObjectPool<BaseType>([]()->BaseType*{
+        return new T();
+    }){};
+};
 
+class NError{
+public:
+    NError(int errcode, const char *errstr)
+    : errcode_(errcode), errstr_(errstr){
+    }
+    NError(int errcode, const std::string &errstr)
+    : errcode_(errcode), errstr_(errstr){
+    }
+    int code()const { return errcode_;}
+    const std::string& str()const { return errstr_;}
+private:
+    int errcode_;
+    const std::string errstr_;
+};
 
 
 #endif /* NUtil_hpp */

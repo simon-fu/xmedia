@@ -104,3 +104,87 @@ int NUtil::ReadTLV(FILE *fp, unsigned char *buf, size_t bufsize, size_t *plength
     } while (0);
     return ret;
 }
+
+
+
+
+
+// TODO: remove 
+class A1{
+public:
+    DECLARE_CLASS_ENUM(Type,
+                       T1,
+                       T2,
+                       T3,
+                       Unknown
+                       );
+public:
+    virtual ~A1(){
+        std::cout << "(" << (void *)this << ") " << "bye A1" << std::endl;
+    }
+    
+    virtual Type getType() const{
+        return T1;
+    }
+    
+    virtual void print() const{
+        std::cout << "(" << (void *)this << ") " << "hello A1" << std::endl;
+    }
+    
+};
+
+class A2 : public A1{
+public:
+    virtual ~A2(){
+        std::cout << "(" << (void *)this << ") " << "bye A2" << std::endl;
+    }
+    
+    virtual Type getType() const override{
+        return T2;
+    }
+    
+    virtual void print() const override{
+        std::cout << "(" << (void *)this << ") " << "hello A2" << std::endl;
+    }
+    
+    void sayMorning() const{
+        std::cout << "(" << (void *)this << ") " << "morning A2" << std::endl;
+    }
+};
+
+class A3 : public A2{
+public:
+    virtual ~A3(){
+        std::cout << "(" << (void *)this << ") " << "bye A3" << std::endl;
+    }
+    
+    virtual Type getType() const override{
+        return T3;
+    }
+    virtual void print() const override{
+        std::cout << "(" << (void *)this << ") " << "hello A3" << std::endl;
+    }
+    
+};
+
+
+int test_pool(){
+    using APtr = NObjectPool<A1>::Unique;
+    APtr a3 = NObjectPool<A1>::MakeNullPtr();
+    {
+        NPool<A1>       pool1;
+        NPool<A2, A1>   pool2;
+        NPool<A3, A1>   pool3;
+        
+        APtr a1 = pool1.get();
+        APtr a2 = pool2.get();
+        a1->print();
+        a2->print();
+        A2 * aa = (A2 *) a2.get();
+        aa->sayMorning();
+        a3 = pool3.get();
+        a3->print();
+    }
+    return 0;
+}
+

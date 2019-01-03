@@ -8,6 +8,7 @@
 #define FMT_HEADER_ONLY
 #define FMT_STRING_ALIAS 1
 #include <spdlog/fmt/bundled/format.h>
+#include "spdlog/fmt/bundled/ostream.h"
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/stdout_sinks.h"
 #include "spdlog/fmt/bin_to_hex.h"

@@ -37,19 +37,20 @@ public:
 class NRTPPacketWindow : public NCircularVector<NRTPPacketSlot>{
 public:
     typedef NCircularVector<NRTPPacketSlot> Parent;
-    enum State {
-        kReachEmptySlot = -5,
-        kOutOfRange = -4,
-        kUnknownData = -3,
-        kDuplicatePacket = -2,
-        kOutOfDatePacket = -1,
-        kNoError = 0,
-        kFirstPacket ,
-        kPrepend,
-        kAppend,
-        kOutOfOrderReset,
-        kDisorderPacket,
-    };
+    DECLARE_CLASS_ENUM(State,
+                       kReachEmptySlot = -5,
+                       kOutOfRange = -4,
+                       kUnknownData = -3,
+                       kDuplicatePacket = -2,
+                       kOutOfDatePacket = -1,
+                       kNoError = 0,
+                       kFirstPacket ,
+                       kPrepend,
+                       //kAppend,
+                       kDiscontinuity,
+                       kOutOfOrderReset,
+                       kDisorderPacket,
+                       );
     
 public:
     NRTPPacketWindow(NCircularBufferSizeT cap = 128)
@@ -119,7 +120,8 @@ public:
     int traverseUntilEmpty (const NRTPSeq& from_seq
                             , const TraverseFuncT& func)  ;
     
-    NRTPPacketSlot* nextSlotInOrder();
+    //NRTPPacketSlot* nextSlotInOrder();
+    State nextSlotInOrder(NRTPPacketSlot* &slot);
     
 private:
     NRTPSeq startSeq_;

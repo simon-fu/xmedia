@@ -12,6 +12,7 @@ public:
     virtual ~NRTPFlow(){}
     int index = -1;
     NMedia::Type type = NMedia::Unknown;
+    const NRTPCodec * mainCodec = nullptr;
     std::set<uint32_t> ssrcs;
 };
 
@@ -58,11 +59,11 @@ public:
         
     }
     
-    const NRTPData * pullRTPInOrder(){
-        NRTPPacketSlot * slot = packetWin.nextSlotInOrder();
-        if(!slot) return nullptr;
-        return &slot->rtpd;
-    }
+//    const NRTPData * pullRTPInOrder(){
+//        NRTPPacketSlot * slot = packetWin.nextSlotInOrder();
+//        if(!slot) return nullptr;
+//        return &slot->rtpd;
+//    }
     
     NRTPUlpfecWindow packetWin;
     NRTPTime::RemoteNTP remoteNTP;

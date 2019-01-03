@@ -56,7 +56,7 @@ NRTPPacketWindow::State NRTPPacketWindow::insertPacket(const NRTPData& rtpd){
         auto num = circular.size() - abs_dist + 1;
         auto over_num = circular.shiftBack(num);
         startSeq_ = startSeq_ + over_num;
-        return checkPlaceSlot(rtpd, circular.back(), kAppend);
+        return checkPlaceSlot(rtpd, circular.back(), kDiscontinuity);
         
     }else {
         // too newer packet, never reach here
@@ -83,27 +83,28 @@ int NRTPPacketWindow::traverseUntilEmpty (const NRTPSeq& from_seq
                             });
 }
 
-NRTPPacketSlot* NRTPPacketWindow::nextSlotInOrder(){
+NRTPPacketWindow::State NRTPPacketWindow::nextSlotInOrder(NRTPPacketSlot* &slot){
     auto dist = startSeq_.distance(nextSeq_);
     if(dist >= this->size()){
         // no expect packet
-        return nullptr;
+        return kReachEmptySlot;
     }
     
+    State state = kNoError;
     if(dist < 0){
         // out of date, reset to start seq
         nextSeq_ = startSeq_;
+        dist = 0;
+        state = kDiscontinuity;
     }
     
-    NRTPPacketSlot& slot = (*this)[dist];
-    if(!slot.valid(nextSeq_.value())){
-        return nullptr;
+    slot = &(*this)[dist];
+    if(!slot->valid(nextSeq_.value())){
+        return kReachEmptySlot;
     }
     nextSeq_ = nextSeq_ + 1;
-    return &slot;
+    return state;
 }
-
-
 
 
 size_t NULPFecData::parse(const uint8_t* data, size_t size) {

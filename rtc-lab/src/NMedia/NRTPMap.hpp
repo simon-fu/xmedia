@@ -236,6 +236,20 @@ public:
     
 };// class NCodec
 
+class NVideoSize{
+public:
+    NVideoSize():NVideoSize(0,0){}
+    NVideoSize(int w, int h):width(w), height(h){}
+
+    friend inline std::ostream& operator<<(std::ostream& out, const NVideoSize& obj){
+        out << obj.width << "x" << obj.height;
+        return out;
+    }
+    
+    int width;
+    int height;
+};
+
 class NRTPHeaderExtension{
 public:
     enum Type {

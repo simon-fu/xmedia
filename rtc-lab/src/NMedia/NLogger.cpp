@@ -99,4 +99,40 @@ int NObjDumperTester::test(){
 }
 
 
+int test_logger(){
+    auto console = spdlog::stdout_logger_mt("console");
+    console->info("Welcome to spdlog!");
+    console->info("logger: spdlog-{}.{}.{}", SPDLOG_VER_MAJOR, SPDLOG_VER_MINOR, SPDLOG_VER_PATCH);
+    
+    std::array<char, 40> buf;
+    for(size_t i = 0; i < buf.size(); ++i){
+        buf[i] = i;
+    }
+    //console->info("Binary example: {}", spdlog::to_hex(buf));
+    for(size_t i = 0; i < buf.size(); ){
+        auto len = std::min((size_t)16, buf.size()-i);
+        //console->info("Another binary example:{:n}", spdlog::to_hex(std::begin(buf)+i, std::begin(buf) + i+len));
+        console->info("Another binary example:{}", spdlog::to_hex(std::begin(buf)+i, std::begin(buf) + i+len));
+        i+=len;
+    }
+    
+    int i = 0;
+    fmt::memory_buffer raw;
+    fmt::format_to(raw, "i1={}", i);
+    fmt::format_to(raw, ",i2={}{{", i);
+    char c = 'c';
+    raw.append(&c, (&c)+1);
+    
+    //std::string s1 = format(fmt("{}"), 42);  // good
+    //std::string s2 = format(fmt("{2}"), 42); // error
+    //std::string s3 = format(fmt("{"), 42); // error
+    
+    console->log(spdlog::level::info, raw.data());
+    raw.clear();
+    fmt::format_to(raw, "n={}", 10);
+    c = '\0';
+    raw.append(&c, (&c)+1);
+    console->log(spdlog::level::info, raw.data());
+    return 0;
+}
 
