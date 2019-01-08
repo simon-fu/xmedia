@@ -121,7 +121,7 @@ public:
                             , const TraverseFuncT& func)  ;
     
     //NRTPPacketSlot* nextSlotInOrder();
-    State nextSlotInOrder(NRTPPacketSlot* &slot);
+    State nextSlotInOrder(NRTPPacketSlot* &slot, bool skip_empty = false);
     
 private:
     NRTPSeq startSeq_;

@@ -28,6 +28,8 @@
 		F42A9F08218018260081FA34 /* Lab034-EVRTMPPush.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F42A9F07218018260081FA34 /* Lab034-EVRTMPPush.cpp */; };
 		F44A0619216F7D9E00599788 /* srs_librtmp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44A0618216F7D9D00599788 /* srs_librtmp.cpp */; };
 		F44A061C216F7E1700599788 /* Lab030-RTMPPush.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F44A061B216F7E1700599788 /* Lab030-RTMPPush.cpp */; };
+		F464B59A21DE0730004537CB /* rav_record.cc in Sources */ = {isa = PBXBuildFile; fileRef = F464B59921DE072F004537CB /* rav_record.cc */; };
+		F464B59D21DE1AE9004537CB /* Lab050-FFPlayer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F464B59B21DE1AE9004537CB /* Lab050-FFPlayer.cpp */; };
 		F46FDCA421BBD1B800EC45FE /* NRTCPPacket.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F46FDCA221BBD1B800EC45FE /* NRTCPPacket.cpp */; };
 		F46FDD1621C79AFD00EC45FE /* NRTPTime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F46FDD1421C79AFD00EC45FE /* NRTPTime.cpp */; };
 		F46FDD1921C79D9300EC45FE /* NLogger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F46FDD1721C79D9300EC45FE /* NLogger.cpp */; };
@@ -152,6 +154,10 @@
 		F44A0618216F7D9D00599788 /* srs_librtmp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = srs_librtmp.cpp; sourceTree = "<group>"; };
 		F44A061A216F7E1700599788 /* Lab030-RTMPPush.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = "Lab030-RTMPPush.hpp"; sourceTree = "<group>"; };
 		F44A061B216F7E1700599788 /* Lab030-RTMPPush.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = "Lab030-RTMPPush.cpp"; sourceTree = "<group>"; };
+		F464B59821DE072F004537CB /* rav_record.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = rav_record.h; sourceTree = "<group>"; };
+		F464B59921DE072F004537CB /* rav_record.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = rav_record.cc; sourceTree = "<group>"; };
+		F464B59B21DE1AE9004537CB /* Lab050-FFPlayer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = "Lab050-FFPlayer.cpp"; sourceTree = "<group>"; };
+		F464B59C21DE1AE9004537CB /* Lab050-FFPlayer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = "Lab050-FFPlayer.hpp"; sourceTree = "<group>"; };
 		F46FDCA221BBD1B800EC45FE /* NRTCPPacket.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NRTCPPacket.cpp; sourceTree = "<group>"; };
 		F46FDCA321BBD1B800EC45FE /* NRTCPPacket.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NRTCPPacket.hpp; sourceTree = "<group>"; };
 		F46FDCDE21BFEE8500EC45FE /* version.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = version.h; sourceTree = "<group>"; };
@@ -544,8 +550,6 @@
 		F4AA9BC32107453E009F11DE /* src */ = {
 			isa = PBXGroup;
 			children = (
-				F46FDCDD21BFEE8500EC45FE /* spdlog */,
-				F4FF95DD21A2E7360005A1BE /* NMedia */,
 				F42A9E8B2179DA0E0081FA34 /* branch_stream */,
 				F42A9E7D217719E50081FA34 /* ev_socket */,
 				F49B1D712116AF4C008CF7A8 /* FFMpegFramework.cpp */,
@@ -564,19 +568,25 @@
 				F42A9EB6217DB7E00081FA34 /* Lab040-BStreamDump.hpp */,
 				F42A9EB8217DB7E00081FA34 /* Lab041-BStreamTLVPlayer.cpp */,
 				F42A9EB7217DB7E00081FA34 /* Lab041-BStreamTLVPlayer.hpp */,
+				F464B59B21DE1AE9004537CB /* Lab050-FFPlayer.cpp */,
+				F464B59C21DE1AE9004537CB /* Lab050-FFPlayer.hpp */,
 				F42A9EE9218017080081FA34 /* libevrtmp */,
+				F4FF95DD21A2E7360005A1BE /* NMedia */,
 				F42A9E8F2179DC670081FA34 /* rapidjson */,
+				F464B59921DE072F004537CB /* rav_record.cc */,
+				F464B59821DE072F004537CB /* rav_record.h */,
 				F49B1D6A211030A5008CF7A8 /* rbf.hpp */,
 				F49B1D6E21105F72008CF7A8 /* SDL_stb */,
 				F49B1D6421100AAA008CF7A8 /* SDLFramework.cpp */,
 				F49B1D6521100AAA008CF7A8 /* SDLFramework.hpp */,
+				F46FDCDD21BFEE8500EC45FE /* spdlog */,
 				F44A0616216F7D9D00599788 /* srs_librtmp */,
 				F49B1D6B21103E4E008CF7A8 /* stb */,
+				F4D5B75E21BA311E00BD2A64 /* VP8Framework.cpp */,
+				F4D5B75F21BA311E00BD2A64 /* VP8Framework.hpp */,
 				F42A9EBC218015100081FA34 /* xsrc */,
 				F42A9E882179BB5D0081FA34 /* xtlv_file.cpp */,
 				F42A9E892179BB5D0081FA34 /* xtlv_file.h */,
-				F4D5B75E21BA311E00BD2A64 /* VP8Framework.cpp */,
-				F4D5B75F21BA311E00BD2A64 /* VP8Framework.hpp */,
 			);
 			name = src;
 			path = ../src;
@@ -694,7 +704,9 @@
 				F49B1D722116AF4C008CF7A8 /* FFMpegFramework.cpp in Sources */,
 				F4D5B76021BA311E00BD2A64 /* VP8Framework.cpp in Sources */,
 				F42A9EBB217DB7E00081FA34 /* Lab040-BStreamDump.cpp in Sources */,
+				F464B59D21DE1AE9004537CB /* Lab050-FFPlayer.cpp in Sources */,
 				F46FDD1F21C79FF000EC45FE /* NRTPPacketWindow.cpp in Sources */,
+				F464B59A21DE0730004537CB /* rav_record.cc in Sources */,
 				F42A9E7C217715BD0081FA34 /* Lab000-Demo.cpp in Sources */,
 				F42A9F04218017090081FA34 /* parseurl.c in Sources */,
 				F42A9F08218018260081FA34 /* Lab034-EVRTMPPush.cpp in Sources */,

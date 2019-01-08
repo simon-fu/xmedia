@@ -365,6 +365,10 @@ public:
         return SDL_QueueAudio(devId_, sampleData, sampleCount*sizeof(int16_t));
     }
     
+    int queueSamples(uint8_t sampleData[], int sampleCount){
+        return SDL_QueueAudio(devId_, sampleData, sampleCount);
+    }
+    
     int64_t getRemainTimeMs(){
         uint32_t remains = SDL_GetQueuedAudioSize(devId_);
         return this->getTimeMsOfSamples(remains/sizeof(int16_t)/this->getChannels());

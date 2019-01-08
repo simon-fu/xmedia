@@ -83,26 +83,35 @@ int NRTPPacketWindow::traverseUntilEmpty (const NRTPSeq& from_seq
                             });
 }
 
-NRTPPacketWindow::State NRTPPacketWindow::nextSlotInOrder(NRTPPacketSlot* &slot){
-    auto dist = startSeq_.distance(nextSeq_);
-    if(dist >= this->size()){
-        // no expect packet
-        return kReachEmptySlot;
-    }
-    
+NRTPPacketWindow::State NRTPPacketWindow::nextSlotInOrder(NRTPPacketSlot* &slot, bool skip_empty){
     State state = kNoError;
-    if(dist < 0){
-        // out of date, reset to start seq
-        nextSeq_ = startSeq_;
-        dist = 0;
-        state = kDiscontinuity;
+    while(true){
+        auto dist = startSeq_.distance(nextSeq_);
+        if(dist >= this->size()){
+            // no expect packet
+            return kOutOfRange;
+        }
+        
+        if(dist < 0){
+            // out of date, reset to start seq
+            nextSeq_ = startSeq_;
+            dist = 0;
+            state = kDiscontinuity;
+        }
+        
+        slot = &(*this)[dist];
+        if(!slot->valid(nextSeq_.value())){
+            if(!skip_empty){
+                return kReachEmptySlot;
+            }
+            state = kDiscontinuity;
+            nextSeq_ = nextSeq_ + 1;
+        }else{
+            nextSeq_ = nextSeq_ + 1;
+            return state;
+        }
+        state = kReachEmptySlot;
     }
-    
-    slot = &(*this)[dist];
-    if(!slot->valid(nextSeq_.value())){
-        return kReachEmptySlot;
-    }
-    nextSeq_ = nextSeq_ + 1;
     return state;
 }
 

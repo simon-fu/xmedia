@@ -159,7 +159,9 @@ protected:
 class NMediaFrame : public NBuffer<uint8_t>{
 public:
     using Unique = NObjectPool<NMediaFrame>::Unique;
-    
+    static inline Unique MakeNullPtr(){
+        return NObjectPool<NMediaFrame>::MakeNullPtr();
+    }
 public:
 
     NMediaFrame(size_t capacity, size_t step_capacity=1024

@@ -152,9 +152,11 @@ public:
                 frameSize_ = codecCtx_->frame_size;
             }
             
+            //AVSampleFormat origin_sample_fmt = (AVSampleFormat)param->format;
+            AVSampleFormat origin_sample_fmt = codecCtx_->sample_fmt;
             if(samplerate_ != param->sample_rate
                || channels_ != param->channels
-               || sampleFormat_ != (AVSampleFormat)param->format){
+               || sampleFormat_ != origin_sample_fmt){
                 
                 audioConverCtx_ = swr_alloc_set_opts(
                                                      NULL,
@@ -162,7 +164,7 @@ public:
                                                      sampleFormat_,
                                                      samplerate_,
                                                      av_get_default_channel_layout(param->channels),
-                                                     (AVSampleFormat)param->format,
+                                                     origin_sample_fmt,
                                                      param->sample_rate,
                                                      0, NULL);
                 
@@ -392,11 +394,14 @@ public:
         int ret = -1;
         do{
             formatCtx_ = avformat_alloc_context();
-            AVInputFormat *ifmt = av_find_input_format(containerFormat.c_str());
-            if(!ifmt){
-                //odbge("fail to find format [%s]", containerFormat.c_str());
-                ret = -11;
-                break;
+            AVInputFormat *ifmt = NULL;
+            if(!containerFormat.empty()){
+                av_find_input_format(containerFormat.c_str());
+                if(!ifmt){
+                    //odbge("fail to find format [%s]", containerFormat.c_str());
+                    ret = -11;
+                    break;
+                }
             }
             for(auto o : cantainerOpt){
                 av_dict_set(&containerDict_, o.first.c_str(), o.second.c_str(), 0);

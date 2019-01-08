@@ -16,9 +16,12 @@
 #include <iostream>
 
 
+#include "rav_record.h"
 #include "Lab010-VP8.hpp"
+#include "Lab050-FFPlayer.hpp"
 #include "VP8Framework.hpp"
 #include "SDLFramework.hpp"
+#include "FFMpegFramework.hpp"
 #include "NRTPMap.hpp"
 #include "NRTPReceiver.hpp"
 #include "Lab000-Demo.hpp"
@@ -340,310 +343,6 @@ struct TLVDecodeUser : public User {
 };
 
 
-//class XSWTLVPlayer1{
-//    class RecordFlow{
-//    public:
-//        RecordFlow(){
-//        }
-//        
-//        RecordFlow(RecordFlow &&other)
-//        :rtpFlow(other.rtpFlow)
-//        , decodeUser_(other.decodeUser_)
-//        , depacker(other.depacker){
-//            other.rtpFlow = nullptr;
-//            other.decodeUser_ = nullptr;
-//            other.depacker = nullptr;
-//        }
-//        
-//        RecordFlow(RecordFlow &other) = delete;
-//        
-//        virtual ~RecordFlow(){
-//            close();
-//        }
-//        
-//        NRTPIncomingFlow * rtpFlow = nullptr;
-//        NRTPTime rtptime;
-//        TLVDecodeUser * decodeUser_ = nullptr;
-//        int64_t lastPTS = -1;
-//        int64_t lastRenderTime = -1;
-//        NRTPDepacker * depacker = nullptr;
-//        
-//        int open(){
-//            close();
-//            decodeUser_ = new TLVDecodeUser("decode1", 640, 480, {1, 90000}, 0);
-//            int ret = decodeUser_->window_->open();
-//            if(ret){
-//                odbge("error: open decode windows, ret=%d", ret);
-//                return ret;
-//            }
-//            
-//            ret = decodeUser_->decoder_->open();
-//            if(ret){
-//                odbge("error: open decoder , ret=%d", ret);
-//                return ret;
-//            }
-//            
-//            return ret;
-//        }
-//        void close(){
-//            if(decodeUser_){
-//                delete decodeUser_;
-//                decodeUser_ = nullptr;
-//            }
-//            if(depacker){
-//                delete depacker;
-//                depacker = nullptr;
-//            }
-//        }
-//    };
-//    
-//    NSDP remoteSDP_;
-//    NRTPReceiver receiver_;
-//    std::vector<RecordFlow> flows_;
-//    int audioFlowIndex_ = -1;
-//    int64_t  firstTime_ = -1;
-//    
-//    const char * RAW_RTP_STR    = "  raw RTP   : ";
-//    const char * BIND_STR       = "  bind RTP  : ";
-//    const char * DEMUX_STR      = "  demux RTP : ";
-//    #define  RAW_RTCP_STR         "  raw RTCP  : "
-//    
-//public:
-////    XSWTLVPlayer1(){
-////        odbgi("flows_.size()={}", flows_.size());
-////        odbgi("flows_.capacity()={}", flows_.capacity());
-////    }
-//    
-//    
-//    static void dump(const NSDP& sdp){
-//        std::list<std::string> lines;
-//        sdp.dump("", lines);
-//        for(auto line : lines){
-//            odbgi("{}", line.c_str());
-//        }
-//    }
-//    
-//    void decode(RecordFlow& rec_flow, NMediaFrame * frame, const NRTPTime & rtptime){
-//        uint32_t rtpts = rtptime.rtpTimestamp();
-//        int64_t pts = NNtp::NTP2Milliseconds(rtptime.localNTP());
-//        if(rec_flow.lastRenderTime < 0){
-//            rec_flow.lastPTS = pts;
-//            rec_flow.lastRenderTime = NUtil::get_now_ms();
-//        }else{
-//            int64_t now_ms = NUtil::get_now_ms();
-//            int64_t elapsed = now_ms - rec_flow.lastRenderTime;
-//            int64_t duration = pts - rec_flow.lastPTS;
-//            if(duration > elapsed){
-//                NUtil::sleep_ms(duration-elapsed);
-//            }
-//            rec_flow.lastPTS = pts;
-//            rec_flow.lastRenderTime = now_ms;
-//        }
-//        
-//        int frameNo = 1;
-//        int layerId = 0;
-//        int ret = rec_flow.decodeUser_->decode(rtpts
-//                           , frame->data()
-//                           , frame->size()
-//                           , frameNo, layerId, false);
-//        SDL::FlushEvent();
-//        if(ret == 0){
-//            //NUtil::sleep_ms(33);
-//        }else{
-//            odbge("error: decode fail with {}", ret);
-//        }
-//    }
-//    
-//    void pullAndDecode(RecordFlow& rec_flow){
-//        if(!rec_flow.depacker){
-//            return;
-//        }
-//        
-//        //const NRTPData * rtpd = rec_flow.rtpFlow->pullRTPInOrder();
-//        NRTPPacketSlot * slot = nullptr;
-//        auto pullstate = rec_flow.rtpFlow->packetWin.nextSlotInOrder(slot);
-//        while(pullstate >= 0){
-//            const NRTPData * rtpd = &slot->rtpd;
-//            
-//            auto ret = rec_flow.depacker->depack(*rtpd, true,
-//                                                    [this, &rec_flow](NMediaFrame::Unique& frame){
-//                                                        //NRTPDepackVP8::dump_vp8_frame(frame->data(), frame->size(), main_logger);
-//                                                        auto& remoteNTP = rec_flow.rtpFlow->remoteNTP;
-//                                                        uint32_t rtpts = (uint32_t)frame->getTime();
-//                                                        uint64_t ntpts = remoteNTP.convert(rtpts, 90000);
-//                                                        uint64_t local_ntpts = rec_flow.rtptime.input(rec_flow.depacker->firstTimeMS(),
-//                                                                                                      rtpts,
-//                                                                                                      90000,
-//                                                                                                      ntpts);
-//                                                        int64_t diff = 0;
-//                                                        if(audioFlowIndex_ >= 0){
-//                                                            auto& audioFlow = flows_[audioFlowIndex_];
-//                                                            rec_flow.rtptime.estimate(audioFlow.rtptime, diff);
-//                                                        }
-//                                                        
-//                                                        odbgi("video ntpts: remote={}, local={}, est={}, diff_audio={}ms",
-//                                                              NNtp::toHuman2String(ntpts),
-//                                                              NNtp::toHuman2String(local_ntpts),
-//                                                              NNtp::toHuman2String(rec_flow.rtptime.localNTP()),
-//                                                              NNtp::DeltaNTP2Milliseconds(diff) );
-//                                                        this->decode(rec_flow, frame.get(), rec_flow.rtptime);
-//
-//                                                    });
-//            DUMPER().dump("pktmedia", *rec_flow.depacker);
-//            if(ret < 0){
-//                odbge("error VP8 packet with [{}]-[{}] =================", ret
-//                      , rec_flow.depacker->getErrorStr(ret));
-//            }else{
-//                if(ret == NRTPDepacker::kComplete){
-//                    //auto frame = rec_flow.depacker->getFrame();
-//
-//                }
-//            }
-//            //rtpd = rec_flow.rtpFlow->pullRTPInOrder();
-//            pullstate = rec_flow.rtpFlow->packetWin.nextSlotInOrder(slot);
-//        }
-//    }
-//    
-//    RecordFlow& checkFlow(NRTPIncomingFlow * rtp_flow, const NRTPReceiver::IncomingRTPInfo * info){
-//        // check add record flow
-//        while(flows_.size() <= rtp_flow->index){
-//            flows_.emplace_back();
-//        }
-//        RecordFlow& rec_flow = flows_[rtp_flow->index];
-//        if(!rec_flow.rtpFlow){
-//            odbgi("add flow [{}]-[{}]", rtp_flow->index, NMedia::GetNameFor(rtp_flow->type));
-//            rec_flow.rtpFlow = rtp_flow;
-//            
-//            if(rec_flow.rtpFlow->type == NMedia::Video){
-//                rec_flow.open();
-//            }else if(rec_flow.rtpFlow->type == NMedia::Audio){
-//                audioFlowIndex_ = rtp_flow->index;
-//            }
-//        }
-//        
-//        if(!rec_flow.depacker && rtp_flow->type == NMedia::Video && info->codec->isNative()){
-//            rec_flow.depacker = NRTPDepacker::CreateDepacker(info->codec);
-//        }
-//        
-//        return rec_flow;
-//    }
-//    
-//    int processRTP(int64_t&          recv_ts,
-//                   const uint8_t *   data_ptr,
-//                   size_t            data_len){
-//        
-//        RecordFlow * prec_flow = nullptr;
-//        
-//        int ret = receiver_.inputRTP(recv_ts, -1, data_ptr, data_len
-//                                 , [this, &prec_flow](const NRTPReceiver::IncomingRTPInfo * info){
-//                                     auto rtpd = info->rtpd;
-//                                     RecordFlow& rec_flow = checkFlow(info->flow, info);
-//                                     if(audioFlowIndex_ == rec_flow.rtpFlow->index){
-//                                         uint64_t remote_ntp = rec_flow.rtpFlow->remoteNTP.convert(rtpd->header.timestamp, info->codec->clockrate);
-//                                         rec_flow.rtptime.input(rtpd->timeMS,
-//                                                                rtpd->header.timestamp,
-//                                                                info->codec->clockrate,
-//                                                                remote_ntp);
-//                                     }
-//                                     prec_flow = &rec_flow;
-//                                 });
-//        if(prec_flow){
-//            if(prec_flow->decodeUser_){
-//                pullAndDecode(*prec_flow);
-//            }
-//        }
-//        return ret;
-//    }// processRTP
-//    
-//    int processRTCP(int64_t&          recv_ts,
-//                   const uint8_t *   data_ptr,
-//                   size_t            data_len){
-////        auto state = NRtcp::Parser::DumpPackets(data_ptr, data_len, DUMPER());
-////        if(state != NRtcp::Parser::kNoError){
-////            odbge("error RTCP with [{}]-[{}]", state, NRtcp::Parser::getNameForState(state).c_str());
-////        }
-//        return receiver_.inputRTCP(recv_ts, -1, data_ptr, data_len);
-//    }
-//    
-//    int onData(int64_t          packet_num,
-//              int               dtype,
-//              const uint8_t *   data_ptr,
-//              size_t            data_len){
-//        int ret = 0;
-//        if(dtype == TLV_TYPE_CODEC) {
-//            odbgi("packet[{}]: codec=[size={}]", packet_num, data_len);
-//            
-//        } else if(dtype == TLV_TYPE_SDP) {
-//            std::ostringstream oss;
-//            int ret = remoteSDP_.parse(data_ptr, data_len, oss);
-//            if(ret){
-//                //odbgi("packet[%lld]: SDP=[%.*s]", packet_num, (int)data_len, data_ptr);
-//                odbgi("packet[{}]: SDP=[{}]", packet_num, data_ptr);
-//                odbge("fail to parse remote SDP, ret=[{}]-[{}]", ret, oss.str().c_str());
-//            }else{
-//                odbgi("parsed remote SDP OK");
-//                dump(remoteSDP_);
-//                receiver_.setRemoteSDP(remoteSDP_);
-//            }
-//            
-//        } else if(dtype == TLV_TYPE_RTP) {
-//            if(data_len < 8){
-//                odbge("too short of RTP, size={}", data_len);
-//            }else{
-//                int64_t recv_ts = NUtil::get8(data_ptr, 0);
-//                if(firstTime_ < 0){
-//                    firstTime_ = recv_ts;
-//                }
-//                odbgi("packet[{}]: RTP=[time={}({} ms), size={}]", packet_num, recv_ts, recv_ts-firstTime_, data_len-8);
-//                processRTP(recv_ts, data_ptr+8, data_len-8);
-//            }
-//            
-//        } else if (dtype == TLV_TYPE_RTCP) {
-//            if(data_len < 8){
-//                odbge("too short of RTCP, size={}", data_len);
-//            }else{
-//                int64_t recv_ts = NUtil::get8(data_ptr, 0);
-//                if(firstTime_ < 0){
-//                    firstTime_ = recv_ts;
-//                }
-//                odbgi("packet[{}]: RTCP=[time={}({} ms), size={}]", packet_num
-//                      , recv_ts
-//                      , recv_ts-firstTime_
-//                      , data_len-8);
-//                processRTCP(recv_ts, data_ptr+8, data_len-8);
-//            }
-//            
-//        } else if (dtype == TLV_TYPE_END) {
-//            odbgi("packet[{}]: END", packet_num);
-//            return 0;
-//            
-//        } else {
-//            odbgi("packet[{}]: unknown type=[{}]", packet_num, dtype);
-//        }
-//        return ret;
-//    }
-//public:
-//    
-//    int play(const std::string& filename){
-//        
-//        std::ostringstream oss;
-//        int ret = TLVFile::process(filename, oss, [this]  (int64_t packet_num,
-//                                                       int dtype,
-//                                                       const uint8_t * data_ptr,
-//                                                       size_t  data_len
-//                                                       )-> int{
-//
-//            return this->onData(packet_num, dtype, data_ptr, data_len);
-//        });
-//        if(ret < 0){
-//            odbge("process tlv ret=[{}]-[{}]", ret, oss.str().c_str());
-//        }
-//        
-//        return ret;
-//    }
-//    
-//};
-
 
 class XSWTLVDemuxer{
 
@@ -669,6 +368,7 @@ public:
             }
         }
         
+        int64_t firstRecvTS = -1;
         NRTPIncomingFlow * rtpFlow = nullptr;
         NRTPDepacker * depacker = nullptr;
         NRTPTime rtptime;
@@ -676,7 +376,7 @@ public:
     
     typedef std::function<void(MediaFlow& mflow, NMediaFrame::Unique& frame)> FrameFunc;
     
-public:
+    const static int64_t flowBufferDurationMS = 1500;
     
     DECLARE_CLASS_ENUM(ErrorCode,
                        kSDPError = -100,
@@ -689,7 +389,9 @@ public:
                        kFrameComplete
                        );
     
-    void checkAddMediaFlow(NRTPIncomingFlow * rtp_flow){
+public:
+    
+    void checkAddMediaFlow(int64_t& recv_ts, NRTPIncomingFlow * rtp_flow){
         // check add flow
         while(flows_.size() <= rtp_flow->index){
             flows_.emplace_back();
@@ -699,6 +401,7 @@ public:
         if(!mflow.rtpFlow){
             odbgi("add flow [{}]-[{}]", rtp_flow->index, NMedia::GetNameFor(rtp_flow->type));
             mflow.rtpFlow = rtp_flow;
+            mflow.firstRecvTS = recv_ts;
         }
         
         if(!mflow.depacker && rtp_flow->mainCodec){
@@ -734,9 +437,10 @@ public:
         frame->setTime(NNtp::NTP2Milliseconds(mflow.rtptime.localNTP()));
         func(mflow, frame);
     }
-    virtual void processFlow(MediaFlow& mflow, const FrameFunc& func){
+    
+    void processFlow(MediaFlow& mflow, const FrameFunc& func, bool skip_empty = false){
         NRTPPacketSlot * slot = nullptr;
-        auto pullstate = mflow.rtpFlow->packetWin.nextSlotInOrder(slot);
+        auto pullstate = mflow.rtpFlow->packetWin.nextSlotInOrder(slot, skip_empty);
         while(pullstate >= 0){
             // NRTPPacketWindow::kNoError or kDiscontinuity
             if(mflow.depacker){
@@ -744,7 +448,7 @@ public:
                                                          [this, &mflow, &func](NMediaFrame::Unique& frame){
                                                              processFrame(mflow, frame, func);
                                                          });
-                //DUMPER().dump("depack-state", *mflow.depacker);
+                DUMPER().dump("depack-state", *mflow.depacker);
                 if(depack_ret < 0){
                     // TODO: stop process when error
                     odbge("fail to depack, error=[{}]-[{}]", depack_ret, mflow.depacker->getErrorStr(depack_ret));
@@ -753,6 +457,7 @@ public:
             pullstate = mflow.rtpFlow->packetWin.nextSlotInOrder(slot);
         }
     }
+    
     
     int processRTP(int64_t&             recv_ts,
                    const uint8_t *      data_ptr,
@@ -771,9 +476,10 @@ public:
         }
         
         if(incoming_flow){
-            checkAddMediaFlow(incoming_flow);
-            if(incoming_flow->packetWin.isFull()){
-                processFlow(flows_[incoming_flow->index], func);
+            checkAddMediaFlow(recv_ts, incoming_flow);
+            auto& flow = flows_[incoming_flow->index];
+            if(incoming_flow->packetWin.isFull() || (recv_ts - flow.firstRecvTS) >= flowBufferDurationMS){
+                processFlow(flow, func);
             }
             return kFrameComplete;
         }
@@ -864,6 +570,13 @@ public:
         while (errcode >= 0 && errcode != kReachFileEnd ) {
             errcode = processUntilFrame(func);
         }
+        
+        // process remain packets
+        for(auto& flow : flows_){
+            if(flow.rtpFlow){
+                processFlow(flow, func, true);
+            }
+        }
 
         return (ErrorCode)errcode;
     }
@@ -880,8 +593,8 @@ private:
 
 class XSWTLVProber {
 public:
-    struct ProbeFlow{
-        ProbeFlow():mainCodec(NCodec::UNKNOWN){}
+    struct Flow{
+        Flow():mainCodec(NCodec::UNKNOWN){}
         int index = -1;
         NRTPCodec mainCodec;
         int64_t numDecodableFrames = 0;
@@ -891,42 +604,20 @@ public:
 public:
 
     NError probe(const std::string& filename){
-        std::vector<ProbeFlow> flows;
+        std::vector<Flow> flows;
         return probe(filename, flows);
     }
-    NError probe(const std::string& filename, std::vector<ProbeFlow>& flows){
+    NError probe(const std::string& filename, std::vector<Flow>& flows){
         XSWTLVDemuxer demuxer;
         int errcode = demuxer.process(filename,
                                   [this, &flows](XSWTLVDemuxer::MediaFlow& mflow, NMediaFrame::Unique& frame){
                                       processFrame(checkAddFlow(mflow, flows), frame);
                                   });
-        odbgi("probe result: [{}]-[{}]", errcode, XSWTLVDemuxer::getNameForErrorCode(errcode));
-        if(errcode >= 0){
-            for(auto& flow : flows){
-                std::string str = fmt::format("  flow[{}]: codec={}, decodable-frames={}",
-                                              flow.index,
-                                              flow.mainCodec.name,
-                                              flow.numDecodableFrames);
-                
-                if(NCodec::GetMediaForCodec(flow.mainCodec.type) == NMedia::Video ){
-                    str += fmt::format(", max-video-win={}x{}",
-                                       flow.maxVideoWin.width, flow.maxVideoWin.height);
-                }
-                odbgi("{}", str);
-                
-                if(flow.historyVideoSizes.size() > 0){
-                    for(size_t n = 0; n < flow.historyVideoSizes.size(); ++n){
-                        auto& o = flow.historyVideoSizes[n];
-                        odbgi("    video-size[{}]={}x{}", n, o.width, o.height);
-                    }
-                }
-            }
-        }
         return NError(errcode, XSWTLVDemuxer::getNameForErrorCode(errcode));
     }
     
 private:
-    ProbeFlow& checkAddFlow(XSWTLVDemuxer::MediaFlow& mflow, std::vector<ProbeFlow>& flows){
+    Flow& checkAddFlow(XSWTLVDemuxer::MediaFlow& mflow, std::vector<Flow>& flows){
         // check add flow
         while(flows.size() <= mflow.rtpFlow->index){
             flows.emplace_back();
@@ -938,7 +629,7 @@ private:
         return flows[mflow.rtpFlow->index];
     }
 
-    void processFrame(ProbeFlow& flow, NMediaFrame::Unique& frame){
+    void processFrame(Flow& flow, NMediaFrame::Unique& frame){
         ++flow.numDecodableFrames;
         if(frame->getMediaType() == NMedia::Video){
             NVideoFrame * video_frame = (NVideoFrame *)frame.get();
@@ -946,13 +637,13 @@ private:
         }
     }
 
-    void processVideoFrame(ProbeFlow& flow, NVideoFrame * video_frame){
+    void processVideoFrame(Flow& flow, NVideoFrame * video_frame){
         if(video_frame->isKeyframe()){
             const NVideoSize& vsize = video_frame->videoSize();
             if(flow.historyVideoSizes.empty()
                || vsize.width != flow.historyVideoSizes.back().width
                || vsize.height != flow.historyVideoSizes.back().height){
-                // TODO: test with mobile
+                // TODO: test with mobile and simulate video size change
                 odbgi("change video size, flow=[{}-{}], vsize=[{}]",
                       flow.index, flow.mainCodec.name, vsize);
                 flow.historyVideoSizes.emplace_back(vsize);
@@ -1055,10 +746,6 @@ private:
     }
     
     void processVideoFrame(Flow& flow, NVideoFrame * video_frame){
-        if(video_frame->isKeyframe()){
-            const NVideoSize& vsize = video_frame->videoSize();
-            
-        }
         this->decode(flow, video_frame);
     }
     
@@ -1093,10 +780,231 @@ private:
     }
 };
 
+class XSWTLVTransformatter {
+private:
+    struct Flow{
+        int originIndex = -1;
+        NRTPCodec mainCodec;
+        NVideoSize maxVideoWin;
+        std::deque<NMediaFrame::Unique> frameQ;
+        
+        mediacodec_id_t translateCodecId(){
+            if(mainCodec.type == NCodec::VP8){
+                return MCODEC_ID_VP8;
+            }else if(mainCodec.type == NCodec::VP9){
+                return MCODEC_ID_VP9;
+            }else if(mainCodec.type == NCodec::H264){
+                return MCODEC_ID_H264;
+            }else if(mainCodec.type == NCodec::OPUS){
+                return MCODEC_ID_OPUS;
+            }else {
+                return MCODEC_ID_NONE;
+            }
+        }
+    };
+    
+    const static int64_t bufferDurationMS = XSWTLVDemuxer::flowBufferDurationMS*2;
+    
+public:
+    NError transformat(const std::string& filename, const std::string& output_base){
+        Flow audio_flow;
+        Flow video_flow;
+        NError error = probe(filename, audio_flow, video_flow);
+        if(error.code() < 0){
+            return error;
+        }
+        
+        std::string ext = selectFileExt(audio_flow, video_flow);
+        std::string output_filename = output_base+"."+ext;
+        odbgi("select output file [{}]", output_filename);
+        
+        // TODO: refactor ravrecord_t to c++ and use NCodec, maybe buffer frames in writter
+        ravrecord_t recorder;
+        recorder = rr_open(output_filename.c_str(),
+                           video_flow.translateCodecId(),
+                           video_flow.maxVideoWin.width,
+                           video_flow.maxVideoWin.height,
+                           15,// TODO: fps
+                           audio_flow.translateCodecId(),
+                           audio_flow.mainCodec.clockrate,
+                           audio_flow.mainCodec.channels,
+                           audio_flow.mainCodec.clockrate,
+                           audio_flow.mainCodec.channels,
+                        NULL, 0);
+        if (recorder == NULL) {
+            // TODO:
+            return NError(-1, "fail to open recorder");
+        }
+        
+        XSWTLVDemuxer demuxer;
+        int errcode = demuxer.process(filename,
+                                      [this, &recorder, &video_flow, &audio_flow](XSWTLVDemuxer::MediaFlow& mflow, NMediaFrame::Unique& frame){
+                                          
+                                          if(mflow.rtpFlow->index == audio_flow.originIndex){
+                                              audio_flow.frameQ.emplace_back(std::move(frame));
+                                          }else if(mflow.rtpFlow->index == video_flow.originIndex){
+                                              video_flow.frameQ.emplace_back(std::move(frame));
+                                          }
+                                          writeFrames(recorder, audio_flow, video_flow, bufferDurationMS);
+                                      });
+        // write remain frames
+        writeFrames(recorder, audio_flow, video_flow, 0);
+        rr_close(recorder);
+
+        return NError(errcode, demuxer.getNameForErrorCode(errcode));
+    }
+    
+private:
+    NError probe(const std::string& filename, Flow& audio_flow, Flow& video_flow){
+        XSWTLVProber prober;
+        std::vector<XSWTLVProber::Flow> flows;
+        NError error = prober.probe(filename, flows);
+        
+        if(error.code() < 0){
+            odbge("probe result: [{}]-[{}]", error.code(), error.str());
+            return error;
+        }
+        odbgi("probe OK");
+        printProbeFlows(flows);
+        
+        
+        int64_t max_decodable_vframes = 0;
+        for(auto& flow : flows){
+            auto media_type = NCodec::GetMediaForCodec(flow.mainCodec.type);
+            if(media_type == NMedia::Video ){
+                if(max_decodable_vframes < flow.numDecodableFrames){
+                    max_decodable_vframes = flow.numDecodableFrames;
+                    video_flow.originIndex = flow.index;
+                }
+            }else if(media_type == NMedia::Audio){
+                audio_flow.originIndex = flow.index;
+            }
+        }
+        
+        if(audio_flow.originIndex < 0 && video_flow.originIndex < 0){
+            return NError(-1, "NOT found audio and video flow");
+        }
+        
+        selectFlow(flows, audio_flow, video_flow);
+        return NError(0, "");
+    }
+    
+    void writeFrames(ravrecord_t recorder, Flow& audio_flow, Flow& video_flow, int64_t min_duration){
+        while (true) {
+            Flow* flow = nextFlow4Write(audio_flow, video_flow, min_duration);
+            if(!flow) break;
+            
+            NMediaFrame::Unique frame = std::move(flow->frameQ.front());
+            flow->frameQ.pop_front();
+            
+            if(flow == &audio_flow){
+                rr_process_audio(recorder,
+                                 frame->getTime(),
+                                 frame->data(),
+                                 (int)frame->size());
+                
+            }else if(flow == &video_flow){
+                NVideoFrame * video_frame = (NVideoFrame *)frame.get();
+                rr_process_video(recorder,
+                                 video_frame->getTime(),
+                                 video_frame->data(),
+                                 (int)video_frame->size(),
+                                 video_frame->isKeyframe());
+            }
+        }
+        
+    }
+    
+    Flow*  nextFlow4Write(Flow& audio_flow, Flow& video_flow, int64_t min_duration){
+        if(audio_flow.frameQ.empty()){
+            return nextFlow4Write(video_flow, min_duration);
+        }else if(video_flow.frameQ.empty()){
+            return nextFlow4Write(audio_flow, min_duration);
+        }else{
+            Flow* flow = (audio_flow.frameQ.front()->getTime() <= video_flow.frameQ.front()->getTime())?
+                &audio_flow : &video_flow;
+            return flow;
+            
+        }
+    }
+    
+    Flow* nextFlow4Write(Flow& flow, int64_t min_duration){
+        if(flow.frameQ.empty()){
+            return nullptr;
+        }
+        int64_t duration = flow.frameQ.back()->getTime() - flow.frameQ.front()->getTime();
+        if(duration < min_duration){
+            return nullptr;
+        }
+        
+        return &flow;
+    }
+    
+    static void printProbeFlows(std::vector<XSWTLVProber::Flow>& flows){
+        for(auto& flow : flows){
+            std::string str = fmt::format("  flow[{}]: codec={}, decodable-frames={}",
+                                          flow.index,
+                                          flow.mainCodec.name,
+                                          flow.numDecodableFrames);
+            
+            if(NCodec::GetMediaForCodec(flow.mainCodec.type) == NMedia::Video ){
+                str += fmt::format(", max-video-win={}x{}",
+                                   flow.maxVideoWin.width, flow.maxVideoWin.height);
+            }
+            odbgi("{}", str);
+            
+            if(flow.historyVideoSizes.size() > 0){
+                for(size_t n = 0; n < flow.historyVideoSizes.size(); ++n){
+                    auto& o = flow.historyVideoSizes[n];
+                    odbgi("    video-size[{}]={}x{}", n, o.width, o.height);
+                }
+            }
+        }
+    }
+    
+    void selectFlow(std::vector<XSWTLVProber::Flow> flows, Flow& audio_flow, Flow& video_flow){
+        if(audio_flow.originIndex >= 0){
+            //audio_flow.originFlow = &flows[audio_flow.originIndex];
+            audio_flow.mainCodec = flows[audio_flow.originIndex].mainCodec;
+            odbgi("select audio index {}", audio_flow.originIndex);
+        }
+        
+        if(video_flow.originIndex >= 0){
+            //video_flow.originFlow = &flows[video_flow.originIndex];
+            video_flow.mainCodec = flows[video_flow.originIndex].mainCodec;
+            video_flow.maxVideoWin = flows[video_flow.originIndex].maxVideoWin;
+            odbgi("select video index {}", video_flow.originIndex);
+        }
+    }
+        
+    std::string selectFileExt(Flow& audio_flow, Flow& video_flow){
+        std::string ext = "mkv";
+        if (audio_flow.originIndex >= 0 && video_flow.originIndex >= 0) {
+            if (audio_flow.mainCodec.type == NCodec::OPUS
+                && video_flow.mainCodec.type == NCodec::VP8) {
+                ext = "webm";
+            }
+        } else if (audio_flow.originIndex >= 0) {
+            // audio only and opus
+            if (audio_flow.mainCodec.type == NCodec::OPUS) {
+                ext = "webm";
+            }
+        } else if (video_flow.originIndex >= 0) {
+            // video only and VP8
+            if (video_flow.mainCodec.type == NCodec::VP8) {
+                ext = "webm";
+            }
+        }
+        return ext;
+    }
+};
 
 int lab_xswtlv_player_main(int argc, char* argv[]){
     spdlog::set_pattern("|%H:%M:%S.%e|%n|%L| %v");
     spdlog::set_level(spdlog::level::debug);
+    
+    av_register_all();
+    avcodec_register_all();
     
     int ret = SDL_Init(SDL_INIT_VIDEO) ;
     if(ret){
@@ -1107,18 +1015,19 @@ int lab_xswtlv_player_main(int argc, char* argv[]){
     
     {
         //const char * filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtx-fec-01.tlv";
-        const char * filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtx-fec-02-nodrop.tlv";
-        XSWTLVPlayer().play(filename);
+        //const char * filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtx-fec-02-nodrop.tlv";
+        const char * filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtc-6000002.tlv";
+        
+        //XSWTLVPlayer().play(filename);
         //XSWTLVProber().probe(filename);
+        const char * output_base = "/Users/simon/Downloads/tmp/tmp/raw-tlv/out";
+        XSWTLVTransformatter().transformat(filename, output_base);
     }
     
     TTF_Quit();
     SDL_Quit();
     return ret;
 }
-
-
-
 
 
 int lab_demo_main(int argc, char* argv[]){
@@ -1130,6 +1039,8 @@ int lab_demo_main(int argc, char* argv[]){
     //return  test_logger();
     
     //return test_time();
+
+    //return lab050_ffplayer_main(argc, argv);
     
     return lab_xswtlv_player_main(argc, argv);
 

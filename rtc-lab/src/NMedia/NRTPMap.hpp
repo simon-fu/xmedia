@@ -519,8 +519,8 @@ public:
     std::set<std::string> rtcpfbs; // unknown rtcp-fb
     
 public:
-//    NRTPCodec() : NRTPCodec(NCodec::UNKNOWN){
-//    }
+    NRTPCodec() : NRTPCodec(NCodec::UNKNOWN){
+    }
     
     NRTPCodec(NCodec::Type typ) : type(typ), clockrate(NCodec::GetClockRate(typ)){
         this->native = NCodec::IsNative(this->type);
