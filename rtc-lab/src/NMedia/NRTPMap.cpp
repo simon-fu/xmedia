@@ -142,9 +142,14 @@ const static std::string STR_FMTP_PRE = "fmtp:";
 const static std::string STR_RTCPFB_PRE = "rtcp-fb:";
 const static std::string STR_EXTMAP_PRE = "extmap:";
 
+
+int NSDP::parse(const uint8_t* data,const size_t size, std::ostringstream& oss){
+    return parse((const char*)data, size, oss);
+}
+
 // see https://tools.ietf.org/id/draft-ietf-rtcweb-sdp-08.html
 // see https://webrtchacks.com/sdp-anatomy/
-int NSDP::parse(const uint8_t* data,const size_t size, std::ostringstream& oss){
+int NSDP::parse(const char* data,const size_t size, std::ostringstream& oss){
     int ret = -1;
 
     do{
@@ -165,7 +170,7 @@ int NSDP::parse(const uint8_t* data,const size_t size, std::ostringstream& oss){
         MediaDesc * current_media = &default_media;
 
         int mlineindex = 0;
-        LinesBuffer lines((const char *) data, (const char *) data+size);
+        LinesBuffer lines(data, data+size);
         ret = 0;
         
         while(lines.next()){

@@ -867,6 +867,7 @@ public:
     }
     
     int parse(const uint8_t* data,const size_t size, std::ostringstream& oss);
+    int parse(const char*    data,const size_t size, std::ostringstream& oss);
     
     MediaDesc * findMedia(const std::string& mid){
         for(auto& media : medias){

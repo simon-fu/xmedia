@@ -290,7 +290,7 @@ bool NRTPUlpfecWindow::recoverULPFEC(NULPFecData& fecd
     
     NCircularBufferSizeT num = fecd.maskLength << 8;
     fecd.recoveryBegin(fecd.level0, miss_slot);
-    packetWin_.traverse(dist, num, [&fecd, &offset, &miss_slot](auto n, NRTPPacketSlot& slot)-> int{
+    packetWin_.traverse(dist, num, [&fecd, &offset, &miss_slot](NCircularBufferSizeT n, NRTPPacketSlot& slot)-> int{
         if(n != offset){
             fecd.recoveryAdd(fecd.level0, slot, miss_slot);
         }
@@ -359,7 +359,7 @@ bool NRTPUlpfecWindow::addFEC(const NRTPData& rtpd){
     }
     
     NCircularBufferSizeT num = fecd.maskLength << 3;
-    packetWin_.traverse(dist, num, [&fecd] (auto n, NRTPPacketSlot& slot) -> int{
+    packetWin_.traverse(dist, num, [&fecd] (NCircularBufferSizeT n, NRTPPacketSlot& slot) -> int{
         fecd.checkSet(slot.rtpd.header.sequenceNumber);
         return 0;
     });

@@ -717,6 +717,10 @@ public:
     
     virtual int nextDecodable(const NRTPData& rtpd) = 0;
     
+    virtual bool pullRemainFrame(const FrameFunc& func){
+        return false;
+    }
+    
 public:
     static NRTPDepacker* CreateDepacker(const NRTPCodec * codec);
     
@@ -757,6 +761,20 @@ public:
     
     virtual const char * getErrorStr(int errorCode) const override{
         return getNameForErrorCode((ErrorCode)errorCode).c_str();
+    }
+    
+    virtual bool pullRemainFrame(const FrameFunc& func) override{
+        if(frame_ && frame_->size() > 0){
+            func(frame_);
+            if(!frame_){
+                frame_ = pool_->get();
+            }else{
+                frame_->Clear();
+            }
+            return true;
+        }else{
+            return false;
+        }
     }
     
     virtual int depack(const NRTPData& rtpd, bool add_payload, const FrameFunc& func) override{
