@@ -288,7 +288,7 @@ int lab050_ffplayer_main(int argc, char* argv[]){
     
     //const char * media_filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtx-fec-02-nodrop.webm";
     const char * media_filename = "/Users/simon/easemob/src/xmedia/resource/sample.mp4";
-    
+    //const char * media_filename = "/tmp/out.mp4";
     
     
     FFContainerReader * reader = new FFContainerReader("file");
@@ -299,6 +299,7 @@ int lab050_ffplayer_main(int argc, char* argv[]){
     FFVideoTrack * video_track = nullptr;
     audio_track = reader->openAudioTrack(-1, -1, AV_SAMPLE_FMT_S16);
     //video_track = reader->openVideoTrack(AV_PIX_FMT_YUV420P) ;
+    //video_track = reader->openVideoTrack(AV_PIX_FMT_NONE) ;
     
     SDLAudioPlayer audio_player;
     if(audio_track){

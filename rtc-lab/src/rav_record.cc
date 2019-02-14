@@ -42,15 +42,15 @@ void * zero_alloc(size_t sz){
 struct ravrecord {
 	//dont use std::string, it will segv on gcc, maybe related to zero_alloc?
 	char filename[1024];
-	FILE * fp;
+	//FILE * fp;
 	AVFormatContext *fctx;
     int write_header;
 	AVStream *vStream;
 	AVStream *aStream;
 	AVCodecContext * audio_encoder_context;
 	AVFrame * pcm_frame;
-	unsigned char audio_encoded_buf[48000];
-	unsigned char audio_pcm_buf[48000*2*2]; // max_samples * channels * (sizeof s16) 
+	//unsigned char audio_encoded_buf[48000];
+	//unsigned char audio_pcm_buf[48000*2*2]; // max_samples * channels * (sizeof s16) 
 	int pcm_frame_in_bytes;
 	int pcm_length;
 	int64_t audio_next_pts;
@@ -232,6 +232,9 @@ ravrecord_t rr_open(const char * output_file_name
         if(audio_codec_id == MCODEC_ID_OPUS)
         {
             rr->aStream = new_audio_stream(rr, rr->fctx, AV_CODEC_ID_OPUS, audio_samplerate, audio_channels, 24000);
+        }else if(audio_codec_id == MCODEC_ID_AAC)
+        {
+            rr->aStream = new_audio_stream(rr, rr->fctx, AV_CODEC_ID_AAC, audio_samplerate, audio_channels, 24000);
         }
 
 		if(int err = avio_open(&rr->fctx->pb, rr->fctx->filename, AVIO_FLAG_WRITE) < 0) {

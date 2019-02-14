@@ -15,6 +15,7 @@ extern "C"{
 #include "libswresample/swresample.h"
 #include "libavdevice/avdevice.h"
 #include "libavutil/imgutils.h"
+//#include "libavutil/samplefmt.h"
 }
 
 class FFTrack{
@@ -26,6 +27,10 @@ protected:
     AVFrame            * avFrame_ = NULL;
     AVFrame            * lastFrame_ = NULL;
 public:
+    
+    virtual ~FFTrack(){
+        close();
+    }
     
     virtual int getIndex(){
         return index_;
@@ -43,6 +48,14 @@ public:
     virtual void setStream(int index, AVStream * stream){
         index_ = index;
         stream_ = stream;
+    }
+    
+    virtual AVRational getTimebase(){
+        if(this->codecCtx_){
+            return this->codecCtx_->time_base;
+        }else{
+            return (AVRational){0, 1};
+        }
     }
     
     virtual int open(const std::map<std::string, std::string> codecOpt){
@@ -85,8 +98,15 @@ public:
     }
     
     virtual void close(){
-        av_frame_free(&this->avFrame_);
-        avcodec_free_context(&this->codecCtx_);
+        if(this->avFrame_){
+            av_frame_free(&this->avFrame_);
+            this->avFrame_ = nullptr;
+        }
+        if(this->codecCtx_){
+            avcodec_close(this->codecCtx_);
+            avcodec_free_context(&this->codecCtx_);
+            this->codecCtx_ = nullptr;
+        }
         lastFrame_ = NULL;
     }
     
@@ -174,7 +194,10 @@ public:
                 }
                 swr_init(audioConverCtx_);
                 dataFrame_ = av_frame_alloc();
-                
+                dataFrame_->sample_rate = samplerate_;
+                dataFrame_->format = sampleFormat_;
+                dataFrame_->channels = channels_;
+                dataFrame_->channel_layout = av_get_default_channel_layout(channels_);
                 // alloc buffer
                 ret = reallocBuffer(frameSize_);
                 
@@ -184,25 +207,52 @@ public:
         return ret;
     }
     
+    virtual void close() override{
+        FFTrack::close();
+        if(audioConverCtx_){
+            if(swr_is_initialized(audioConverCtx_)){
+                swr_close(audioConverCtx_);
+            }
+            swr_free(&audioConverCtx_);
+        }
+        
+        if(dataFrame_){
+            av_frame_free(&dataFrame_);
+            dataFrame_ = nullptr;
+        }
+        
+        if(dataBuffer_){
+            av_freep(&dataBuffer_);
+        }
+    }
+    
     int reallocBuffer(int frameSize){
         // alloc buffer
         int ret = 0;
         if(frameSize > 0){
-            int sz = av_samples_get_buffer_size(NULL, channels_, frameSize, sampleFormat_, 1);
-            if(sz > dataSize_){
-                if(dataBuffer_){
-                    av_freep(dataBuffer_);
-                }
-                frameSize_ = frameSize;
-                dataSize_ = sz;
-                dataBuffer_ = (uint8_t *) av_malloc(dataSize_);
-                dataFrame_->nb_samples = frameSize_;
+            
+            if(frameSize > frameSize_){
+                dataFrame_->nb_samples = frameSize;
                 dataFrame_->format = sampleFormat_;
                 dataFrame_->channels = channels_;
-                ret = avcodec_fill_audio_frame(dataFrame_, dataFrame_->channels, (AVSampleFormat)dataFrame_->format, (const uint8_t*)dataBuffer_, (int)dataSize_, 0);
-                if(ret >= 0){
-                    ret = 0;
+                
+//                int sz = av_samples_get_buffer_size(NULL, channels_, frameSize, sampleFormat_, 1);
+//                if(dataBuffer_){
+//                    av_freep(&dataBuffer_);
+//                }
+//                dataSize_ = sz;
+//                dataBuffer_ = (uint8_t *) av_malloc(sz);
+//                ret = avcodec_fill_audio_frame(dataFrame_, dataFrame_->channels, (AVSampleFormat)dataFrame_->format, (const uint8_t*)dataBuffer_, (int)sz, 0);
+//                if(ret >= 0){
+//                    ret = 0;
+//                }
+                
+                if(frameSize_ > 0){
+                    av_frame_unref(dataFrame_);
                 }
+                av_frame_get_buffer(dataFrame_, 0);
+                
+                frameSize_ = frameSize;
             }
         }
         return ret;
@@ -221,9 +271,16 @@ public:
             
             dataFrame_->pkt_size = av_samples_get_buffer_size(dataFrame_->linesize, dataFrame_->channels,
                                                               dataFrame_->nb_samples, sampleFormat_, 1);
+            
+            dataFrame_->pts = avFrame_->pts;
             //odbgi("input nb_samples=%d, output nb_samples=%d pkt_size=%d", avFrame_->nb_samples, dataFrame_->nb_samples, dataFrame_->pkt_size);
             
             lastFrame_ = dataFrame_;
+        }else{
+            if(lastFrame_){
+                lastFrame_->channels = channels_;
+                lastFrame_->channel_layout = av_get_default_channel_layout(channels_);
+            }
         }
         return ret;
     }
@@ -313,12 +370,16 @@ public:
             avFrameYUV_->width = this->avFrame_->width;
             avFrameYUV_->height = this->avFrame_->height;
             avFrameYUV_->pkt_size = (int)imageSize_;
+            avFrameYUV_->pts = this->avFrame_->pts;
+            avFrameYUV_->pkt_dts = this->avFrame_->pkt_dts;
             lastFrame_ = avFrameYUV_;
         }
         return ret;
     }
     
     virtual void close() override{
+        FFTrack::close();
+        
         if(imgConvertCtx_){
             sws_freeContext(imgConvertCtx_);
             imgConvertCtx_ = NULL;
@@ -329,10 +390,8 @@ public:
         }
         
         if(imageBuffer_){
-            av_freep(imageBuffer_);
+            av_freep(&imageBuffer_);
         }
-        
-        FFTrack::close();
     }
     
     int getWidth(){
@@ -361,6 +420,10 @@ protected:
 public:
     FFContainerReader(const std::string& name):name_(name){
         
+    }
+    
+    virtual ~FFContainerReader(){
+        close();
     }
     
     int setVideoOptions(int width, int height, int framerate, const std::string& optPixelFmt){
@@ -396,7 +459,7 @@ public:
             formatCtx_ = avformat_alloc_context();
             AVInputFormat *ifmt = NULL;
             if(!containerFormat.empty()){
-                av_find_input_format(containerFormat.c_str());
+                ifmt = av_find_input_format(containerFormat.c_str());
                 if(!ifmt){
                     //odbge("fail to find format [%s]", containerFormat.c_str());
                     ret = -11;
@@ -443,7 +506,8 @@ public:
         }
         
         if(formatCtx_){
-            avformat_free_context(formatCtx_);
+            avformat_close_input(&formatCtx_);
+            //avformat_free_context(formatCtx_);
             formatCtx_ = NULL;
         }
         lastTrack_ = NULL;
@@ -543,9 +607,10 @@ public:
     
     void closeTrack(FFTrack *track){
         if(!track) return;
-        track->close();
         for(int i = 0; i < tracks_.size(); ++i){
             if(tracks_[i] == track){
+                track->close();
+                delete track;
                 tracks_[i] = NULL;
                 break;
             }

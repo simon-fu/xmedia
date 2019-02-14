@@ -1047,9 +1047,9 @@ int lab_demo_main(int argc, char* argv[]){
     
     //return test_time();
 
-    //return lab050_ffplayer_main(argc, argv);
+    return lab050_ffplayer_main(argc, argv);
     
-    return lab_xswtlv_player_main(argc, argv);
+    //return lab_xswtlv_player_main(argc, argv);
 
 }
 
