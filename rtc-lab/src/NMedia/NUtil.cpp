@@ -106,7 +106,8 @@ int NUtil::ReadTLV(FILE *fp, unsigned char *buf, size_t bufsize, size_t *plength
 }
 
 
-
+thread_local int NThreadError::code_ = 0;
+thread_local std::string NThreadError::msg_ = "";
 
 
 // TODO: remove 

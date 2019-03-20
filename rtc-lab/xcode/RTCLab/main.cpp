@@ -8,15 +8,17 @@
 #include "Lab034-EVRTMPPush.hpp"
 #include "Lab040-BStreamDump.hpp"
 #include "Lab041-BStreamTLVPlayer.hpp"
+#include "Lab060-PushTLV.hpp"
 
 int main(int argc, char * argv[]) {
     int ret = 0;
     //ret = lab_vp8_main(argc, argv);
     //ret = lab020_beauty_main(argc, argv);
-    ret = lab030_rtmp_push_main(argc, argv);
+    //ret = lab030_rtmp_push_main(argc, argv);
 //    ret = lab034_evrtmp_push_main(argc, argv);
 //    ret = lab_bstream_dump_main(argc, argv);
 //    ret = lab_bstream_tlv_player_main(argc, argv);
 //    ret = lab_demo_main(argc, argv);
+    ret = lab060_PushTLV_main(argc, argv);
     return 0;
 }

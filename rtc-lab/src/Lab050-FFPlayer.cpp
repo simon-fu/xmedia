@@ -275,7 +275,6 @@ int simplest_ffmpeg_audio_player(int argc, char* argv[])
 
 int lab050_ffplayer_main(int argc, char* argv[]){
     //return simplest_ffmpeg_audio_player(argc, argv);
-    
     spdlog::set_pattern("|%H:%M:%S.%e|%n|%L| %v");
     av_register_all();
     avcodec_register_all();

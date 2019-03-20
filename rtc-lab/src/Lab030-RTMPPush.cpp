@@ -562,574 +562,8 @@ int main_push_av(int argc, char** argv)
 #define odbgi(FMT, ARGS...) do{  printf("|%7s|I| " FMT, "main", ##ARGS); printf("\n"); fflush(stdout); }while(0)
 #define odbge(FMT, ARGS...) do{  printf("|%7s|E| " FMT, "main", ##ARGS); printf("\n"); fflush(stdout); }while(0)
 
-#define NERROR_FMT_SET(code, ...)\
-    NThreadError::setError(code, fmt::format(__VA_ARGS__))
-class NThreadError{
-public:
-    static const std::string& lastMsg() {
-        return msg_;
-    }
-    
-    static int lastCode() {
-        return code_;
-    }
-    
-    static void setError(int code, const std::string& msg){
-        code_ = code;
-        msg_ = msg;
-    }
-    
-private:
-    static thread_local int code_ ;
-    static thread_local std::string msg_;
-};
-thread_local int NThreadError::code_ = 0;
-thread_local std::string NThreadError::msg_ = "";
-
-class FFPTSConverter{
-public:
-    FFPTSConverter():FFPTSConverter((AVRational){1, 1000}, (AVRational){1, 1000}){
-        
-    }
-    
-    FFPTSConverter(const AVRational& src, const AVRational& dst)
-    : src_(src), dst_(dst){
-        
-    }
-    
-    void setSrcBase(const AVRational& src){
-        src_ = src;
-    }
-    
-    void setDstBase(const AVRational& dst){
-        dst_ = dst;
-    }
-    
-    int64_t convert(int64_t pts){
-        pts = pts * dst_.den/dst_.num/src_.den/src_.num;
-        return pts;
-    }
-private:
-    AVRational src_;
-    AVRational dst_;
-};
-
-class Int64Relative{
-public:
-    class Offset{
-    public:
-        int64_t offset(int64_t pts){
-            if(!validbase_){
-                validbase_ = true;
-                base_ = pts;
-            }
-            pts = pts - base_;
-            return pts;
-        }
-    private:
-        bool validbase_ = false;
-        int64_t base_ = 0;
-    };
-    
-    class Delta{
-    public:
-        int64_t delta(int64_t pts){
-            if(!validlast_){
-                validlast_ = true;
-                last_ = pts;
-            }
-            int64_t delta = pts - last_;
-            last_ = pts;
-            return delta;
-        }
-    private:
-        bool validlast_ = false;
-        int64_t last_ = 0;
-    };
-    
-public:
-    
-    int64_t offset(int64_t pts){
-        return offset_.offset(pts);
-    }
-    
-    int64_t delta(int64_t pts){
-        return delta_.delta(pts);
-    }
-    
-private:
-    Offset offset_;
-    Delta delta_;
-};
-
-class Int64Delta{
-public:
-    int64_t delta(int64_t pts){
-        if(first_){
-            first_ = false;
-            last_ = pts;
-        }
-        pts = pts - last_;
-        last_ = pts;
-        return pts;
-    }
-private:
-    bool first_ = true;
-    int64_t last_ = 0;
-};
 
 
-class FFContainerWriter{
-public:
-
-    virtual ~FFContainerWriter(){
-        close();
-    }
-    
-    int open(const std::string& output_file_name,
-             AVCodecID video_codec_id, int width, int height, int fps,
-             AVCodecID audio_codec_id, int audio_samplerate, int audio_channels){
-        int ret = 0;
-        do{
-            fctx_ = avformat_alloc_context();
-            if(fctx_ == NULL) {
-                odbge("error allocating context");
-                ret = -1;
-                break;
-            }
-            check_first_intra_frame_ = true;
-            fctx_->oformat = av_guess_format(NULL, output_file_name.c_str(), NULL);
-            if(fctx_->oformat == NULL) {
-                odbge("Error guessing format");
-                ret = -1;
-                break;
-            }
-            snprintf(fctx_->filename, sizeof(fctx_->filename), "%s", output_file_name.c_str());
-            //         if (fctx_->flags & AVFMT_GLOBALHEADER)
-            //             vStream_->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-            
-            if(video_codec_id != AV_CODEC_ID_NONE ){
-                vStream_ = new_video_stream(fctx_, video_codec_id, width, height, fps, nullptr, 0);
-            }
- 
-            if(audio_codec_id != AV_CODEC_ID_NONE ){
-                aStream_ = new_audio_stream(fctx_, audio_codec_id, audio_samplerate, audio_channels, 24000);
-            }
-            
-            if(int err = avio_open(&fctx_->pb, fctx_->filename, AVIO_FLAG_WRITE) < 0) {
-                
-                dbge("Error opening file for output, %d\n", err);
-                ret = -1;
-                break;
-            }
-            
-            AVDictionary* opts = nullptr;
-            // this will let matroska_enc split cluster and add cue point to the output file,
-            // but, such file wont play in Chrome 56 (Windows)
-            //
-            //        if (strcmp(rr->fctx->oformat->name, "webm") == 0) {
-            //            // matroska only write cue point when dash is set to 1
-            //            av_dict_set(&opts, "dash", "1", 0);
-            //        }
-            if(avformat_write_header(fctx_, &opts) < 0) {
-                odbge("Error writing header\n");
-                ret = -1;
-                break;
-            }
-            
-//            if (fctx_->pb->seekable) {
-//                odbgi("seekable");
-//            } else {
-//                odbgi("not seekable");
-//            }
-            
-            if (opts) {
-                AVDictionaryEntry* t = av_dict_get(opts, "", t, 0);
-                while (t) {
-                    odbge("invalid opt `%s` found", t->key);
-                    t = av_dict_get(opts, "", t, 0);
-                }
-            }
-            write_header_ = 1;
-            
-            ret = 0;
-            
-        }while(0);
-        
-        if(ret){
-            close();
-        }
-        return ret;
-    }
-    
-    void close(){
-        if(fctx_ != NULL && write_header_){
-            av_write_trailer(fctx_);
-        }
-        
-        if(audio_encoder_context_) {
-            avcodec_free_context(&audio_encoder_context_);
-            audio_encoder_context_ = nullptr;
-        }
-        
-        if (pcm_frame_) {
-            av_frame_free(&pcm_frame_);
-            pcm_frame_ = nullptr;
-        }
-        
-        if(fctx_ != NULL) {
-            avio_close(fctx_->pb);
-            fctx_->pb = nullptr;
-            avformat_free_context(fctx_);
-            fctx_ = nullptr;
-        }
-    }
-    
-    int writeVideo(int64_t pts, unsigned char * buf, int length, bool is_key_frame){
-        
-        if(!vStream_){
-            return -1;
-        }
-        
-        if(pts_base_ == 0){
-            pts_base_ = pts;
-        }
-        
-        pts = pts - pts_base_;
-        if(pts < 0){
-            pts = 0;
-        }
-        
-        if (check_first_intra_frame_) {
-            if (!is_key_frame) {
-                //dbge("discard inter frame without preceeding intra frame");
-                return -1;
-            } else {
-                check_first_intra_frame_ = false;
-            }
-        }
-        
-        AVPacket packet;
-        av_init_packet(&packet);
-        packet.stream_index = vStream_->index;
-        packet.data = buf;
-        packet.size = length;
-        
-        AVRational& time_base = vStream_->time_base;
-        pts = pts * time_base.den/time_base.num/1000;
-        
-        if (is_key_frame){
-            packet.flags |= AV_PKT_FLAG_KEY;
-        }
-        
-        packet.dts = pts;
-        packet.pts = pts;
-        if(int err = av_interleaved_write_frame(fctx_, &packet) < 0) {
-            odbge("write one video frame to file %s failed", fctx_->filename);
-        }
-        return 0;
-    }
-    
-    int writeAudio(int64_t pts, unsigned char * buf, int length){
-        
-        if(!aStream_){
-            return -1;
-        }
-        
-        if(pts_base_ == 0){
-            pts_base_ = pts;
-        }
-        
-        if(pts < pts_base_){
-            //dbgw("drop audio frame (pts=%lld)\n", (long long) pts);
-            return -1;
-        }
-        pts = pts - pts_base_;
-        //printf("write audio: pts=%lld\n", pts);
-        
-        AVPacket packet;
-        av_init_packet(&packet);
-        packet.stream_index = aStream_->index;
-        packet.data = buf;
-        packet.size = length;
-        
-        //AVRational time_base = rr->aStream->time_base;
-        //pts = (double)(pts*1000)/(double)(av_q2d(time_base)*AV_TIME_BASE);
-        
-        AVRational& time_base = aStream_->time_base;
-        pts = pts * time_base.den/time_base.num/1000;
-        
-        packet.dts = pts;
-        packet.pts = pts;
-        if(av_interleaved_write_frame(fctx_, &packet) < 0) {
-            odbge("write one audio frame to file %s failed\n", fctx_->filename);
-        }
-        return 0;
-    }
-
-    
-private:
-    static
-    AVStream * new_video_stream(AVFormatContext * fctx, enum AVCodecID codecid, int max_width, int max_height, int fps,unsigned char *sps_pps_buffer, int  sps_pps_length){
-        int ret = 0;
-        AVStream *stream = NULL;
-        do{
-            stream = avformat_new_stream(fctx, 0);
-            if(stream == NULL) {
-                dbge("Error new video stream\n");
-                ret = -1;
-                break;
-            }
-            
-            stream->codecpar->codec_id = codecid;
-            stream->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
-            stream->time_base = (AVRational){1, fps};
-            stream->codecpar->width = max_width;
-            stream->codecpar->height = max_height;
-            stream->codecpar->format = AV_PIX_FMT_YUV420P;
-            // following line resolves webm file decode error in chrome 56.0 (windows)
-            stream->codecpar->field_order = AV_FIELD_PROGRESSIVE;
-            
-            if(codecid == AV_CODEC_ID_H264){
-                if(sps_pps_buffer && sps_pps_length > 0){
-                    stream->codecpar->extradata = new uint8_t[sps_pps_length];
-                    memcpy(stream->codecpar->extradata, sps_pps_buffer,sps_pps_length);
-                    stream->codecpar->extradata_size = sps_pps_length;
-                }
-            }
-        }while(0);
-        
-        return stream;
-        
-    }
-    
-    // todo: audio transcoding part is broken
-    static
-    AVStream * new_audio_stream(AVFormatContext * fctx, enum AVCodecID codecid, int sample_rate, int channels, int bit_rate){
-        int ret = 0;
-        AVStream *stream = NULL;
-        do{
-            const AVCodec *codec = avcodec_find_encoder(codecid);
-            stream = avformat_new_stream(fctx, codec);
-            if(stream == NULL) {
-                dbge("Error new audio stream\n");
-                ret = -1;
-                break;
-            }
-            
-            //avcodec_get_context_defaults3(stream->codec, NULL);
-            stream->codecpar->codec_id = codecid;
-            stream->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
-            stream->codecpar->sample_rate = sample_rate;
-            stream->codecpar->channels = channels;
-            //stream->codecpar->bit_rate = bit_rate <= 0 ? 24000 : bit_rate;
-            stream->codecpar->format = AV_SAMPLE_FMT_S16;
-            stream->time_base = (AVRational){ 1, sample_rate };
-            stream->codecpar->channel_layout = channels == 1 ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
-            stream->codecpar->frame_size = 1024; // TODO:
-            
-            odbgi("audio-stream: ar=%d, ch=[%d,0x%08llX], bitrate=%lld, frmsz=%d"
-                  , stream->codecpar->sample_rate
-                  , stream->codecpar->channels
-                  , stream->codecpar->channel_layout
-                  , stream->codecpar->bit_rate
-                  , stream->codecpar->frame_size);
-            
-            //        if (fctx->flags & AVFMT_GLOBALHEADER)
-            //            stream->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-            
-            ret = 0;
-            
-        }while(0);
-        
-        if(ret){
-            // TODO:
-        }
-        
-        return stream;
-        
-    }
-private:
-    AVFormatContext *fctx_ = nullptr;
-    int write_header_ = 0;
-    AVStream *vStream_ = nullptr;
-    AVStream *aStream_ = nullptr;
-    AVCodecContext * audio_encoder_context_ = nullptr;
-    AVFrame * pcm_frame_ = nullptr;
-    int64_t audio_next_pts_ = 0;
-    int64_t audio_pts_ = 0;
-    int64_t pts_base_ = 0;
-    //enum AVCodecID video_codecid;
-    bool check_first_intra_frame_ = false;
-};
-
-typedef std::function<int(const AVFrame * )> FFFrameFunc;
-typedef std::function<int(AVPacket * pkt)> FFPacketFunc;
-
-struct FFImageConfig{
-    AVPixelFormat pix_fmt = AV_PIX_FMT_NONE;
-    int width = -1;
-    int height = -1;
-    
-    void assign(const AVFrame* frame){
-        pix_fmt = (AVPixelFormat)frame->format;
-        width = frame->width;
-        height = frame->height;
-    }
-    
-    bool valid()const{
-        return !(pix_fmt <= AV_PIX_FMT_NONE || width <= 0 || height <= 0);
-    }
-    
-    bool equal(const FFImageConfig& other)const{
-        if(&other == this) return true;
-        return (pix_fmt == other.pix_fmt && width == other.width && height == other.height);
-    }
-    
-    bool equal(const AVFrame* frame)const{
-        if(!frame) return false;
-        return ((int)pix_fmt == frame->format
-                && width == frame->width
-                && height == frame->height);
-    }
-    
-    void match(const FFImageConfig& stdcfg){
-        FFImageConfig& cfg = *this;
-        if(cfg.pix_fmt <= AV_PIX_FMT_NONE){
-            cfg.pix_fmt = stdcfg.pix_fmt;
-        }
-        if(cfg.width <= 0){
-            cfg.width = stdcfg.width;
-        }
-        if(cfg.height <= 0){
-            cfg.height = stdcfg.height;
-        }
-    }
-};
-
-
-class FFImageAdapter{
-public:
-    virtual ~FFImageAdapter(){
-        close();
-    }
-    
-    int open(const FFImageConfig& dstcfg){
-        return open(FFImageConfig(), dstcfg);
-    }
-    
-    int open(const FFImageConfig& srccfg, const FFImageConfig& dstcfg){
-        close();
-        dstcfg_ = dstcfg;
-        int ret = check4Open(srccfg);
-        if(ret){
-            close();
-        }
-        return ret;
-    }
-    
-    void close(){
-        doClose();
-    }
-    
-    int adapt(const AVFrame * srcframe, const FFFrameFunc& func){
-        if(!srcframe){
-            return 0;
-        }
-        
-        int ret = 0;
-        if(!swsctx_){
-            if(!dstcfg_.valid() || dstcfg_.equal(srcframe)){
-                return func(srcframe);
-            }
-        }
-        
-        if(!srccfg_.equal(srcframe) || !swsctx_){
-            FFImageConfig srccfg;
-            srccfg.assign(srcframe);
-            ret = check4Open(srccfg);
-            if(ret){
-                return ret;
-            }
-            if(!swsctx_){
-                return func(srcframe);
-            }
-        }
-        
-        //av_frame_copy_props(frame_, srcframe);
-        frame_->format = dstcfg_.pix_fmt;
-        frame_->width = dstcfg_.width;
-        frame_->height = dstcfg_.height;
-        
-        ret = av_frame_get_buffer(frame_, 32);
-        if(ret){
-            NERROR_FMT_SET(ret, "fail to av_frame_get_buffer video, err=[{}]", av_err2str(ret));
-            return ret;
-        }
-        
-        sws_scale(swsctx_,
-                  (const unsigned char* const*)srcframe->data, srcframe->linesize
-                  , 0, srcframe->height
-                  , frame_->data, frame_->linesize);
-        frame_->pts = srcframe->pts;
-        frame_->pkt_dts = srcframe->pkt_dts;
-        frame_->key_frame = srcframe->key_frame;
-        
-        ret = func(frame_);
-        
-        av_frame_unref(frame_);
-        return ret;
-    }
-    
-private:
-    int check4Open(const FFImageConfig& srccfg){
-        const FFImageConfig& dstcfg = dstcfg_;
-        if(!srccfg.valid() || !dstcfg.valid() || srccfg.equal(dstcfg)){
-            doClose();
-            return 0;
-        }
-        return doOpen(srccfg);
-    }
-    
-    int doOpen(const FFImageConfig& srccfg){
-        doClose();
-        
-        int ret = 0;
-        const FFImageConfig& dstcfg = dstcfg_;
-        swsctx_ = sws_getContext(srccfg.width, srccfg.height, srccfg.pix_fmt
-                                 , dstcfg.width, dstcfg.height, dstcfg.pix_fmt
-                                 , SWS_BICUBIC, NULL, NULL, NULL);
-        
-        if(!swsctx_){
-            ret = -61;
-            NERROR_FMT_SET(ret, "fail to sws_getContext");
-            return ret;
-        }
-        
-        frame_ = av_frame_alloc();
-        
-        srccfg_ = srccfg;
-        return ret;
-    }
-    
-    void doClose(){
-        if(swsctx_){
-            sws_freeContext(swsctx_);
-            swsctx_ = NULL;
-        }
-        
-        if(frame_){
-            av_frame_free(&frame_);
-            frame_ = nullptr;
-        }
-    }
-    
-private:
-    FFImageConfig srccfg_;
-    FFImageConfig dstcfg_;
-    SwsContext * swsctx_ = nullptr;
-    AVFrame * frame_ = nullptr;
-};
 
 class FFVideoEncoder{
 public:
@@ -1143,9 +577,9 @@ public:
     
 public:
     FFVideoEncoder():timebase_({1, 1000}){
-        srcImgCfg_.pix_fmt = DEFAULT_PIX_FMT;
-        srcImgCfg_.width = DEFAULT_WIDTH;
-        srcImgCfg_.height = DEFAULT_HEIGHT;
+        srcImgCfg_.setFormat(DEFAULT_PIX_FMT);
+        srcImgCfg_.setWidth(DEFAULT_WIDTH);
+        srcImgCfg_.setHeight(DEFAULT_HEIGHT);
     }
     
     virtual ~FFVideoEncoder(){
@@ -1204,7 +638,7 @@ public:
             AVCodecID codec_id = (AVCodecID)codecId_;
             if(codec_id <= AV_CODEC_ID_NONE){
                 ret = -1;
-                NERROR_FMT_SET(ret, "NOT spec video codec");
+                NERROR_FMT_SET(ret, "NOT spec video encoder");
                 break;
             }
             
@@ -1213,7 +647,7 @@ public:
                 codec = avcodec_find_encoder(codec_id);
                 if (!codec) {
                     ret = -1;
-                    NERROR_FMT_SET(ret, "fail to avcodec_find_encoder video codec id [{}]",
+                    NERROR_FMT_SET(ret, "fail to avcodec_find_encoder video id [{}]",
                                    (int)codec_id);
                     break;
                 }
@@ -1243,8 +677,8 @@ public:
             ctx_->rc_max_rate = ctx_->bit_rate *2;
             ctx_->rc_buffer_size = (int)(ctx_->rc_max_rate * 2);
             
-            ctx_->width = srcImgCfg_.width > 0 ? srcImgCfg_.width : DEFAULT_WIDTH;
-            ctx_->height = srcImgCfg_.height > 0 ? srcImgCfg_.height : DEFAULT_HEIGHT;
+            ctx_->width = srcImgCfg_.getWidth(DEFAULT_WIDTH);
+            ctx_->height = srcImgCfg_.getHeight(DEFAULT_HEIGHT);
             
             ctx_->time_base = timebase_;
             
@@ -1260,7 +694,7 @@ public:
             ctx_->gop_size = gopSize_ > 0 ? gopSize_ : DEFAULT_GOPSIZE;
             
             
-            ctx_->pix_fmt = selectPixelFormat(codec, srcImgCfg_.pix_fmt);
+            ctx_->pix_fmt = selectPixelFormat(codec, srcImgCfg_.getFormat());
             for(auto& it : codecOpts_){
                 av_opt_set(ctx_->priv_data, it.first.c_str(), it.second.c_str(), 0);
             }
@@ -1289,9 +723,9 @@ public:
                 break;
             }
             
-            encImgCfg_.pix_fmt = ctx_->pix_fmt;
-            encImgCfg_.width = ctx_->width;
-            encImgCfg_.height = ctx_->height;
+            encImgCfg_.setFormat(ctx_->pix_fmt);
+            encImgCfg_.setWidth(ctx_->width);
+            encImgCfg_.setHeight(ctx_->height);
             srcImgCfg_.match(encImgCfg_);
             ret = adatper_.open(srcImgCfg_, encImgCfg_);
             if(ret != 0){
@@ -1398,67 +832,6 @@ private:
 };
 
 
-struct FFSampleConfig{
-    int samplerate ;
-    uint64_t channellayout ;
-    AVSampleFormat samplefmt;
-    int framesize;
-    
-    FFSampleConfig(){
-        reset();
-    }
-    
-    void reset(){
-        samplerate = -1;
-        channellayout = 0;
-        samplefmt = AV_SAMPLE_FMT_NONE;
-        framesize = 0;
-    }
-    
-    void assign(const AVFrame* frame){
-        samplerate = frame->sample_rate;
-        channellayout = frame->channel_layout;
-        samplefmt = (AVSampleFormat)frame->format;
-    }
-    
-    bool valid()const{
-        return (samplerate > 0 && channellayout > 0 && samplefmt > AV_SAMPLE_FMT_NONE);
-    }
-    
-    bool equalBase(const FFSampleConfig& other)const{
-        return (samplerate == other.samplerate
-                && channellayout == other.channellayout
-                && samplefmt == other.samplefmt);
-    }
-    
-    bool equalBase(const AVFrame* frame)const{
-        return (samplerate == frame->sample_rate
-                && channellayout == frame->channel_layout
-                && (int)samplefmt == frame->format);
-    }
-    
-    bool equal(const FFSampleConfig& other)const{
-        return (equalBase(other)
-                && framesize == other.framesize);
-    }
-    
-    void match(const FFSampleConfig& stdcfg){
-        FFSampleConfig& cfg = *this;
-        if(cfg.samplefmt <= AV_SAMPLE_FMT_NONE){
-            cfg.samplefmt = stdcfg.samplefmt;
-        }
-        if(cfg.samplerate <= 0){
-            cfg.samplerate = stdcfg.samplerate;
-        }
-        if(cfg.channellayout == 0){
-            cfg.channellayout = stdcfg.channellayout;
-        }
-        if(cfg.framesize <= 0 && stdcfg.framesize > 0){
-            cfg.framesize = stdcfg.framesize;
-        }
-    }
-};
-
 class FFFramesizeConverter{
 public:
     FFFramesizeConverter():outTimebase_({1, 1000}){
@@ -1472,7 +845,7 @@ public:
     int open(const AVRational& timebase, int framesize){
         close();
         outTimebase_ = timebase;
-        dstCfg_.framesize = framesize;
+        dstCfg_.setFrameSize(framesize);
         return 0;
     }
     
@@ -1495,7 +868,7 @@ public:
         }
         
         if(!outFrame_){
-            if(srcframe->nb_samples == dstCfg_.framesize || dstCfg_.framesize <= 0){
+            if(srcframe->nb_samples == dstCfg_.getFrameSize() || dstCfg_.getFrameSize() <= 0){
                 // same frame size, output directly
                 ret = func(srcframe);
                 return ret;
@@ -1512,7 +885,7 @@ public:
         while(src_offset < srcframe->nb_samples){
             checkAssignFrame();
             int remain_samples = srcframe->nb_samples-src_offset;
-            int min = std::min(remain_samples+dst_offset, dstCfg_.framesize);
+            int min = std::min(remain_samples+dst_offset, dstCfg_.getFrameSize());
             int num_copy = min - dst_offset;
             
             av_samples_copy(outFrame_->data, srcframe->data,
@@ -1522,7 +895,7 @@ public:
             dst_offset += num_copy;
             src_offset += num_copy;
             outFrame_->nb_samples = dst_offset;
-            if(outFrame_->nb_samples == dstCfg_.framesize){
+            if(outFrame_->nb_samples == dstCfg_.getFrameSize()){
                 outFrame_->pkt_size = av_samples_get_buffer_size(outFrame_->linesize, outFrame_->channels,
                                                                  outFrame_->nb_samples, (AVSampleFormat)outFrame_->format,
                                                                  1);
@@ -1541,14 +914,14 @@ public:
     
 private:
     int64_t samples2Duration(int out_samples){
-        int64_t duration = out_samples * outTimebase_.den / dstCfg_.samplerate / outTimebase_.num;
+        int64_t duration = out_samples * outTimebase_.den / dstCfg_.getSampleRate() / outTimebase_.num;
         return duration;
     }
     
     void checkAssignFrame(){
         if(!outFrame_->buf[0]){
             assignFrame();
-            outFrame_->nb_samples = dstCfg_.framesize;
+            outFrame_->nb_samples = dstCfg_.getFrameSize();
             if(outFrame_->nb_samples > 0){
                 av_frame_get_buffer(outFrame_, 0);
             }
@@ -1557,9 +930,9 @@ private:
     }
     
     void assignFrame(){
-        outFrame_->sample_rate = dstCfg_.samplerate;
-        outFrame_->format = dstCfg_.samplefmt;
-        outFrame_->channel_layout = dstCfg_.channellayout;
+        outFrame_->sample_rate = dstCfg_.getSampleRate();
+        outFrame_->format = dstCfg_.getFormat();
+        outFrame_->channel_layout = dstCfg_.getChLayout();
         outFrame_->channels = av_get_channel_layout_nb_channels(outFrame_->channel_layout);
     }
     
@@ -1595,12 +968,12 @@ public:
             
             swrctx_ = swr_alloc_set_opts(
                                         NULL,
-                                        dstcfg.channellayout,
-                                        dstcfg.samplefmt,
-                                        dstcfg.samplerate,
-                                        srccfg.channellayout,
-                                        srccfg.samplefmt,
-                                        srccfg.samplerate,
+                                        dstcfg.getChLayout(),
+                                        dstcfg.getFormat(),
+                                        dstcfg.getSampleRate(),
+                                        srccfg.getChLayout(),
+                                        srccfg.getFormat(),
+                                        srccfg.getSampleRate(),
                                         0, NULL);
             if(!swrctx_){
                 NERROR_FMT_SET(ret, "fail to swr_alloc_set_opts");
@@ -1619,7 +992,7 @@ public:
             frame_ = av_frame_alloc();
             
         }else{
-            ret = sizeConverter_.open(timebase_, dstcfg_.framesize);
+            ret = sizeConverter_.open(timebase_, dstcfg_.getFrameSize());
         }
         return ret;
     }
@@ -1754,19 +1127,19 @@ public:
     
 private:
     int64_t dstDuration(int out_samples){
-        int64_t duration = out_samples * timebase_.den / dstcfg_.samplerate / timebase_.num;
+        int64_t duration = out_samples * timebase_.den / dstcfg_.getSampleRate() / timebase_.num;
         return duration;
     }
     
     int checkAssignFrame(){
-        frame_->sample_rate = dstcfg_.samplerate;
-        frame_->format = dstcfg_.samplefmt;
-        frame_->channel_layout = dstcfg_.channellayout;
+        frame_->sample_rate = dstcfg_.getSampleRate();
+        frame_->format = dstcfg_.getFormat();
+        frame_->channel_layout = dstcfg_.getChLayout();
         frame_->channels = av_get_channel_layout_nb_channels(frame_->channel_layout);
         
         int ret = 0;
-        if(dstcfg_.framesize > 0){
-            frame_->nb_samples = dstcfg_.framesize;
+        if(dstcfg_.getFrameSize() > 0){
+            frame_->nb_samples = dstcfg_.getFrameSize();
             ret = av_frame_get_buffer(frame_, 0);
         }
         return ret;
@@ -1900,9 +1273,9 @@ public:
             }
             
             ctx_->bit_rate = bitrate_ > 0 ? bitrate_ : DEFAULT_BITRATE;
-            ctx_->sample_fmt     = selectSampleFormat(codec, srcCfg_.samplefmt);
-            ctx_->sample_rate    = selectSampleRate(codec, srcCfg_.samplerate);
-            ctx_->channel_layout = selectChannelLayout(codec, srcCfg_.channellayout );
+            ctx_->sample_fmt     = selectSampleFormat(codec, srcCfg_.getFormat());
+            ctx_->sample_rate    = selectSampleRate(codec, srcCfg_.getSampleRate());
+            ctx_->channel_layout = selectChannelLayout(codec, srcCfg_.getChLayout() );
             ctx_->channels       = av_get_channel_layout_nb_channels(ctx_->channel_layout);
             ctx_->time_base      = timebase_;
             //ctx_->time_base      = srcCfg_.timebase;
@@ -1914,10 +1287,10 @@ public:
                 break;
             }
             
-            encodeCfg_.samplefmt = ctx_->sample_fmt;
-            encodeCfg_.samplerate = ctx_->sample_rate;
-            encodeCfg_.channellayout = ctx_->channel_layout;
-            encodeCfg_.framesize = ctx_->frame_size;
+            encodeCfg_.setFormat(ctx_->sample_fmt);
+            encodeCfg_.setSampleRate(ctx_->sample_rate);
+            encodeCfg_.setChLayout(ctx_->channel_layout);
+            encodeCfg_.setFrameSize(ctx_->frame_size);
             //encodeCfg_.timebase = ctx_->time_base;
             
             srcCfg_.match(encodeCfg_);
@@ -2116,8 +1489,6 @@ private:
 
 int main_write_mp4(int argc, char** argv)
 {
-    av_register_all();
-    avcodec_register_all();
     
     const char* video_raw_file = NULL;
     const char* audio_raw_file = NULL;
@@ -2132,7 +1503,7 @@ int main_write_mp4(int argc, char** argv)
     dbgi("output_file=[%s]", output_file);
     
     //ravrecord_t recorder = nullptr;
-    FFContainerWriter writer;
+    FFWriter writer;
     H264FileReader * video = nullptr;
     AACFileReader * audio = nullptr;
     int ret = 0;
@@ -2152,12 +1523,29 @@ int main_write_mp4(int argc, char** argv)
             }
         }
         
-        ret = writer.open(output_file,
-                           AV_CODEC_ID_H264,
-                           1280, 720, 25, // TODO: fps
-                           AV_CODEC_ID_AAC,
-                           44100,
-                           2);
+        
+//        ret = writer.open(output_file,
+//                           AV_CODEC_ID_H264,
+//                           1280, 720, 25, // TODO: fps
+//                           AV_CODEC_ID_AAC,
+//                           44100,
+//                           2);
+        
+        FFVideoConfig video_cfg;
+        video_cfg.setCodecId(AV_CODEC_ID_H264);
+        video_cfg.setTimeBase(AVRational{1, 1000});
+        video_cfg.video.setWidth(1280);
+        video_cfg.video.setHeight(720);
+        
+        FFAudioConfig audio_cfg;
+        audio_cfg.setCodecId(AV_CODEC_ID_AAC);
+        audio_cfg.setTimeBase(AVRational{1, 1000});
+        audio_cfg.audio.setSampleRate(44100);
+        audio_cfg.audio.setChLayout(av_get_default_channel_layout(2));
+        
+        int video_index = writer.addVideoTrack(video_cfg);
+        int audio_index = writer.addAudioTrack(audio_cfg);
+        ret = writer.open(output_file);
         if (ret) {
             dbge("fail to open writer");
             ret = -1;
@@ -2179,7 +1567,8 @@ int main_write_mp4(int argc, char** argv)
         while(video_ts != MAX_TS || audio_ts != MAX_TS){
             if(audio && audio_ts <= video_ts && audio_ts != MAX_TS){
                 //rr_process_audio(recorder, audio_ts, audio->data(), (int)audio->dataLength());
-                writer.writeAudio(audio_ts, audio->data(), (int)audio->dataLength());
+                //writer.writeAudio(audio_ts, audio->data(), (int)audio->dataLength());
+                writer.write(audio_index, audio_ts, audio_ts, audio->data(), (int)audio->dataLength());
                 ret = audio->next();
                 audio_ts = ret == 0 ? audio->timestamp() : MAX_TS;
             }else if(video && video_ts != MAX_TS){
@@ -2191,7 +1580,9 @@ int main_write_mp4(int argc, char** argv)
                 } else {
                     is_key_frame = false;
                 }
-                writer.writeVideo(video_ts, video->data(), (int)video->dataLength(), is_key_frame);
+                //writer.writeVideo(video_ts, video->data(), (int)video->dataLength(), is_key_frame);
+                writer.write(video_index, video_ts, video_ts,
+                             video->data(), (int)video->dataLength(), is_key_frame);
                 ret = video->next();
                 video_ts = ret == 0 ? video->timestamp() : MAX_TS;
             }
@@ -2217,281 +1608,276 @@ int main_write_mp4(int argc, char** argv)
     return 0;
 }
 
-int record_camera(){
-    const std::string output_path = "/tmp";
-    
-    const std::string output_encoded_file = output_path +"/out.mp4";
-    const std::string deviceName = "FaceTime HD Camera"; // or "2";
-    const std::string optFormat = "avfoundation";
-    const std::string optPixelFmt;
-    FILE * out_yuv_fp = NULL;
-    
-    
-    odbgi("output_encoded_file=[%s]", output_encoded_file.c_str());
-    
-    FFContainerReader * deviceReader = nullptr;
-    FFVideoEncoder videoEncoder;
-    FFContainerWriter writer;
-    int ret = -1;
-    do{
-        deviceReader = new FFContainerReader("dev");
-        deviceReader->setVideoOptions(640, 480, 30, optPixelFmt);
-        ret = deviceReader->open(optFormat, deviceName);
-        if(ret){
-            odbge("fail to open camera, ret=%d", ret);
-            break;
-        }
-        
-        FFVideoTrack * videoTrack = deviceReader->openVideoTrack(AV_PIX_FMT_YUV420P);
-        //FFVideoTrack * videoTrack = deviceReader->openVideoTrack(AV_PIX_FMT_NONE);
-        if(!videoTrack){
-            odbge("fail to open video track");
-            ret = -22;
-            break;
-        }
-        odbgi("open camera ok");
-        
-        FFImageConfig imgcfg;
-        imgcfg.pix_fmt = videoTrack->getPixelFormat();
-        imgcfg.width = videoTrack->getWidth();
-        imgcfg.height = videoTrack->getHeight();
-        videoEncoder.setSrcImageConfig(imgcfg);
-        videoEncoder.setCodecId(AV_CODEC_ID_H264);
-        videoEncoder.setBitrate(1000*1000);
-        ret = videoEncoder.open();
-        if (ret) {
-            odbge("fail to open encoder");
-            ret = -1;
-            break;
-        }
-        odbgi("open encoder success");
-        
-        ret = writer.open(output_encoded_file,
-                          AV_CODEC_ID_H264,
-                          videoTrack->getWidth(), videoTrack->getHeight(), 25, // TODO: fps
-                          AV_CODEC_ID_NONE,
-                          44100,
-                          2);
-        if (ret) {
-            odbge("fail to open writer");
-            ret = -1;
-            break;
-        }
-        odbgi("open writer success");
-        
-        const std::string output_yuv_file = fmt::format("{}/out_{}x{}_{}.yuv",
-                                                        output_path,
-                                                        imgcfg.width,
-                                                        imgcfg.height,
-                                                        av_get_pix_fmt_name(imgcfg.pix_fmt));
-        out_yuv_fp = fopen(output_yuv_file.c_str(), "wb");
-        if(!out_yuv_fp){
-            odbge("fail to write open [%s]", output_yuv_file.c_str());
-            ret = -1;
-            break;
-        }
-        odbgi("opened output_yuv_file=[%s]", output_yuv_file.c_str());
-        
-        AVRational cap_time_base = {1, 1000000};
-        AVRational mux_time_base = {1, 1000};
-        FFPTSConverter pts_converter(cap_time_base, mux_time_base);
-        
-        Int64Relative cap_rel_pts;
-        Int64Relative enc_rel_pts;
-        
-        AVFrame * avframe = NULL;
-        for(uint32_t nframes = 0; nframes < 30*3; ++nframes){
-            FFTrack * track = deviceReader->readNext();
-            if(track->getMediaType() == AVMEDIA_TYPE_VIDEO){
-                avframe = track->getLastFrame();
-                if(avframe){
-                    //avframe->pts = NUtil::get_now_ms();
-                    avframe->pts = pts_converter.convert(avframe->pts);
-                    odbgi("camera image: pts=%lld(%+lld,%+lld) w=%d, h=%d, size=%d, fmt=%s",
-                          avframe->pts, cap_rel_pts.offset(avframe->pts), cap_rel_pts.delta(avframe->pts),
-                          avframe->width, avframe->height, avframe->pkt_size,
-                          av_get_pix_fmt_name((AVPixelFormat)avframe->format));
-                    
-                    if(out_yuv_fp ){
-                        if(imgcfg.pix_fmt == AV_PIX_FMT_YUV420P){
-                            ret = (int)fwrite(avframe->data[0], sizeof(char), imgcfg.width*imgcfg.height, out_yuv_fp);
-                            ret = (int)fwrite(avframe->data[1], sizeof(char), imgcfg.width*imgcfg.height/4, out_yuv_fp);
-                            ret = (int)fwrite(avframe->data[2], sizeof(char), imgcfg.width*imgcfg.height/4, out_yuv_fp);
-                        }else if(imgcfg.pix_fmt == AV_PIX_FMT_UYVY422){
-                            ret = (int)fwrite(avframe->data[0], sizeof(char), imgcfg.width*imgcfg.height*2, out_yuv_fp);
-                        }
+//int record_camera(){
+//    const std::string output_path = "/tmp";
+//
+//    const std::string output_encoded_file = output_path +"/out.mp4";
+//    const std::string deviceName = "FaceTime HD Camera"; // or "2";
+//    const std::string optFormat = "avfoundation";
+//    const std::string optPixelFmt;
+//    FILE * out_yuv_fp = NULL;
+//
+//
+//    odbgi("output_encoded_file=[%s]", output_encoded_file.c_str());
+//
+//    FFContainerReader * deviceReader = nullptr;
+//    FFVideoEncoder videoEncoder;
+//    FFContainerWriter writer;
+//    int ret = -1;
+//    do{
+//        deviceReader = new FFContainerReader("dev");
+//        deviceReader->setVideoOptions(640, 480, 30, optPixelFmt);
+//        ret = deviceReader->open(optFormat, deviceName);
+//        if(ret){
+//            odbge("fail to open camera, ret=%d", ret);
+//            break;
+//        }
+//
+//        FFVideoTrack * videoTrack = deviceReader->openVideoTrack(AV_PIX_FMT_YUV420P);
+//        //FFVideoTrack * videoTrack = deviceReader->openVideoTrack(AV_PIX_FMT_NONE);
+//        if(!videoTrack){
+//            odbge("fail to open video track");
+//            ret = -22;
+//            break;
+//        }
+//        odbgi("open camera ok");
+//
+//        FFImageConfig imgcfg;
+//        imgcfg.pix_fmt = videoTrack->getPixelFormat();
+//        imgcfg.width = videoTrack->getWidth();
+//        imgcfg.height = videoTrack->getHeight();
+//        videoEncoder.setSrcImageConfig(imgcfg);
+//        videoEncoder.setCodecId(AV_CODEC_ID_H264);
+//        videoEncoder.setBitrate(1000*1000);
+//        ret = videoEncoder.open();
+//        if (ret) {
+//            odbge("fail to open encoder");
+//            ret = -1;
+//            break;
+//        }
+//        odbgi("open encoder success");
+//
+//        ret = writer.open(output_encoded_file,
+//                          AV_CODEC_ID_H264,
+//                          videoTrack->getWidth(), videoTrack->getHeight(), 25, // TODO: fps
+//                          AV_CODEC_ID_NONE,
+//                          44100,
+//                          2);
+//        if (ret) {
+//            odbge("fail to open writer");
+//            ret = -1;
+//            break;
+//        }
+//        odbgi("open writer success");
+//
+//        const std::string output_yuv_file = fmt::format("{}/out_{}x{}_{}.yuv",
+//                                                        output_path,
+//                                                        imgcfg.width,
+//                                                        imgcfg.height,
+//                                                        av_get_pix_fmt_name(imgcfg.pix_fmt));
+//        out_yuv_fp = fopen(output_yuv_file.c_str(), "wb");
+//        if(!out_yuv_fp){
+//            odbge("fail to write open [%s]", output_yuv_file.c_str());
+//            ret = -1;
+//            break;
+//        }
+//        odbgi("opened output_yuv_file=[%s]", output_yuv_file.c_str());
+//
+//        AVRational cap_time_base = {1, 1000000};
+//        AVRational mux_time_base = {1, 1000};
+//        FFPTSConverter pts_converter(cap_time_base, mux_time_base);
+//
+//        Int64Relative cap_rel_pts;
+//        Int64Relative enc_rel_pts;
+//
+//        AVFrame * avframe = NULL;
+//        for(uint32_t nframes = 0; nframes < 30*3; ++nframes){
+//            FFTrack * track = deviceReader->readNext();
+//            if(track->getMediaType() == AVMEDIA_TYPE_VIDEO){
+//                avframe = track->getLastFrame();
+//                if(avframe){
+//                    //avframe->pts = NUtil::get_now_ms();
+//                    avframe->pts = pts_converter.convert(avframe->pts);
+//                    odbgi("camera image: pts=%lld(%+lld,%+lld) w=%d, h=%d, size=%d, fmt=%s",
+//                          avframe->pts, cap_rel_pts.offset(avframe->pts), cap_rel_pts.delta(avframe->pts),
+//                          avframe->width, avframe->height, avframe->pkt_size,
+//                          av_get_pix_fmt_name((AVPixelFormat)avframe->format));
+//
+//                    if(out_yuv_fp ){
+//                        if(imgcfg.pix_fmt == AV_PIX_FMT_YUV420P){
+//                            ret = (int)fwrite(avframe->data[0], sizeof(char), imgcfg.width*imgcfg.height, out_yuv_fp);
+//                            ret = (int)fwrite(avframe->data[1], sizeof(char), imgcfg.width*imgcfg.height/4, out_yuv_fp);
+//                            ret = (int)fwrite(avframe->data[2], sizeof(char), imgcfg.width*imgcfg.height/4, out_yuv_fp);
+//                        }else if(imgcfg.pix_fmt == AV_PIX_FMT_UYVY422){
+//                            ret = (int)fwrite(avframe->data[0], sizeof(char), imgcfg.width*imgcfg.height*2, out_yuv_fp);
+//                        }
+//
+//                    }
+//
+//                    videoEncoder.encode(avframe, [&writer, &enc_rel_pts](AVPacket * pkt)->int{
+//                        odbgi("encode pkt: pts=%lld(%+lld,%+lld), size=%d, keyfrm=%d",
+//                              pkt->pts, enc_rel_pts.offset(pkt->pts), enc_rel_pts.delta(pkt->pts),
+//                              pkt->size,
+//                              pkt->flags & AV_PKT_FLAG_KEY);
+//                        return writer.writeVideo(pkt->pts, pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
+//                    });
+//                }
+//            }
+//
+//        }
+//
+//        odbgi("ecode remain frames");
+//        videoEncoder.encode(nullptr, [&writer, &enc_rel_pts](AVPacket * pkt)->int{
+//            odbgi("encode pkt: pts=%lld(%+lld,%+lld), size=%d, keyfrm=%d",
+//                  pkt->pts, enc_rel_pts.offset(pkt->pts), enc_rel_pts.delta(pkt->pts),
+//                  pkt->size,
+//                  pkt->flags & AV_PKT_FLAG_KEY);
+//            return writer.writeVideo(pkt->pts, pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
+//        });
+//
+//        ret = 0;
+//    }while(0);
+//
+//    deviceReader->close();
+//    delete deviceReader;
+//
+//    videoEncoder.close();
+//    writer.close();
+//
+//    if(out_yuv_fp){
+//        fclose(out_yuv_fp);
+//        out_yuv_fp = nullptr;
+//    }
+//
+//    odbgi("record_camera done");
+//    return ret;
+//}
+//int main_record_camera(int argc, char** argv){
+//
+//    return record_camera();
+//}
+//
+//
+//
+//int main_record_microphone(int argc, char** argv){
+//
+//
+//    const char* output_file = NULL;
+//    output_file = "/tmp/out.mp4";
+//
+//
+//    const std::string deviceName = ":Built-in Microphone"; // or ":0";
+//    const std::string optFormat = "avfoundation";
+//    const std::string optPixelFmt;
+//
+//
+//    dbgi("output_file=[%s]", output_file);
+//
+//    FFContainerReader deviceReader("device");
+//    FFAudioEncoder audioEncoder;
+//    FFContainerWriter writer;
+//    int ret = -1;
+//    do{
+//        ret = deviceReader.open(optFormat, deviceName);
+//        if(ret){
+//            odbge("fail to open microphone, ret=%d", ret);
+//            break;
+//        }
+//
+//        FFAudioTrack * audioTrack = deviceReader.openAudioTrack(-1, -1, AV_SAMPLE_FMT_NONE);
+//        //FFAudioTrack * audioTrack = deviceReader.openAudioTrack(-1, -1, AV_SAMPLE_FMT_S16);
+//        if(!audioTrack){
+//            odbge("fail to open audio track");
+//            ret = -22;
+//            break;
+//        }
+//        odbgi("microphone: ch=%d, ar=%d, fmt=[%s], timeb=[%d,%d]",
+//              audioTrack->getChannels(),
+//              audioTrack->getSamplerate(),
+//              av_get_sample_fmt_name(audioTrack->getSampleFormat()),
+//              audioTrack->getTimebase().num, audioTrack->getTimebase().den );
+//
+//        AVRational cap_time_base = {1, 1000000};
+//        AVRational mux_time_base = {1, 1000};
+//        FFPTSConverter pts_converter(cap_time_base, mux_time_base);
+//
+//        FFSampleConfig src_cfg;
+//        //src_cfg.timebase = cap_time_base;
+//        src_cfg.samplerate = audioTrack->getSamplerate();
+//        src_cfg.samplefmt = audioTrack->getSampleFormat();
+//        src_cfg.channellayout = av_get_default_channel_layout(audioTrack->getChannels()); // TODO:
+//
+//        audioEncoder.setCodecName("libfdk_aac"); //audioEncoder.setCodecId(AV_CODEC_ID_AAC);
+//        audioEncoder.setSrcConfig(src_cfg);
+//        audioEncoder.setTimebase(mux_time_base);
+//        ret = audioEncoder.open();
+//        if (ret) {
+//            odbge("fail to open encoder");
+//            ret = -1;
+//            break;
+//        }
+//        odbgi("open encoder success");
+//
+//        ret = writer.open(output_file,
+//                          AV_CODEC_ID_NONE,
+//                          0, 0, 0,
+//                          AV_CODEC_ID_AAC,
+//                          audioEncoder.encodeConfig().samplerate,
+//                          av_get_channel_layout_nb_channels(audioEncoder.encodeConfig().channellayout));
+//        if (ret) {
+//            odbge("fail to open writer");
+//            ret = -1;
+//            break;
+//        }
+//        odbgi("open writer success");
+//
+//        int64_t start_ms = NUtil::get_now_ms();
+//        AVFrame * avframe = NULL;
+//        for(uint32_t nframes = 0; (NUtil::get_now_ms()-start_ms) < 5000; ++nframes){
+//            FFTrack * track = deviceReader.readNext();
+//            if(track->getMediaType() == AVMEDIA_TYPE_AUDIO){
+//                avframe = track->getLastFrame();
+//                if(avframe){
+//                    avframe->pts = pts_converter.convert(avframe->pts);
+//                    ret = audioEncoder.encode(avframe, [&writer](AVPacket * pkt)->int{
+//                        return writer.writeAudio(pkt->pts, pkt->data, pkt->size);
+//                    });
+//                    if(ret){
+//                        odbge("fail to encode audio, err=[%d]-[%s]",
+//                              ret, NThreadError::lastMsg().c_str());
+//                        break;
+//                    }
+//                }
+//            }
+//        }
+//
+//        if(ret == 0){
+//            odbgi("encode remain frames");
+//            ret = audioEncoder.encode(nullptr, [&writer](AVPacket * pkt)->int{
+//                return writer.writeAudio(pkt->pts, pkt->data, pkt->size);
+//            });
+//            if(ret){
+//                odbge("fail to encode audio, err=[%d]-[%s]",
+//                      ret, NThreadError::lastMsg().c_str());
+//                break;
+//            }
+//        }
+//
+//        ret = 0;
+//    }while(0);
+//
+//    deviceReader.close();
+//    audioEncoder.close();
+//    writer.close();
+//
+//    return 0;
+//}
 
-                    }
-                    
-                    videoEncoder.encode(avframe, [&writer, &enc_rel_pts](AVPacket * pkt)->int{
-                        odbgi("encode pkt: pts=%lld(%+lld,%+lld), size=%d, keyfrm=%d",
-                              pkt->pts, enc_rel_pts.offset(pkt->pts), enc_rel_pts.delta(pkt->pts),
-                              pkt->size,
-                              pkt->flags & AV_PKT_FLAG_KEY);
-                        return writer.writeVideo(pkt->pts, pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
-                    });
-                }
-            }
-            
-        }
-        
-        odbgi("ecode remain frames");
-        videoEncoder.encode(nullptr, [&writer, &enc_rel_pts](AVPacket * pkt)->int{
-            odbgi("encode pkt: pts=%lld(%+lld,%+lld), size=%d, keyfrm=%d",
-                  pkt->pts, enc_rel_pts.offset(pkt->pts), enc_rel_pts.delta(pkt->pts),
-                  pkt->size,
-                  pkt->flags & AV_PKT_FLAG_KEY);
-            return writer.writeVideo(pkt->pts, pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
-        });
-        
-        ret = 0;
-    }while(0);
-    
-    deviceReader->close();
-    delete deviceReader;
-    
-    videoEncoder.close();
-    writer.close();
-    
-    if(out_yuv_fp){
-        fclose(out_yuv_fp);
-        out_yuv_fp = nullptr;
-    }
-    
-    odbgi("record_camera done");
-    return ret;
-}
-int main_record_camera(int argc, char** argv){
-    av_register_all();
-    avdevice_register_all();
-    avcodec_register_all();
-    
-    return record_camera();
-}
 
 
-
-int main_record_microphone(int argc, char** argv){
-    av_register_all();
-    avdevice_register_all();
-    avcodec_register_all();
-    
-    
-    const char* output_file = NULL;
-    output_file = "/tmp/out.mp4";
-    
-    
-    const std::string deviceName = ":Built-in Microphone"; // or ":0";
-    const std::string optFormat = "avfoundation";
-    const std::string optPixelFmt;
-    
-    
-    dbgi("output_file=[%s]", output_file);
-    
-    FFContainerReader deviceReader("device");
-    FFAudioEncoder audioEncoder;
-    FFContainerWriter writer;
-    int ret = -1;
-    do{
-        ret = deviceReader.open(optFormat, deviceName);
-        if(ret){
-            odbge("fail to open microphone, ret=%d", ret);
-            break;
-        }
-        
-        FFAudioTrack * audioTrack = deviceReader.openAudioTrack(-1, -1, AV_SAMPLE_FMT_NONE);
-        //FFAudioTrack * audioTrack = deviceReader.openAudioTrack(-1, -1, AV_SAMPLE_FMT_S16);
-        if(!audioTrack){
-            odbge("fail to open audio track");
-            ret = -22;
-            break;
-        }
-        odbgi("microphone: ch=%d, ar=%d, fmt=[%s], timeb=[%d,%d]",
-              audioTrack->getChannels(),
-              audioTrack->getSamplerate(),
-              av_get_sample_fmt_name(audioTrack->getSampleFormat()),
-              audioTrack->getTimebase().num, audioTrack->getTimebase().den );
-        
-        AVRational cap_time_base = {1, 1000000};
-        AVRational mux_time_base = {1, 1000};
-        FFPTSConverter pts_converter(cap_time_base, mux_time_base);
-        
-        FFSampleConfig src_cfg;
-        //src_cfg.timebase = cap_time_base;
-        src_cfg.samplerate = audioTrack->getSamplerate();
-        src_cfg.samplefmt = audioTrack->getSampleFormat();
-        src_cfg.channellayout = av_get_default_channel_layout(audioTrack->getChannels()); // TODO:
-        
-        audioEncoder.setCodecName("libfdk_aac"); //audioEncoder.setCodecId(AV_CODEC_ID_AAC);
-        audioEncoder.setSrcConfig(src_cfg);
-        audioEncoder.setTimebase(mux_time_base);
-        ret = audioEncoder.open();
-        if (ret) {
-            odbge("fail to open encoder");
-            ret = -1;
-            break;
-        }
-        odbgi("open encoder success");
-        
-        ret = writer.open(output_file,
-                          AV_CODEC_ID_NONE,
-                          0, 0, 0,
-                          AV_CODEC_ID_AAC,
-                          audioEncoder.encodeConfig().samplerate,
-                          av_get_channel_layout_nb_channels(audioEncoder.encodeConfig().channellayout));
-        if (ret) {
-            odbge("fail to open writer");
-            ret = -1;
-            break;
-        }
-        odbgi("open writer success");
-        
-        int64_t start_ms = NUtil::get_now_ms();
-        AVFrame * avframe = NULL;
-        for(uint32_t nframes = 0; (NUtil::get_now_ms()-start_ms) < 5000; ++nframes){
-            FFTrack * track = deviceReader.readNext();
-            if(track->getMediaType() == AVMEDIA_TYPE_AUDIO){
-                avframe = track->getLastFrame();
-                if(avframe){
-                    avframe->pts = pts_converter.convert(avframe->pts);
-                    ret = audioEncoder.encode(avframe, [&writer](AVPacket * pkt)->int{
-                        return writer.writeAudio(pkt->pts, pkt->data, pkt->size);
-                    });
-                    if(ret){
-                        odbge("fail to encode audio, err=[%d]-[%s]",
-                              ret, NThreadError::lastMsg().c_str());
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if(ret == 0){
-            odbgi("encode remain frames");
-            ret = audioEncoder.encode(nullptr, [&writer](AVPacket * pkt)->int{
-                return writer.writeAudio(pkt->pts, pkt->data, pkt->size);
-            });
-            if(ret){
-                odbge("fail to encode audio, err=[%d]-[%s]",
-                      ret, NThreadError::lastMsg().c_str());
-                break;
-            }
-        }
-        
-        ret = 0;
-    }while(0);
-    
-    deviceReader.close();
-    audioEncoder.close();
-    writer.close();
-    
-    return 0;
-}
 
 int main_record_mp4(int argc, char** argv){
-    av_register_all();
-    avdevice_register_all();
-    avcodec_register_all();
+
 
     const std::string video_codec_name = "libx264";
     const std::string audio_codec_name = "libfdk_aac";
@@ -2512,18 +1898,59 @@ int main_record_mp4(int argc, char** argv){
     FFContainerReader deviceReader("device");
     FFAudioEncoder audioEncoder;
     FFVideoEncoder videoEncoder;
-    FFContainerWriter writer;
+    FFWriter writer;
+    FFDecodeReader reader;
     int ret = -1;
     do{
+//        FFImageConfig camera_cfg;
+//        camera_cfg.setWidth(640);
+//        camera_cfg.setHeight(480);
+//        camera_cfg.setFrameRate(30);
+//        reader.setOptions(camera_cfg);
+//        ret = reader.open(optFormat, deviceName,std::map<std::string, std::string>());
+//        if(ret){
+//            odbge("fail to open device, ret=%d", ret);
+//            break;
+//        }
+//        odbgi("open input OK");
+//        
+//        FFMediaConfig cap_audio_cfg;
+//        FFMediaConfig cap_video_cfg;
+//        
+//        int cap_audio_index = reader.getFirstIndex(AVMEDIA_TYPE_AUDIO);
+//        int cap_video_index = reader.getFirstIndex(AVMEDIA_TYPE_VIDEO);
+//        if(cap_audio_index >= 0){
+//            //cap_audio_cfg.assignDecode(reader.getCodecCtx(cap_audio_index));
+//            cap_audio_cfg = reader.getCfg(cap_audio_index);
+//        }
+//        if(cap_video_index >= 0){
+//            //cap_video_cfg.assignDecode(reader.getCodecCtx(cap_video_index));
+//            cap_video_cfg = reader.getCfg(cap_video_index);
+//        }
+//        
+//        while(1){
+//            ret = reader.read([&cap_audio_index, &cap_video_index]
+//                              (int index, const AVFrame * frame)->int{
+//                odbgi("got frame: index=%d, pts=%lld, format=%d", index, frame->pts, frame->format);
+//                if (index == cap_audio_index){
+//                    
+//                }else if (index == cap_video_index){
+//                    
+//                }
+//                return 0;
+//            });
+//        }
+
+        
         AVRational cap_time_base = {1, 1000000};
         AVRational mux_time_base = {1, 1000};
         FFPTSConverter pts_converter(cap_time_base, mux_time_base);
         
-        //deviceReader.setVideoOptions(640, 480, 30, optPixelFmt);
-        deviceReader.setVideoOptions(1280, 720, 30, optPixelFmt);
+        deviceReader.setVideoOptions(640, 480, 30, optPixelFmt);
+        //deviceReader.setVideoOptions(1280, 720, 30, optPixelFmt);
         ret = deviceReader.open(optFormat, deviceName);
         if(ret){
-            odbge("fail to open microphone, ret=%d", ret);
+            odbge("fail to open device, ret=%d", ret);
             break;
         }
 
@@ -2539,9 +1966,9 @@ int main_record_mp4(int argc, char** argv){
                   audioTrack->getTimebase().num, audioTrack->getTimebase().den );
             
             FFSampleConfig sample_cfg;
-            sample_cfg.samplerate = audioTrack->getSamplerate();
-            sample_cfg.samplefmt = audioTrack->getSampleFormat();
-            sample_cfg.channellayout = av_get_default_channel_layout(audioTrack->getChannels()); // TODO:
+            sample_cfg.setSampleRate(audioTrack->getSamplerate());
+            sample_cfg.setFormat(audioTrack->getSampleFormat());
+            sample_cfg.setChLayout(av_get_default_channel_layout(audioTrack->getChannels())); // TODO:
             
             //audioEncoder.setCodecId(AV_CODEC_ID_AAC);
             audioEncoder.setCodecName(audio_codec_name);
@@ -2567,13 +1994,13 @@ int main_record_mp4(int argc, char** argv){
                   av_get_pix_fmt_name(videoTrack->getPixelFormat()),
                   videoTrack->getTimebase().num, videoTrack->getTimebase().den );
             
-            imgcfg.pix_fmt = videoTrack->getPixelFormat();
-            imgcfg.width = videoTrack->getWidth();
-            imgcfg.height = videoTrack->getHeight();
+            imgcfg.setFormat(videoTrack->getPixelFormat());
+            imgcfg.setWidth(videoTrack->getWidth());
+            imgcfg.setHeight(videoTrack->getHeight());
             videoEncoder.setSrcImageConfig(imgcfg);
             //videoEncoder.setCodecId(AV_CODEC_ID_H264);
             videoEncoder.setCodecName(video_codec_name);
-            videoEncoder.setBitrate(2000*1000);
+            videoEncoder.setBitrate(1000*1000);
             videoEncoder.setCodecOpt("preset", "fast");
             ret = videoEncoder.open();
             if (ret) {
@@ -2585,9 +2012,9 @@ int main_record_mp4(int argc, char** argv){
             
             const std::string output_yuv_file = fmt::format("{}/out_{}x{}_{}.yuv",
                                                             output_path,
-                                                            imgcfg.width,
-                                                            imgcfg.height,
-                                                            av_get_pix_fmt_name(imgcfg.pix_fmt));
+                                                            imgcfg.getWidth(),
+                                                            imgcfg.getHeight(),
+                                                            av_get_pix_fmt_name(imgcfg.getFormat()));
             out_yuv_fp = fopen(output_yuv_file.c_str(), "wb");
             if(!out_yuv_fp){
                 odbge("fail to write open [%s]", output_yuv_file.c_str());
@@ -2603,14 +2030,37 @@ int main_record_mp4(int argc, char** argv){
             break;
         }
         
-        ret = writer.open(output_encoded_file,
-                          videoEncoder.codecId(),
-                          videoEncoder.encodeImageCfg().width,
-                          videoEncoder.encodeImageCfg().height,
-                          25,
-                          audioEncoder.codecId(),
-                          audioEncoder.encodeConfig().samplerate,
-                          av_get_channel_layout_nb_channels(audioEncoder.encodeConfig().channellayout));
+//        ret = writer.open(output_encoded_file,
+//                          videoEncoder.codecId(),
+//                          videoEncoder.encodeImageCfg().width,
+//                          videoEncoder.encodeImageCfg().height,
+//                          25,
+//                          audioEncoder.codecId(),
+//                          audioEncoder.encodeConfig().samplerate,
+//                          av_get_channel_layout_nb_channels(audioEncoder.encodeConfig().channellayout));
+        
+        FFAudioConfig out_audio_cfg;
+        FFVideoConfig out_video_cfg;
+        
+        int write_audio_index = -1;
+        if(audioTrack){
+            out_audio_cfg.setCodecId(audioEncoder.codecId());
+            out_audio_cfg.setTimeBase(mux_time_base);
+            out_audio_cfg.audio = audioEncoder.encodeConfig();
+            ret = writer.addAudioTrack(out_audio_cfg);
+            write_audio_index = ret;
+        }
+        
+        int write_video_index = -1;
+        if(videoTrack){
+            out_video_cfg.setCodecId(videoEncoder.codecId());
+            out_video_cfg.setTimeBase(mux_time_base);
+            out_video_cfg.video = videoEncoder.encodeImageCfg();
+            ret = writer.addVideoTrack(out_video_cfg);
+            write_video_index = ret;
+        }
+        
+        ret = writer.open(output_encoded_file);
         if (ret) {
             odbge("fail to open writer");
             ret = -1;
@@ -2644,10 +2094,11 @@ int main_record_mp4(int argc, char** argv){
                       avframe->sample_rate, avframe->channels, avframe->nb_samples,
                       av_get_sample_fmt_name((AVSampleFormat)avframe->format),
                       avframe->pkt_size);
-                ret = audioEncoder.encode(avframe, [&writer, &audio_enc_pts](AVPacket * pkt)->int{
+                ret = audioEncoder.encode(avframe, [&writer, &audio_enc_pts, &write_audio_index](AVPacket * pkt)->int{
                     odbgi("write audio: pts=%lld(%+lld,%+lld), dts=%lld, size=%d",
                           pkt->pts, audio_enc_pts.offset(pkt->pts), audio_enc_pts.delta(pkt->pts), pkt->dts, pkt->size);
-                    return writer.writeAudio(pkt->pts, pkt->data, pkt->size);
+                    //return writer.writeAudio(pkt->pts, pkt->data, pkt->size);
+                    return writer.write(write_audio_index, pkt);
                 });
                 
                 if(ret){
@@ -2666,22 +2117,23 @@ int main_record_mp4(int argc, char** argv){
                       avframe->pkt_size);
                 
                 if(out_yuv_fp ){
-                    if(imgcfg.pix_fmt == AV_PIX_FMT_YUV420P){
-                        ret = (int)fwrite(avframe->data[0], sizeof(char), imgcfg.width*imgcfg.height, out_yuv_fp);
-                        ret = (int)fwrite(avframe->data[1], sizeof(char), imgcfg.width*imgcfg.height/4, out_yuv_fp);
-                        ret = (int)fwrite(avframe->data[2], sizeof(char), imgcfg.width*imgcfg.height/4, out_yuv_fp);
-                    }else if(imgcfg.pix_fmt == AV_PIX_FMT_UYVY422){
-                        ret = (int)fwrite(avframe->data[0], sizeof(char), imgcfg.width*imgcfg.height*2, out_yuv_fp);
+                    if(imgcfg.getFormat() == AV_PIX_FMT_YUV420P){
+                        ret = (int)fwrite(avframe->data[0], sizeof(char), imgcfg.getImageSize(), out_yuv_fp);
+                        ret = (int)fwrite(avframe->data[1], sizeof(char), imgcfg.getImageSize()/4, out_yuv_fp);
+                        ret = (int)fwrite(avframe->data[2], sizeof(char), imgcfg.getImageSize()/4, out_yuv_fp);
+                    }else if(imgcfg.getFormat() == AV_PIX_FMT_UYVY422){
+                        ret = (int)fwrite(avframe->data[0], sizeof(char), imgcfg.getImageSize()*2, out_yuv_fp);
                     }
                     
                 }
                 
-                ret = videoEncoder.encode(avframe, [&writer, &video_enc_pts](AVPacket * pkt)->int{
+                ret = videoEncoder.encode(avframe, [&writer, &video_enc_pts, &write_video_index](AVPacket * pkt)->int{
                     odbgi("write video pkt: pts=%lld(%+lld,%+lld), dts=%lld, size=%d, keyfrm=%d",
                           pkt->pts, video_enc_pts.offset(pkt->pts), video_enc_pts.delta(pkt->pts),
                           pkt->dts, pkt->size,
                           pkt->flags & AV_PKT_FLAG_KEY);
-                    return writer.writeVideo(pkt->pts, pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
+                    //return writer.writeVideo(pkt->pts, pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
+                    return writer.write(write_video_index, pkt);
                 });
                 
                 if(ret){
@@ -2695,20 +2147,22 @@ int main_record_mp4(int argc, char** argv){
         odbgi("ecode remain frames");
         
         if(audioTrack){
-            ret = audioEncoder.encode(nullptr, [&writer, &audio_enc_pts](AVPacket * pkt)->int{
+            ret = audioEncoder.encode(nullptr, [&writer, &audio_enc_pts, &write_audio_index](AVPacket * pkt)->int{
                 odbgi("write audio pkt: pts=%lld(%+lld,%+lld), dts=%lld, size=%d",
                       pkt->pts, audio_enc_pts.offset(pkt->pts), audio_enc_pts.delta(pkt->pts), pkt->dts, pkt->size);
-                return writer.writeAudio(pkt->pts, pkt->data, pkt->size);
+                //return writer.writeAudio(pkt->pts, pkt->data, pkt->size);
+                return writer.write(write_audio_index, pkt);
             });
         }
 
         if(videoTrack){
-            ret = videoEncoder.encode(nullptr, [&writer, &video_enc_pts](AVPacket * pkt)->int{
+            ret = videoEncoder.encode(nullptr, [&writer, &video_enc_pts, &write_video_index](AVPacket * pkt)->int{
                 odbgi("write video pkt: pts=%lld(%+lld,%+lld), dts=%lld, size=%d, keyfrm=%d",
                       pkt->pts, video_enc_pts.offset(pkt->pts), video_enc_pts.delta(pkt->pts),
                       pkt->dts, pkt->size,
                       pkt->flags & AV_PKT_FLAG_KEY);
-                return writer.writeVideo(pkt->pts, pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
+                //return writer.writeVideo(pkt->pts, pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
+                return writer.write(write_video_index, pkt);
             });
         }
 
@@ -2732,7 +2186,133 @@ int main_record_mp4(int argc, char** argv){
 }
 
 
+class Camera2YUV{
+public:
+    
+    int capture(const std::string& deviceName,
+                const std::string& optFormat,
+                const std::string& outPath,
+                std::string& outFile){
+        const std::string video_codec_name = "libx264";
+        const std::string audio_codec_name = "libfdk_aac";
+        
+        FILE * out_yuv_fp = NULL;
+        FFDecodeReader reader;
+        FFImageAdapter image_adapter;
+        int ret = 0;
+        do{
+            FFImageConfig req_cfg;
+            req_cfg.setWidth(640);
+            req_cfg.setHeight(480);
+            req_cfg.setFrameRate(30);
+            reader.setOptions(req_cfg);
+            ret = reader.open(optFormat, deviceName,std::map<std::string, std::string>());
+            if(ret){
+                odbge("fail to open device, ret=%d", ret);
+                break;
+            }
+            odbgi("open input OK");
+            
+            FFMediaConfig cap_audio_cfg;
+            FFMediaConfig cap_video_cfg;
+            
+            int cap_audio_index = reader.getFirstIndex(AVMEDIA_TYPE_AUDIO);
+            int cap_video_index = reader.getFirstIndex(AVMEDIA_TYPE_VIDEO);
+            if(cap_audio_index >= 0){
+                //cap_audio_cfg.assignDecode(reader.getCodecCtx(cap_audio_index));
+                cap_audio_cfg = reader.getCfg(cap_audio_index);
+            }
+            if(cap_video_index >= 0){
+                //cap_video_cfg.assignDecode(reader.getCodecCtx(cap_video_index));
+                cap_video_cfg = reader.getCfg(cap_video_index);
+            }
+            
+            //FFImageConfig& imgcfg = cap_video_cfg.video;
+            FFImageConfig imgcfg = cap_video_cfg.video;
+            imgcfg.setFormat(AV_PIX_FMT_YUV420P);
+            image_adapter.open(imgcfg);
+            
+            
+            char name_buf[512];
+            sprintf(name_buf,
+                    "%s/out_%dx%d_%s.yuv",
+                    outPath.c_str(),
+                    imgcfg.getWidth(),
+                    imgcfg.getHeight(),
+                    av_get_pix_fmt_name(imgcfg.getFormat()));
+            outFile = name_buf;
+            
+            out_yuv_fp = fopen(outFile.c_str(), "wb");
+            if(!out_yuv_fp){
+                odbge("fail to write open [%s]", outFile.c_str());
+                ret = -1;
+                break;
+            }
+            odbgi("opened output_yuv_file=[%s]", outFile.c_str());
+            
+            int nframes = 100;
+            for(int i = 0; i < nframes; ++i){
+                ret = reader.read([&image_adapter, &cap_audio_index, &cap_video_index, &imgcfg, &out_yuv_fp]
+                                  (int index, const AVFrame * frame)->int{
+                                      odbgi("got frame: index=%d, pts=%lld, format=%d", index, frame->pts, frame->format);
+                                      int ret = 0;
+                                      if (index == cap_audio_index){
+                                          
+                                      }else if (index == cap_video_index){
+                                          ret = image_adapter.adapt(frame, [&cap_audio_index, &cap_video_index, &imgcfg, &out_yuv_fp]
+                                                                    (const AVFrame * frame)->int{
+                                                                        int ret = 0;
+                                                                        if(out_yuv_fp ){
+                                                                            if(imgcfg.getFormat() == AV_PIX_FMT_YUV420P){
+                                                                                ret = (int)fwrite(frame->data[0], sizeof(char), imgcfg.getImageSize(), out_yuv_fp);
+                                                                                ret = (int)fwrite(frame->data[1], sizeof(char), imgcfg.getImageSize()/4, out_yuv_fp);
+                                                                                ret = (int)fwrite(frame->data[2], sizeof(char), imgcfg.getImageSize()/4, out_yuv_fp);
+                                                                            }else if(imgcfg.getFormat() == AV_PIX_FMT_UYVY422){
+                                                                                ret = (int)fwrite(frame->data[0], sizeof(char), imgcfg.getImageSize()*2, out_yuv_fp);
+                                                                            }
+                                                                        }
+                                                                        return ret;
+                                                                    });
+                                      }
+                                      return ret;
+                                      
+                                      
+                                      
+                                  });
+                if(ret) break;
+            }
+            
+            odbgi("capture ok");
+            odbgi("command: ffplay -f rawvideo -video_size %dx%d -pixel_format %s %s",
+                  imgcfg.getWidth(),
+                  imgcfg.getHeight(),
+                  av_get_pix_fmt_name(imgcfg.getFormat()),
+                  outFile.c_str());
+            ret = 0;
+        }while(0);
+        
+        reader.close();
+        image_adapter.close();
+        
+        if(out_yuv_fp){
+            fclose(out_yuv_fp);
+            out_yuv_fp = nullptr;
+        }
+        
+        return ret;
+    }
+};
+
 int lab030_rtmp_push_main(int argc, char** argv){
+    av_register_all();
+    avdevice_register_all();
+    avcodec_register_all();
+    
+//    {
+//        std::string outFile;
+//        Camera2YUV().capture("FaceTime HD Camera", "avfoundation", "/tmp", outFile);
+//    }
+    
     //return main_push_av(argc, argv);
     //return main_write_mp4(argc, argv);
     //return main_record_camera(argc, argv);

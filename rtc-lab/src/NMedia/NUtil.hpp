@@ -12,6 +12,7 @@
 #include <functional>
 #include <iostream>
 #include <thread>
+#include "spdlog/fmt/bundled/format.h"
 
 #define DEFAULT_END_CHARS "\r\n"
 class NLineParser{
@@ -428,6 +429,55 @@ public:
         | ((uint32_t)(data[i+3]))<<24;
     }
     
+    static inline uint64_t le_get8(const uint8_t *data,size_t i) {
+        return (uint64_t)(data[i+0])
+        | ((uint64_t)(data[i+1]))<<8
+        | ((uint64_t)(data[i+2]))<<16
+        | ((uint64_t)(data[i+3]))<<24
+        | ((uint64_t)(data[i+4]))<<32
+        | ((uint64_t)(data[i+5]))<<40
+        | ((uint64_t)(data[i+6]))<<48
+        | ((uint64_t)(data[i+7]))<<56;
+    }
+    
+    static inline void le_set2(uint8_t *data,size_t i,uint32_t val){
+        data[i]     = (uint8_t)(val);
+        data[i+1]   = (uint8_t)(val>>8);
+    }
+    
+    static inline void le_set3(uint8_t *data,size_t i,uint32_t val){
+        data[i]     = (uint8_t)(val);
+        data[i+1]   = (uint8_t)(val>>8);
+        data[i+2]   = (uint8_t)(val>>16);
+    }
+    
+    static inline void le_set4(uint8_t *data,size_t i,uint32_t val){
+        data[i]     = (uint8_t)(val);
+        data[i+1]   = (uint8_t)(val>>8);
+        data[i+2]   = (uint8_t)(val>>16);
+        data[i+3]   = (uint8_t)(val>>24);
+    }
+    
+    static inline void le_set6(uint8_t *data,size_t i,uint64_t val){
+        data[i]     = (uint8_t)(val);
+        data[i+1]   = (uint8_t)(val>>8);
+        data[i+2]   = (uint8_t)(val>>16);
+        data[i+3]   = (uint8_t)(val>>24);
+        data[i+4]   = (uint8_t)(val>>32);
+        data[i+5]   = (uint8_t)(val>>40);
+    }
+    
+    static inline void le_set8(uint8_t *data,size_t i,uint64_t val){
+        data[i]     = (uint8_t)(val);
+        data[i+1]   = (uint8_t)(val>>8);
+        data[i+2]   = (uint8_t)(val>>16);
+        data[i+3]   = (uint8_t)(val>>24);
+        data[i+4]   = (uint8_t)(val>>32);
+        data[i+5]   = (uint8_t)(val>>40);
+        data[i+6]   = (uint8_t)(val>>48);
+        data[i+7]   = (uint8_t)(val>>56);
+    }
+    
     template<typename T>
     static inline T Pad32(T size){
         auto mod = size % 4;
@@ -602,6 +652,29 @@ private:
     int errcode_;
     const std::string errstr_;
 };
+
+#define NERROR_FMT_SET(code, ...)\
+NThreadError::setError(code, fmt::format(__VA_ARGS__))
+class NThreadError{
+public:
+    static const std::string& lastMsg() {
+        return msg_;
+    }
+    
+    static int lastCode() {
+        return code_;
+    }
+    
+    static void setError(int code, const std::string& msg){
+        code_ = code;
+        msg_ = msg;
+    }
+    
+private:
+    static thread_local int code_ ;
+    static thread_local std::string msg_;
+};
+
 
 
 #endif /* NUtil_hpp */
