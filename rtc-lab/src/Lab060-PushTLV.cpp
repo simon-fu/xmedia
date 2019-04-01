@@ -850,7 +850,7 @@ private:
 
 
 
-int lab060_PushTLV_main(int argc, char* argv[]){
+int lab060_PushTLV_main0(int argc, char* argv[]){
     av_register_all();
     avdevice_register_all();
     avcodec_register_all();
@@ -878,3 +878,937 @@ int lab060_PushTLV_main(int argc, char* argv[]){
     
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class FFPCMWriter{
+public:
+    FFPCMWriter(const std::string& name):logger_(NLogger::Get(name)){
+    }
+    
+    virtual ~FFPCMWriter(){
+        close();
+    }
+    
+    int open(const FFSampleConfig& srccfg, const std::string& path_name_prefix){
+        int ret = 0;
+        do {
+            char fname[256];
+            sprintf(fname, "%s%dHz_%dch_%sle.pcm",
+                    path_name_prefix.c_str(),
+                    srccfg.getSampleRate(),
+                    srccfg.getChannels(),
+                    av_get_sample_fmt_name(srccfg.getFormat()));
+            
+            outfp_ = fopen(fname, "wb");
+            if(!outfp_){
+                logger_->error("fail to open [{}]", fname);
+                ret = -1;
+                break;
+            }
+            logger_->info("opened [{}]", fname);
+        } while (0);
+        return ret;
+    }
+    
+    void close(){
+        if(outfp_){
+            fclose(outfp_);
+            outfp_ = nullptr;
+        }
+    }
+    
+    int write(const AVFrame * avframe){
+        if(!outfp_) return -1;
+        
+        int ret = (int)fwrite(avframe->data[0], sizeof(char), avframe->pkt_size, outfp_);
+        if(ret != avframe->pkt_size){
+            logger_->error("fail to write file, ret=[%d]", ret);
+            return -1;
+        }
+        return 0;
+    }
+    
+private:
+    NLogger::shared logger_;
+    FILE * outfp_ = nullptr;
+    //FFSampleConverter000 converter_;
+};
+
+class FFPCMReader{
+public:
+    FFPCMReader(const std::string& name):logger_(NLogger::Get(name)){
+    }
+    
+    virtual ~FFPCMReader(){
+        close();
+    }
+    
+    int open(const FFSampleConfig& srccfg, const std::string& filename){
+        int ret = 0;
+        do {
+            fp_ = fopen(filename.c_str(), "rb");
+            if(!fp_){
+                logger_->error("fail to open [{}]", filename);
+                ret = -1;
+                break;
+            }
+            logger_->info("opened [{}]", filename);
+            cfg_ = srccfg;
+            if(cfg_.getFrameSize() <= 0){
+                cfg_.setFrameSize(1024);
+            }
+            frame_ = av_frame_alloc();
+            ptsconv_.setSrcBase((AVRational){1, srccfg.getSampleRate()});
+            ptsconv_.setDstBase((AVRational){1, srccfg.getSampleRate()});
+            readSamples_ = 0;
+        } while (0);
+        return ret;
+    }
+    
+    void setOutTimebase(const AVRational &dst){
+        ptsconv_.setDstBase(dst);
+    }
+    
+    const AVRational& getOutTimebase()const{
+        return ptsconv_.dst();
+    }
+    
+    void close(){
+        if(fp_){
+            fclose(fp_);
+            fp_ = nullptr;
+        }
+        if(frame_){
+            av_frame_free(&frame_);
+        }
+    }
+    
+    int read(const FFFrameFunc& func){
+        if(!fp_) return -1;
+        
+        frame_->sample_rate = cfg_.getSampleRate();
+        frame_->format = cfg_.getFormat();
+        frame_->channel_layout = cfg_.getChLayout();
+        frame_->channels = av_get_channel_layout_nb_channels(frame_->channel_layout);
+        
+        int ret = 0;
+        frame_->nb_samples = cfg_.getFrameSize();
+        av_frame_get_buffer(frame_, 0);
+        frame_->pkt_size = av_samples_get_buffer_size(frame_->linesize, frame_->channels,
+                                                      frame_->nb_samples, (AVSampleFormat)frame_->format, 1);
+        
+        ret = (int)fread(frame_->data[0], sizeof(char), frame_->pkt_size, fp_);
+        if(ret != frame_->pkt_size){
+            if (!feof(fp_)) {
+                logger_->error("fail to read file, ret=[{}]", ret);
+                return -1;
+            }
+            logger_->info("reach file end");
+            return 0;
+        }
+        int bytes = ret;
+        
+        frame_->pts = ptsconv_.convert(10000 + readSamples_);;
+        readSamples_ += frame_->nb_samples;
+        func(frame_);
+        av_frame_unref(frame_);
+        return bytes;
+    }
+    
+private:
+    NLogger::shared logger_;
+    FILE * fp_ = nullptr;
+    FFSampleConfig cfg_;
+    AVFrame * frame_ = nullptr;
+    FFPTSConverter ptsconv_;
+    int64_t readSamples_ = 0;
+};
+
+
+
+
+class FFFramesizeConverter000{
+public:
+    FFFramesizeConverter000():outTimebase_({1, 1000}){
+        
+    }
+    
+    virtual ~FFFramesizeConverter000(){
+        close();
+    }
+    
+    int open(const AVRational& timebase, int framesize){
+        close();
+        outTimebase_ = timebase;
+        dstCfg_.setFrameSize(framesize);
+        return 0;
+    }
+    
+    void close(){
+        if(outFrame_){
+            av_frame_free(&outFrame_);
+            outFrame_ = nullptr;
+        }
+        dstCfg_.reset();
+    }
+    
+    int convert(const AVFrame * srcframe, const FFFrameFunc& func){
+        int ret = 0;
+        if(!srcframe){
+            if(outFrame_ && outFrame_->nb_samples > 0){
+                // fflush remain samples
+                ret = func(outFrame_);
+            }
+            return ret;
+        }
+        
+        if(!outFrame_){
+            if(srcframe->nb_samples == dstCfg_.getFrameSize() || dstCfg_.getFrameSize() <= 0){
+                // same frame size, output directly
+                ret = func(srcframe);
+                return ret;
+            }
+            
+            dstCfg_.assign(srcframe);
+            outFrame_ = av_frame_alloc();
+        }
+        
+        outFrame_->pts = srcframe->pts - samples2Duration(outFrame_->nb_samples);
+        
+        int dst_offset = outFrame_->nb_samples;
+        int src_offset = 0;
+        while(src_offset < srcframe->nb_samples){
+            checkAssignFrame();
+            int remain_samples = srcframe->nb_samples-src_offset;
+            int min = std::min(remain_samples+dst_offset, dstCfg_.getFrameSize());
+            int num_copy = min - dst_offset;
+            
+            av_samples_copy(outFrame_->data, srcframe->data,
+                            dst_offset,
+                            src_offset,
+                            num_copy, outFrame_->channels, (AVSampleFormat)outFrame_->format);
+            dst_offset += num_copy;
+            src_offset += num_copy;
+            outFrame_->nb_samples = dst_offset;
+            if(outFrame_->nb_samples == dstCfg_.getFrameSize()){
+                outFrame_->pkt_size = av_samples_get_buffer_size(outFrame_->linesize, outFrame_->channels,
+                                                                 outFrame_->nb_samples, (AVSampleFormat)outFrame_->format,
+                                                                 1);
+                ret = func(outFrame_);
+                av_frame_unref(outFrame_);
+                if(ret != 0){
+                    return ret;
+                }
+                outFrame_->pts = outFrame_->pts + samples2Duration(outFrame_->nb_samples);
+                outFrame_->nb_samples = 0;
+                dst_offset = 0;
+            }
+        }
+        return 0;
+    }
+    
+private:
+    int64_t samples2Duration(int out_samples){
+        int64_t duration = out_samples * outTimebase_.den / dstCfg_.getSampleRate() / outTimebase_.num;
+        return duration;
+    }
+    
+    void checkAssignFrame(){
+        if(!outFrame_->buf[0]){
+            assignFrame();
+            outFrame_->nb_samples = dstCfg_.getFrameSize();
+            if(outFrame_->nb_samples > 0){
+                av_frame_get_buffer(outFrame_, 0);
+            }
+            outFrame_->nb_samples = 0;
+        }
+    }
+    
+    void assignFrame(){
+        outFrame_->sample_rate = dstCfg_.getSampleRate();
+        outFrame_->format = dstCfg_.getFormat();
+        outFrame_->channel_layout = dstCfg_.getChLayout();
+        outFrame_->channels = av_get_channel_layout_nb_channels(outFrame_->channel_layout);
+    }
+    
+private:
+    //int framesize_ = 0;
+    AVRational outTimebase_;
+    AVFrame * outFrame_ = nullptr;
+    FFSampleConfig dstCfg_;
+};
+
+
+
+
+class FFSampleConverter000{
+public:
+    FFSampleConverter000():timebase_({1, 1000}){
+        
+    }
+    
+    virtual ~FFSampleConverter000(){
+        close();
+    }
+    
+    int open(const FFSampleConfig& srccfg, const FFSampleConfig& dstcfg, const AVRational& timebase){
+        close();
+        
+        srccfg_ = srccfg;
+        dstcfg_ = dstcfg;
+        timebase_ = timebase;
+        
+        int ret = 0;
+        if(!srccfg.equalBase(dstcfg)){
+            
+            swrctx_ = swr_alloc_set_opts(
+                                         NULL,
+                                         dstcfg.getChLayout(),
+                                         dstcfg.getFormat(),
+                                         dstcfg.getSampleRate(),
+                                         srccfg.getChLayout(),
+                                         srccfg.getFormat(),
+                                         srccfg.getSampleRate(),
+                                         0, NULL);
+            if(!swrctx_){
+                NERROR_FMT_SET(ret, "fail to swr_alloc_set_opts");
+                return -61;
+            }
+            
+            ret = swr_init(swrctx_);
+            if(ret != 0){
+                NERROR_FMT_SET(ret, "fail to swr_init , err=[{}]", av_err2str(ret));
+                return ret;
+            }
+            
+            // alloc buffer
+            //reallocBuffer(dstcfg_.framesize);
+            
+            frame_ = av_frame_alloc();
+            
+        }else{
+            ret = sizeConverter_.open(timebase_, dstcfg_.getFrameSize());
+        }
+        return ret;
+    }
+    
+    void close(){
+        if(swrctx_){
+            if(swr_is_initialized(swrctx_)){
+                swr_close(swrctx_);
+            }
+            swr_free(&swrctx_);
+        }
+        
+        if(frame_){
+            av_frame_free(&frame_);
+            frame_ = nullptr;
+        }
+        
+        sizeConverter_.close();
+        realDstFramesize_ = 0;
+    }
+    
+    int convert(const AVFrame * srcframe, const FFFrameFunc& func){
+        if(!swrctx_){
+            return sizeConverter_.convert(srcframe, func);
+        }
+        int ret = 0;
+        if(!srcframe){
+            if(remainDstSamples_ > 0){
+                // pull remain samples
+                checkAssignFrame();
+                frame_->pts = nextDstPTS_;
+                ret = swr_convert_frame(swrctx_, frame_, NULL);
+                if(ret != 0){
+                    av_frame_unref(frame_);
+                    NERROR_FMT_SET(ret, "fail to swr_convert_frame 1st, err=[{}]", av_err2str(ret));
+                    return ret;
+                }
+                frame_->pkt_size = av_samples_get_buffer_size(frame_->linesize, frame_->channels,
+                                                              frame_->nb_samples, (AVSampleFormat)frame_->format, 1);
+                if(frame_->nb_samples > 0){
+                    ret = func(frame_);
+                }
+                av_frame_unref(frame_);
+            }
+            return ret;
+        }
+        
+        int out_samples = swr_get_out_samples(swrctx_, srcframe->nb_samples);
+        if(out_samples < realDstFramesize_){
+            // not enough output samples
+            ret = swr_convert_frame(swrctx_, NULL, srcframe);
+            if(ret != 0){
+                NERROR_FMT_SET(ret, "fail to swr_convert_frame 2nd, err=[{}]", av_err2str(ret));
+                return ret;
+            }
+            return 0;
+        }
+        
+        //        if(dstcfg_.framesize <= 0){
+        //            reallocBuffer(srcframe->nb_samples);
+        //        }
+        
+        checkAssignFrame();
+        
+        int64_t dst_pts = srcframe->pts;
+        frame_->pts = dst_pts - dstDuration(remainDstSamples_);
+        frame_->pkt_size = av_samples_get_buffer_size(frame_->linesize, frame_->channels,
+                                                      frame_->nb_samples, (AVSampleFormat)frame_->format, 1);
+        
+        ret = swr_convert_frame(swrctx_, frame_, srcframe);
+        if(ret != 0){
+            av_frame_unref(frame_);
+            NERROR_FMT_SET(ret, "fail to swr_convert_frame 3rd, err=[{}]", av_err2str(ret));
+            return ret;
+        }
+        
+        frame_->pkt_size = av_samples_get_buffer_size(frame_->linesize, frame_->channels,
+                                                      frame_->nb_samples, (AVSampleFormat)frame_->format, 1);
+        
+        // TODO:
+        //        static Int64Relative srcRelpts_;
+        //        const AVFrame * frame = frame_;
+        //        odbgd("src frame0: pts=%lld(%+lld,%+lld), ch=%d, nb_samples=%d, pkt_size=%d, fmt=[%s], samplerate=%d"
+        //              , frame->pts, srcRelpts_.offset(frame->pts), srcRelpts_.delta(frame->pts)
+        //              , frame->channels, frame->nb_samples, frame->pkt_size
+        //              , av_get_sample_fmt_name((AVSampleFormat)frame->format)
+        //              , frame->sample_rate);
+        
+        ret = func(frame_);
+        
+        
+        if(ret){
+            av_frame_unref(frame_);
+            return ret;
+        }else{
+            out_samples -= frame_->nb_samples;
+            frame_->pts += dstDuration(frame_->nb_samples);
+            nextDstPTS_ = frame_->pts;
+            av_frame_unref(frame_);
+        }
+        
+        while(realDstFramesize_>0 && out_samples >= realDstFramesize_){
+            checkAssignFrame();
+            //frame_->pts = nextPTS(srcframe->pts, out_samples);
+            ret = swr_convert_frame(swrctx_, frame_, NULL);
+            if(ret != 0){
+                av_frame_unref(frame_);
+                NERROR_FMT_SET(ret, "fail to swr_convert_frame 4th, err=[{}]", av_err2str(ret));
+                return ret;
+            }
+            frame_->pkt_size = av_samples_get_buffer_size(frame_->linesize, frame_->channels,
+                                                          frame_->nb_samples, (AVSampleFormat)frame_->format, 1);
+            
+            //            // TODO:
+            //            const AVFrame * frame = frame_;
+            //            odbgd("src frame1: pts=%lld(%+lld,%+lld), ch=%d, nb_samples=%d, pkt_size=%d, fmt=[%s], samplerate=%d"
+            //                  , frame->pts, srcRelpts_.offset(frame->pts), srcRelpts_.delta(frame->pts)
+            //                  , frame->channels, frame->nb_samples, frame->pkt_size
+            //                  , av_get_sample_fmt_name((AVSampleFormat)frame->format)
+            //                  , frame->sample_rate);
+            
+            ret = func(frame_);
+            av_frame_unref(frame_);
+            if(ret){
+                return ret;
+            }
+            
+            out_samples -= frame_->nb_samples;
+            frame_->pts += dstDuration(frame_->nb_samples);
+            nextDstPTS_ = frame_->pts;
+            //out_samples = swr_get_out_samples(swrctx_, 0);
+        }
+        
+        remainDstSamples_ = out_samples;
+        
+        return 0;
+    }
+    
+private:
+    int64_t dstDuration(int out_samples){
+        int64_t duration = out_samples * timebase_.den / dstcfg_.getSampleRate() / timebase_.num;
+        return duration;
+    }
+    
+    int checkAssignFrame(){
+        frame_->sample_rate = dstcfg_.getSampleRate();
+        frame_->format = dstcfg_.getFormat();
+        frame_->channel_layout = dstcfg_.getChLayout();
+        frame_->channels = av_get_channel_layout_nb_channels(frame_->channel_layout);
+        
+        int ret = 0;
+        if(dstcfg_.getFrameSize() > 0){
+            frame_->nb_samples = dstcfg_.getFrameSize();
+            ret = av_frame_get_buffer(frame_, 0);
+        }
+        return ret;
+    }
+    
+    //    int reallocBuffer(int frameSize){
+    //        // alloc buffer
+    //        int ret = 0;
+    //        if(frameSize > 0 && frameSize > realDstFramesize_){
+    //            if(!frame_){
+    //                frame_ = av_frame_alloc();
+    //                frame_->sample_rate = dstcfg_.samplerate;
+    //                frame_->format = dstcfg_.samplefmt;
+    //                frame_->channel_layout = dstcfg_.channellayout;
+    //                frame_->channels = av_get_channel_layout_nb_channels(frame_->channel_layout);
+    //            }
+    //
+    //            if(frame_ && realDstFramesize_ > 0){
+    //                av_frame_unref(frame_);
+    //                realDstFramesize_ = 0;
+    //            }
+    //
+    //            frame_->nb_samples = frameSize;
+    //            ret = av_frame_get_buffer(frame_, 0);
+    //            if(ret == 0){
+    //                realDstFramesize_ = frameSize;
+    //            }
+    //        }
+    //        return ret;
+    //    }
+    
+private:
+    FFSampleConfig srccfg_;
+    FFSampleConfig dstcfg_;
+    AVRational timebase_;
+    SwrContext * swrctx_ = nullptr;
+    AVFrame * frame_ = nullptr;
+    int realDstFramesize_ = -1;
+    int64_t nextDstPTS_ = 0;
+    int remainDstSamples_ = 0;
+    FFFramesizeConverter000 sizeConverter_;
+};
+
+
+
+
+class FFAudioEncoder000{
+public:
+    //static const AVCodecID DEFAULT_CODEC_ID = AV_CODEC_ID_AAC;
+    //static const int DEFAULT_CLOCKRATE = 44100;
+    //static const int DEFAULT_CHANNELS = 2;
+    static const int64_t DEFAULT_BITRATE = 24000;
+    
+public:
+    FFAudioEncoder000():timebase_((AVRational){1, 1000}),
+    srcWriter_("srcwriter"),
+    encWriter_("encwriter")
+    {
+        
+    }
+    
+    virtual ~FFAudioEncoder000(){
+        close();
+    }
+    
+    void setCodecName(const std::string& codec_name){
+        codec_ = avcodec_find_encoder_by_name(codec_name.c_str());
+        if(codec_){
+            codecId_ = codec_->id;
+        }else{
+            codecId_ = AV_CODEC_ID_NONE;
+        }
+    }
+    
+    void setCodecId(AVCodecID codec_id){
+        codecId_ = codec_id;
+        codec_ = avcodec_find_encoder(codec_id);
+    }
+    
+    void setBitrate(int64_t bitrate){
+        bitrate_ = bitrate;
+    }
+    
+    void setSrcConfig(const FFSampleConfig& cfg){
+        srcCfg_ = cfg;
+    }
+    
+    void setTimebase(const AVRational& timebase){
+        timebase_ = timebase;
+    }
+    
+    void setStreamIndex(int index){
+        streamIndex_ = index;
+    }
+    
+    const FFSampleConfig& srcConfig(){
+        return srcCfg_;
+    }
+    
+    const FFSampleConfig& encodeConfig(){
+        return encodeCfg_;
+    }
+    
+    AVCodecID codecId() const{
+        return codecId_;
+    }
+    
+    int open(){
+        int ret = 0;
+        do{
+            AVCodecID codec_id = (AVCodecID)codecId_;
+            if(codec_id <= AV_CODEC_ID_NONE){
+                ret = -1;
+                break;
+            }
+            
+            const AVCodec * codec = codec_;
+            if(!codec){
+                codec = avcodec_find_encoder(codec_id);
+                if (!codec) {
+                    ret = -1;
+                    NERROR_FMT_SET(ret, "fail to avcodec_find_encoder audio codec id [{}]",
+                                   (int)codec_id);
+                    break;
+                }
+            }
+            
+            ctx_ = avcodec_alloc_context3(codec);
+            if (!ctx_) {
+                ret = -1;
+                NERROR_FMT_SET(ret, "fail to avcodec_alloc_context3 audio codec [{}][{}]",
+                               (int)codec->id, codec->name);
+                break;
+            }
+            
+            pkt_ = av_packet_alloc();
+            if (!pkt_){
+                NERROR_FMT_SET(ret, "fail to av_packet_alloc audio");
+                ret = -1;
+                break;
+            }
+            
+            ctx_->bit_rate = bitrate_ > 0 ? bitrate_ : DEFAULT_BITRATE;
+            ctx_->sample_fmt     = selectSampleFormat(codec, srcCfg_.getFormat());
+            ctx_->sample_rate    = selectSampleRate(codec, srcCfg_.getSampleRate());
+            ctx_->channel_layout = selectChannelLayout(codec, srcCfg_.getChLayout() );
+            ctx_->channels       = av_get_channel_layout_nb_channels(ctx_->channel_layout);
+            ctx_->time_base      = timebase_;
+            //ctx_->time_base      = srcCfg_.timebase;
+            
+            ret = avcodec_open2(ctx_, codec, NULL);
+            if (ret != 0) {
+                NERROR_FMT_SET(ret, "fail to avcodec_open2 audio codec [{}][{}], err=[{}]",
+                               (int)codec->id, codec->name, av_err2str(ret));
+                break;
+            }
+            
+            encodeCfg_.setFormat(ctx_->sample_fmt);
+            encodeCfg_.setSampleRate(ctx_->sample_rate);
+            encodeCfg_.setChLayout(ctx_->channel_layout);
+            encodeCfg_.setFrameSize(ctx_->frame_size);
+            //encodeCfg_.timebase = ctx_->time_base;
+            
+            srcCfg_.match(encodeCfg_);
+            
+            ret = converter_.open(srcCfg_, encodeCfg_, timebase_);
+            if(ret != 0){
+                break;
+            }
+            
+            srcWriter_.open(srcCfg_,    "/tmp/out_src_");
+            encWriter_.open(encodeCfg_, "/tmp/out_enc_");
+            
+            ret = 0;
+        }while(0);
+        
+        if(ret){
+            close();
+        }
+        
+        return ret;
+    }
+    
+    void close(){
+        if(ctx_){
+            avcodec_free_context(&ctx_);
+            ctx_ = nullptr;
+        }
+        
+        if(pkt_){
+            av_packet_free(&pkt_);
+            pkt_ = nullptr;
+        }
+        
+        srcWriter_.close();
+        encWriter_.close();
+    }
+    
+    int encode(const AVFrame *frame, const FFPacketFunc& out_func){
+        int ret = 0;
+        if(frame){
+            //            odbgd("audio frame: pts=%lld(%+lld,%+lld), ch=%d, nb_samples=%d, pkt_size=%d, fmt=[%s], samplerate=%d"
+            //                  , frame->pts, srcRelpts_.offset(frame->pts), srcRelpts_.delta(frame->pts)
+            //                  , frame->channels, frame->nb_samples, frame->pkt_size
+            //                  , av_get_sample_fmt_name((AVSampleFormat)frame->format)
+            //                  , frame->sample_rate);
+            srcWriter_.write(frame);
+        }
+        
+        ret = converter_.convert(frame, [this, out_func](const AVFrame * outframe)->int{
+            return doEncode(outframe, out_func);
+        });
+        
+        if(!frame && numInFrames_ > 0){
+            ret = doEncode(nullptr, out_func);
+        }
+        return ret;
+    }
+    
+private:
+    int doEncode(const AVFrame *frame, const FFPacketFunc& out_func){
+        if(frame){
+            ++numInFrames_;
+            //            odbgd("No.%lld encode audio: pts=%lld(%+lld,%+lld), ch=%d, nb_samples=%d, pkt_size=%d, fmt=[%s], samplerate=%d"
+            //                  , numInFrames_
+            //                  , frame->pts, encRelpts_.offset(frame->pts), encRelpts_.delta(frame->pts)
+            //                  , frame->channels, frame->nb_samples, frame->pkt_size
+            //                  , av_get_sample_fmt_name((AVSampleFormat)frame->format)
+            //                  , frame->sample_rate);
+            encWriter_.write(frame);
+        }
+        int ret = avcodec_send_frame(ctx_, frame);
+        if (ret != 0) {
+            NERROR_FMT_SET(ret, "fail to avcodec_send_frame audio, err=[{}]",
+                           av_err2str(ret));
+            return ret;
+        }
+        
+        while (ret >= 0) {
+            ret = avcodec_receive_packet(ctx_, pkt_);
+            if (ret == AVERROR(EAGAIN)){
+                return 0;
+            }else if(ret == AVERROR_EOF){
+                return 0;
+            }else if (ret < 0) {
+                NERROR_FMT_SET(ret, "fail to avcodec_receive_packet audio, err=[{}]",
+                               av_err2str(ret));
+                return ret;
+            }
+            ++numOutPackets_;
+            //            odbgd("No.%lld audio pkt: pts=%lld(%+lld,%+lld), dts=%lld, size=%d",
+            //                  numOutPackets_,
+            //                  pkt_->pts,
+            //                  dstRelpts_.offset(pkt_->pts),
+            //                  dstRelpts_.delta(pkt_->pts),
+            //                  pkt_->dts, pkt_->size);
+            pkt_->stream_index = streamIndex_;
+            ret = out_func(pkt_);
+            av_packet_unref(pkt_);
+            if(ret){
+                return ret;
+            }
+        }
+        return 0;
+    }
+    
+    static int selectSampleRate(const AVCodec *codec, int prefer_samplerate){
+        if(!codec->supported_samplerates || *codec->supported_samplerates == 0){
+            // no supported samplerate
+            if(prefer_samplerate > 0){
+                // select prefer one
+                return prefer_samplerate;
+            }else{
+                // select default one
+                return 44100;
+            }
+        }
+        
+        int best_samplerate = 0;
+        const int * p = codec->supported_samplerates;
+        while (*p) {
+            if (best_samplerate <= 0
+                || (abs(prefer_samplerate - *p) < abs(prefer_samplerate - best_samplerate))){
+                best_samplerate = *p;
+            }
+            p++;
+        }
+        return best_samplerate;
+    }
+    
+    static uint64_t selectChannelLayout(const AVCodec *codec, uint64_t prefer_layout){
+        if(!codec->channel_layouts || *codec->channel_layouts == 0){
+            // no supported channel layout
+            if(prefer_layout > 0){
+                // select prefer one
+                return prefer_layout; //  == 1 ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
+            }else{
+                // select default one
+                return AV_CH_LAYOUT_MONO;
+            }
+        }
+        
+        if(prefer_layout == 0){
+            // if no prefer, select first
+            return *codec->channel_layouts;
+        }
+        
+        int prefer_channels = av_get_channel_layout_nb_channels(prefer_layout);
+        uint64_t best_ch_layout = 0;
+        int best_nb_channels   = 0;
+        const uint64_t *p = codec->channel_layouts;
+        while (*p) {
+            if(*p == prefer_layout){
+                return *p;
+            }
+            
+            int nb_channels = av_get_channel_layout_nb_channels(*p);
+            if (best_nb_channels <= 0
+                || (abs(prefer_channels - nb_channels) < abs(prefer_channels - best_nb_channels))){
+                best_nb_channels = nb_channels;
+            }
+            p++;
+        }
+        return best_ch_layout;
+    }
+    
+    static AVSampleFormat selectSampleFormat(const AVCodec *codec, AVSampleFormat prefer_fmt){
+        if(!codec->sample_fmts || *codec->sample_fmts <= AV_SAMPLE_FMT_NONE){
+            // no supported format
+            if(prefer_fmt > AV_SAMPLE_FMT_NONE){
+                // select prefer format
+                return prefer_fmt;
+            }else{
+                // select default format
+                return AV_SAMPLE_FMT_S16;
+            }
+        }
+        
+        const enum AVSampleFormat *p = codec->sample_fmts;
+        while (*p != AV_SAMPLE_FMT_NONE) {
+            if (*p == prefer_fmt){
+                // match, select it
+                return prefer_fmt;
+            }
+            p++;
+        }
+        // NOT match, select first supported format
+        return *codec->sample_fmts;
+    }
+    
+private:
+    AVCodecID codecId_ = AV_CODEC_ID_NONE;
+    FFSampleConfig  srcCfg_;
+    FFSampleConfig  encodeCfg_;
+    FFSampleConverter000 converter_;
+    int64_t bitrate_ = -1;
+    const AVCodec * codec_ = nullptr;
+    AVCodecContext * ctx_ = nullptr;
+    AVPacket * pkt_ = nullptr;
+    AVRational timebase_;
+    int64_t numInFrames_ = 0;
+    int64_t numOutPackets_ = 0;
+    Int64Relative srcRelpts_;
+    Int64Relative encRelpts_;
+    Int64Relative dstRelpts_;
+    int streamIndex_ = -1;
+    FFPCMWriter srcWriter_;
+    FFPCMWriter encWriter_;
+};
+
+
+
+
+
+class AudioEncoderTester{
+public:
+    AudioEncoderTester(const std::string& name):logger_(NLogger::Get(name)){
+        
+    }
+    
+    virtual ~AudioEncoderTester(){
+        
+    }
+    
+    int test(){
+        const std::string& filename = "/tmp/test_44100Hz_2ch_fltle.pcm";
+        FFSampleConfig srccfg;
+        srccfg.setFormat(AV_SAMPLE_FMT_FLT);
+        srccfg.setSampleRate(44100);
+        srccfg.setChLayout(av_get_default_channel_layout(2));
+        srccfg.setFrameSize(512);
+        
+        FFPCMReader reader("pcmreader");
+        int ret = 0;
+        do{
+            ret = reader.open(srccfg, filename);
+            if(ret){
+                logger_->error("fail to open file [{}], ret={}", filename, ret);
+                break;
+            }
+            reader.setOutTimebase((AVRational){1, 1000000});
+            
+            audioEncoder_.setStreamIndex(0);
+            audioEncoder_.setCodecName("libfdk_aac");
+            audioEncoder_.setBitrate(32*1000);
+            audioEncoder_.setTimebase(reader.getOutTimebase());
+            audioEncoder_.setSrcConfig(srccfg);
+            ret = audioEncoder_.open();
+            if(ret){
+                logger_->error("fail to open audio encoder, ret={}", ret);
+                break;
+            }
+            
+            while(1){
+                ret = reader.read([this](const AVFrame * frame)->int{
+                    logger_->info("got frame,  format={}, pts={}", frame->format, frame->pts);
+                    audioEncoder_.encode(frame, [this](AVPacket * pkt)->int{
+                        logger_->info("got packet, index={}, pts={}", pkt->stream_index, pkt->pts);
+                        return 0;
+                    });
+                    return 0;
+                });
+                if(ret <= 0){
+                    break;
+                }
+            }
+        }while(0);
+        
+        reader.close();
+        audioEncoder_.close();
+        
+        return ret;
+    }
+    
+private:
+    NLogger::shared logger_ ;
+    FFAudioEncoder000 audioEncoder_;
+};
+
+int lab060_PushTLV_main(int argc, char* argv[]){
+    av_register_all();
+    avdevice_register_all();
+    avcodec_register_all();
+    
+    {
+        AudioEncoderTester tester("tester");
+        tester.test();
+    }
+    
+    
+    return 0;
+}
+
