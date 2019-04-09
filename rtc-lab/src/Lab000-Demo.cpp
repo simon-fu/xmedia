@@ -448,6 +448,7 @@ public:
                                                          [this, &mflow, &func](NMediaFrame::Unique& frame){
                                                              processFrame(mflow, frame, func);
                                                          });
+                //odbgi("depack rtp length={}", slot->rtpd.size);
                 DUMPER().dump("depack-state", *mflow.depacker);
                 if(depack_ret < 0){
                     // TODO: stop process when error
@@ -1004,6 +1005,533 @@ private:
     }
 };
 
+class NRTPPacker{
+public:
+    typedef std::function<int(const uint8_t * data, size_t size)> DataFunc;
+    
+public:
+    virtual ~NRTPPacker(){
+        
+    }
+    
+    virtual void setPayloadType(NRTPPayloadType pt){
+        pt_ = pt;
+    }
+    
+    virtual void setSSRC(uint32_t ssrc){
+        ssrc_ = ssrc;
+    }
+    
+    virtual void setSeq(uint32_t seq){
+        seq_ = seq;
+    }
+    
+    virtual int pack(uint32_t ts, const uint8_t* data, size_t size, const DataFunc& func) = 0;
+    
+protected:
+    NRTPPayloadType pt_ = 0;
+    uint32_t ssrc_ = 0;
+    uint32_t seq_ = 0;
+    
+public:
+    static NRTPPacker* CreatePacker(const NRTPCodec * codec);
+    static NRTPPacker* CreatePacker(const NCodec::Type typ);
+    
+};
+
+#define NRTPPACK_NO_ERROR 0
+#define NRTPPACK_COMPLETE 1
+class NRTPPackerVP8:public NRTPPacker{
+public:
+    DECLARE_CLASS_ENUM(ErrorCode,
+                       kNoError = NRTPPACK_NO_ERROR,
+                       );
+public:
+    NRTPPackerVP8()
+    {
+    }
+    
+    virtual ~NRTPPackerVP8(){
+    }
+    
+    virtual int pack(uint32_t ts, const uint8_t* data, size_t size, const DataFunc& func)override {
+        size_t headerLen_ = (size_t)vp8header_.Parse(data, (uint32_t)size);
+        if(headerLen_ == 0){
+            return -1;
+        }
+        
+        const size_t buf_sz = 1024;
+        uint8_t buf[1024];
+        size_t est_sz = buf_sz-1-12; // reserve 1 bytes for vp8 descriptor, 12 bytes for rtp header
+        int num_pkts = (int) (size+est_sz-1)/est_sz;
+        size_t len_each_pkt = (size+num_pkts-1)/num_pkts;
+        size_t offset = 0;
+        
+        for(int i = 0; i < num_pkts; ++i){
+            bool first = (i == 0);
+            bool last = (i == num_pkts-1);
+            
+            size_t dst_offset = 0;
+            
+            // RTP header
+            buf[dst_offset + 0] = 0x80;
+            buf[dst_offset + 1] = pt_;
+            if(last){
+                buf[dst_offset + 1] |= 0x80;
+            }
+            NUtil::set2(buf, 2, ++seq_);    // sequence
+            NUtil::set4(buf, 4, ts);        // timestamp
+            NUtil::set4(buf, 8, ssrc_);     // SSRC
+            dst_offset += 12;
+            
+            // VP8 descriptor
+            uint8_t& desc_byte = buf[dst_offset];
+            desc_byte = 0;
+            if(first){
+                desc_byte |= (1<<4); // start of partition
+            }
+            
+            uint8_t parti_index = 0; // TODO: why partitionIndex is always 0;
+            desc_byte |= parti_index;
+            dst_offset += 1;
+            
+            size_t copy_bytes = std::min(size-offset, len_each_pkt);
+            memcpy(buf+dst_offset, data+offset, copy_bytes);
+            offset += copy_bytes;
+            int ret = func(buf, copy_bytes+dst_offset);
+            if(ret < 0) return ret;
+        }
+        
+        return kNoError;
+    }
+    
+private:
+    VP8PayloadHeader vp8header_;
+};
+
+class NRTPPackGeneric:public NRTPPacker{
+public:
+    DECLARE_CLASS_ENUM(ErrorCode,
+                       kNoError = NRTPPACK_NO_ERROR,
+                       );
+public:
+    NRTPPackGeneric()
+    {
+    }
+    
+    virtual ~NRTPPackGeneric(){
+    }
+    
+    virtual int pack(uint32_t ts, const uint8_t* data, size_t size, const DataFunc& func)override {
+        const size_t buf_sz = 1700;
+        uint8_t buf[1700];
+        size_t est_sz = buf_sz-1-12; // reserve 1 bytes for vp8 descriptor, 12 bytes for rtp header
+        int num_pkts = (int) (size+est_sz-1)/est_sz;
+        size_t len_each_pkt = (size+num_pkts-1)/num_pkts;
+        size_t offset = 0;
+        
+        //bool first = true;
+        bool last = true;
+        size_t dst_offset = 0;
+        
+        // RTP header
+        buf[dst_offset + 0] = 0x80;
+        buf[dst_offset + 1] = pt_;
+        if(last){
+            buf[dst_offset + 1] |= 0x80;
+        }
+        NUtil::set2(buf, 2, ++seq_);    // sequence
+        NUtil::set4(buf, 4, ts);        // timestamp
+        NUtil::set4(buf, 8, ssrc_);     // SSRC
+        dst_offset += 12;
+        
+        size_t copy_bytes = std::min(size-offset, len_each_pkt);
+        memcpy(buf+dst_offset, data+offset, copy_bytes);
+        offset += copy_bytes;
+        int ret = func(buf, copy_bytes+dst_offset);
+        return ret;
+    }
+};
+
+
+NRTPPacker* NRTPPacker::CreatePacker(const NRTPCodec * codec){
+    return CreatePacker(codec->type);
+}
+
+NRTPPacker* NRTPPacker::CreatePacker(const NCodec::Type typ){
+    if(typ == NCodec::VP8){
+        std::shared_ptr<NVP8Frame::Pool> pool(new NVP8Frame::Pool());
+        return new NRTPPackerVP8();
+    }else if(NCodec::GetMediaForCodec(typ) == NMedia::Audio){
+        // TODO: add media type to NRTPCodec for performance
+        return new NRTPPackGeneric();
+    }else{
+        // return new NRTPPackGeneric();
+        return nullptr;
+    }
+}
+
+class CodecTypeMap{
+public:
+    static NCodec::Type fromFF(AVCodecID codec_id){
+        if(codec_id == AV_CODEC_ID_VP8){
+            return NCodec::VP8;
+        }else if(codec_id == AV_CODEC_ID_VP9){
+            return NCodec::VP9;
+        }else if(codec_id == AV_CODEC_ID_H264){
+            return NCodec::H264;
+        }else if(codec_id == AV_CODEC_ID_OPUS){
+            return NCodec::OPUS;
+        }else if(codec_id == AV_CODEC_ID_AAC){
+            return NCodec::AAC;
+        }else{
+            return NCodec::UNKNOWN;
+        }
+    }
+    
+    static AVCodecID toFF(NCodec::Type typ){
+        if(typ == NCodec::VP8){
+            return AV_CODEC_ID_VP8;
+        }else if(typ == NCodec::VP9){
+            return AV_CODEC_ID_VP9;
+        }else if(typ == NCodec::H264){
+            return AV_CODEC_ID_H264;
+        }else if(typ == NCodec::OPUS){
+            return AV_CODEC_ID_OPUS;
+        }else if(typ == NCodec::AAC){
+            return AV_CODEC_ID_AAC;
+        }else {
+            return AV_CODEC_ID_FIRST_UNKNOWN;
+        }
+    }
+};
+
+
+class NRTPPackTester{
+public:
+    NRTPPackTester(const std::string& name):logger_(NLogger::Get(name)){
+        
+    }
+    virtual ~NRTPPackTester(){
+        
+    }
+    
+    struct Track{
+        NCodec::Type codecType = NCodec::UNKNOWN;
+        NRTPPacker * packer = nullptr;
+        NRTPDepacker * depacker = nullptr;
+        FFPTSConverter * ptsconv = nullptr;
+        int open(const AVStream* stream){
+            this->codecType = CodecTypeMap::fromFF(stream->codecpar->codec_id);
+            this->packer = NRTPPacker::CreatePacker(this->codecType);
+            this->depacker = NRTPDepacker::CreateDepacker(this->codecType);
+            this->ptsconv = new FFPTSConverter();
+            if(!this->packer || !this->depacker){
+                close();
+                return -1;
+            }
+            return 0;
+        }
+        
+        void close(){
+            if(this->packer){
+                delete this->packer;
+                this->packer = nullptr;
+            }
+            
+            if(this->depacker){
+                delete this->depacker;
+                this->depacker = nullptr;
+            }
+            
+            if(this->ptsconv){
+                delete this->ptsconv;
+                this->ptsconv = nullptr;
+            }
+            this->codecType = NCodec::UNKNOWN;
+        }
+    };
+    
+    
+    int test(const std::string& media_file){
+        bool enabled_video = true;
+        bool enabled_audio = false;
+        
+        FFReader reader;
+        int ret = 0;
+        do{
+            const std::string containerFormat = "";
+            ret = reader.open(containerFormat, media_file);
+            if(ret){
+                logger_->error("fail to open [{}]", media_file);
+                break;
+            }
+            logger_->info("media file opened [{}]", media_file);
+            
+            NObjDumperLog dumper(*logger_);
+            
+            ret = 0;
+            std::vector<Track> tracks;
+            for(int i = 0; i < reader.getNumStreams(); ++i){
+                const AVStream* stream = reader.getStream(i);
+                logger_->info("stream[{}]: codec_id={}({}), time_base=({},{})",
+                              i,
+                              stream->codecpar->codec_id,
+                              avcodec_get_name(stream->codecpar->codec_id),
+                              stream->time_base.num, stream->time_base.den
+                              );
+
+                Track track;
+                if((enabled_video && stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO)
+                   || (enabled_audio && stream->codecpar->codec_type == AVMEDIA_TYPE_AUDIO)){
+                    ret = track.open(stream);
+                    if(ret){
+                        logger_->error("fail to open track, index={}", stream->index);
+                        break;
+                    }
+                    
+                    track.packer->setPayloadType(100+stream->index);
+                    track.packer->setSeq(100);
+                    track.packer->setSSRC(7000 + stream->index*2);
+                    track.ptsconv->setSrcBase(stream->time_base);
+                    if(stream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO){
+                        track.ptsconv->setDstBase(av_make_q(1, 90000));
+                    }else{
+                        track.ptsconv->setDstBase(av_make_q(1, stream->codecpar->sample_rate));
+                    }
+                }
+                
+                tracks.push_back(track);
+            }
+            
+            int64_t pkt_num = 0;
+            while(1){
+                FFPacket packet;
+                ret = reader.read(packet);
+                if(ret){
+                    if(ret == AVERROR_EOF){
+                        ret = 0;
+                    }
+                    break;
+                }
+                const AVStream* stream = reader.getStream(packet.avpkt->stream_index);
+                Track& track = tracks[stream->index];
+                if(track.codecType != NCodec::UNKNOWN){
+                    logger_->info("pkt: index={}, pts={}, codec={}, size={}",
+                                  packet.avpkt->stream_index,
+                                  packet.avpkt->pts,
+                                  avcodec_get_name(stream->codecpar->codec_id),
+                                  packet.avpkt->size);
+                    uint32_t ts = (uint32_t)track.ptsconv->convert(packet.avpkt->pts);
+                    ret = verify(&track, ts, packet.avpkt->data, packet.avpkt->size);
+                    if(ret != 0){
+                        logger_->info("fail to verify!!!");
+                        break;
+                    }
+                }
+
+                ++pkt_num;
+            }
+            
+            for(auto& track : tracks){
+                track.close();
+            }
+            tracks.clear();
+            
+            logger_->info("test media done");
+        }while (0);
+        
+        reader.close();
+        return ret;
+    }
+    
+private:
+    int verify(Track * track,
+               uint32_t ts, const uint8_t* frame_data, size_t frame_size){
+        int ret = 0;
+        std::deque<NBuffer<uint8_t>> rtpQ;
+        NObjDumperLog dumper(*logger_);
+        unsigned n = 0;
+        ret = track->packer->pack(ts, frame_data, frame_size,
+                           [this, &rtpQ, &n, &dumper, &track](const uint8_t * data, size_t size)->int{
+                               ++n;
+                               NRTPData rtpd;
+                               size_t hdr_len = rtpd.parse(data, size);
+                               if(!hdr_len){
+                                   logger_->error("  fail to parse pack RTP");
+                                   return -1;
+                               }
+                               rtpd.codecType = track->codecType;
+                               dumper.kv("  n", n).dump("rtp", rtpd).endl();
+                               
+                               rtpQ.emplace_back(data, size);
+                               return 0;
+                           });
+        if(ret) {
+            logger_->error("fail to pack rtp");
+            return ret;
+        }
+        
+        std::deque<NMediaFrame::Unique> frameQ;
+        for(auto& buffer : rtpQ){
+            //logger_->info("parse pack rtp, size={}", buffer.size());
+            if(frameQ.size() > 0){
+                logger_->error("already exist frame when parse pack RTP");
+                return -1;
+            }
+            NRTPData rtpd;
+            size_t hdr_len = rtpd.parse(buffer.data(), buffer.size());
+            if(!hdr_len){
+                logger_->error("fail to parse pack RTP");
+                return -1;
+            }
+            rtpd.codecType = track->codecType;
+            
+            ret = track->depacker->depack(rtpd, true, [this, &frameQ](NMediaFrame::Unique& frame){
+                frameQ.push_back(std::move(frame));
+            });
+            if(ret<0){
+                logger_->error("fail to depack RTP");
+                return ret;
+            }
+        }
+        
+        if(frameQ.size() != 1){
+            logger_->error("fail to verify frames count");
+            return -1;
+        }
+        NMediaFrame::Unique& frame = frameQ.back();
+        if(frame->size() != frame_size){
+            logger_->error("fail to verify frame size, expect {} but {}", frame_size, frame->size());
+            return -1;
+        }
+        
+        int cmp_result = memcmp(frame->data(), frame_data, frame->size());
+        if(cmp_result != 0){
+            logger_->error("fail to verify frame data, result {}", cmp_result);
+            return -1;
+        }
+        
+        return 0;
+    }
+    
+private:
+    NLogger::shared logger_;
+};
+
+
+class Media2XSWTlv{
+public:
+    Media2XSWTlv(const std::string& name):logger_(NLogger::Get(name)){
+        
+    }
+    virtual ~Media2XSWTlv(){
+        
+    }
+    
+    int transfmt(const std::string& media_file, const std::string& tlv_file){
+        FFReader reader;
+        int ret = 0;
+        do{
+            const std::string containerFormat = "";
+            ret = reader.open(containerFormat, media_file);
+            if(ret){
+                logger_->error("fail to open [{}]", media_file);
+                break;
+            }
+            logger_->info("media file opened [{}]", media_file);
+            
+            NObjDumperLog dumper(*logger_);
+            
+            NRTPPackerVP8 vp8pack;
+            vp8pack.setPayloadType(100);
+            vp8pack.setSeq(100);
+            vp8pack.setSSRC(7788);
+            
+            FFPTSConverter vpts;
+            vpts.setDstBase(av_make_q(1, 90000));
+            
+            
+            
+            std::vector<FFMediaConfig> configs(reader.getNumStreams());
+            for(int i = 0; i < reader.getNumStreams(); ++i){
+                const AVStream* stream = reader.getStream(i);
+                logger_->info("stream[{}]: codec_id={}({}), time_base=({},{})",
+                              i,
+                              stream->codecpar->codec_id,
+                              avcodec_get_name(stream->codecpar->codec_id),
+                              stream->time_base.num, stream->time_base.den
+                              );
+                configs[i].assign(stream);
+                if(stream->codecpar->codec_id == AV_CODEC_ID_VP8){
+                    vpts.setSrcBase(stream->time_base);
+                }
+            }
+            
+//            NRTPDepacker * depacker = NRTPDepacker::CreateDepacker(NCodec::VP8);
+//            NRTPPackVerifier verifier("veri", vp8pack, *depacker);
+            
+            int64_t pkt_num = 0;
+            while(1){
+                FFPacket packet;
+                ret = reader.read(packet);
+                if(ret){
+                    if(ret == AVERROR_EOF){
+                        ret = 0;
+                    }
+                    break;
+                }
+                const AVStream* stream = reader.getStream(packet.avpkt->stream_index);
+                
+                logger_->info("pkt: index={}, pts={}, codec={}, size={}",
+                              packet.avpkt->stream_index,
+                              packet.avpkt->pts,
+                              avcodec_get_name(stream->codecpar->codec_id),
+                              packet.avpkt->size);
+                
+                if(stream->codecpar->codec_id == AV_CODEC_ID_VP8){
+                    
+                    uint32_t ts = (uint32_t)vpts.convert(packet.avpkt->pts);
+                    unsigned n = 0;
+                    vp8pack.pack(ts, packet.avpkt->data, packet.avpkt->size,
+                                 [this, &dumper, &n](const uint8_t * data, size_t size)->int{
+                                     //logger_->info("  video RTP[{}]: size={}", n, size);
+                                     ++n;
+
+                                     NRTPData rtpd;
+                                     size_t hdr_len = rtpd.parse(data, size);
+                                     if(!hdr_len){
+                                         logger_->error("  fail to parse RTP");
+                                         return -1;
+                                     }
+
+                                     dumper.kv("  n", n).dump("rtp", rtpd).endl();
+                                     return 0;
+                                 });
+                    
+//                    uint32_t ts = (uint32_t)vpts.convert(packet.avpkt->pts);
+//                    ret = verifier.verify(ts, packet.avpkt->data, packet.avpkt->size);
+//                    if(ret != 0){
+//                        break;
+//                    }
+                }
+                
+                ++pkt_num;
+            }
+            
+//            delete depacker;
+            logger_->info("transfmt media -> tlv done");
+        }while (0);
+        
+        
+        reader.close();
+        return ret;
+    }
+    
+private:
+    NLogger::shared logger_;
+};
+
 int lab_xswtlv_player_main(int argc, char* argv[]){
     spdlog::set_pattern("|%H:%M:%S.%e|%n|%L| %v");
     spdlog::set_level(spdlog::level::debug);
@@ -1018,17 +1546,22 @@ int lab_xswtlv_player_main(int argc, char* argv[]){
     }
     ret = TTF_Init();
     
+//    {
+//        //const char * filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtx-fec-01.tlv";
+//        //const char * filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtx-fec-02-nodrop.tlv";
+//        const char * filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtc-6000002.tlv";
+//        //const char * filename = "/Users/simon/Downloads/rtc-3896-aem-0.tlv";
+//
+//        //XSWTLVPlayer().play(filename);
+//        //XSWTLVProber().probe(filename);
+//
+//        const char * output_base = "/Users/simon/Downloads/tmp/tmp/raw-tlv/out";
+//        XSWTLVTransformatter().transformat(filename, output_base);
+//    }
+    
     {
-        //const char * filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtx-fec-01.tlv";
-        //const char * filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtx-fec-02-nodrop.tlv";
-        const char * filename = "/Users/simon/Downloads/tmp/tmp/raw-tlv/rtc-6000002.tlv";
-        //const char * filename = "/Users/simon/Downloads/rtc-3896-aem-0.tlv";
-        
-        //XSWTLVPlayer().play(filename);
-        //XSWTLVProber().probe(filename);
-        
-        const char * output_base = "/Users/simon/Downloads/tmp/tmp/raw-tlv/out";
-        XSWTLVTransformatter().transformat(filename, output_base);
+        NRTPPackTester("test").test("/Users/simon/Downloads/tmp/media/tt.webm");
+        //Media2XSWTlv("m2t ").transfmt("/Users/simon/Downloads/tmp/media/tt.webm", "/tmp/out.tlv");
     }
     
     TTF_Quit();
@@ -1047,9 +1580,9 @@ int lab_demo_main(int argc, char* argv[]){
     
     //return test_time();
 
-    return lab050_ffplayer_main(argc, argv);
+    //return lab050_ffplayer_main(argc, argv);
     
-    //return lab_xswtlv_player_main(argc, argv);
+    return lab_xswtlv_player_main(argc, argv);
 
 }
 

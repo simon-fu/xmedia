@@ -76,18 +76,20 @@ private:
 };
 
 NRTPDepacker* NRTPDepacker::CreateDepacker(const NRTPCodec * codec){
-    if(codec->type == NCodec::VP8){
+    return CreateDepacker(codec->type);
+}
+
+NRTPDepacker* NRTPDepacker::CreateDepacker(const NCodec::Type typ){
+    if(typ == NCodec::VP8){
         std::shared_ptr<NVP8Frame::Pool> pool(new NVP8Frame::Pool());
         return new NRTPDepackVP8(pool);
-    }else if(NCodec::GetMediaForCodec(codec->type) == NMedia::Audio){
+    }else if(NCodec::GetMediaForCodec(typ) == NMedia::Audio){
         // TODO: add media type to NRTPCodec for performance
         std::shared_ptr<NAudioFrame::Pool> pool(new NAudioFrame::Pool());
-        return new NRTPDepackGeneric<NAudioFrame::Pool>(codec->type, pool);
+        return new NRTPDepackGeneric<NAudioFrame::Pool>(typ, pool);
     }else{
         //return new NRTPDepackGeneric(codec_type, pool);
         return nullptr;
     }
 }
-
-
 

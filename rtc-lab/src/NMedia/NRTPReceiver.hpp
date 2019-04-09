@@ -47,11 +47,16 @@ public:
 
     }
     
-    
-    NBuffer(const T* data, size_t size, size_t capacity)
-    : NBuffer(size, capacity) {
+    NBuffer(const T* data, size_t size)
+    : NBuffer(size) {
         std::memcpy(data_.get(), data, size);
+        size_ = size;
     }
+    
+//    NBuffer(const T* data, size_t size, size_t capacity)
+//    : NBuffer(size, capacity) {
+//        std::memcpy(data_.get(), data, size);
+//    }
     
     // Note: The destructor works even if the buffer has been moved from.
     virtual ~NBuffer(){
@@ -723,6 +728,7 @@ public:
     
 public:
     static NRTPDepacker* CreateDepacker(const NRTPCodec * codec);
+    static NRTPDepacker* CreateDepacker(const NCodec::Type typ);
     
 protected:
     bool                startPhase_     = true;
