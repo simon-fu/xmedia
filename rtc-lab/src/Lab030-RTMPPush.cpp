@@ -672,7 +672,7 @@ public:
             
             // TODO:
             ctx_->max_b_frames = 0; // aaa
-            ctx_->flags |= CODEC_FLAG_QSCALE;
+            //ctx_->flags |= CODEC_FLAG_QSCALE;
             ctx_->rc_min_rate = ctx_->bit_rate*2/3;
             ctx_->rc_max_rate = ctx_->bit_rate *2;
             ctx_->rc_buffer_size = (int)(ctx_->rc_max_rate * 2);
