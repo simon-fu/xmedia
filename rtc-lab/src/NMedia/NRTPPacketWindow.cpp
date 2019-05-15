@@ -53,7 +53,8 @@ NRTPPacketWindow::State NRTPPacketWindow::insertPacket(const NRTPData& rtpd){
         
     }else if(abs_dist < 2*circular.size()){
         // newer packet
-        auto num = circular.size() - abs_dist + 1;
+        //auto num = circular.size() - abs_dist + 1;
+        auto num = abs_dist - circular.size() + 1;
         auto over_num = circular.shiftBack(num);
         startSeq_ = startSeq_ + over_num;
         return checkPlaceSlot(rtpd, circular.back(), kDiscontinuity);
