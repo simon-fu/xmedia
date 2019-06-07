@@ -88,17 +88,17 @@ NRTPPacketWindow::State NRTPPacketWindow::nextSlotInOrder(NRTPPacketSlot* &slot,
     State state = kNoError;
     while(true){
         auto dist = startSeq_.distance(nextSeq_);
-        if(dist >= this->size()){
-            // no expect packet
-            return kOutOfRange;
-        }
-        
         if(dist < 0){
             // out of date, reset to start seq
             nextSeq_ = startSeq_;
             dist = 0;
             state = kDiscontinuity;
+        }else if(dist >= this->size()){
+            // no expect packet
+            return kOutOfRange;
         }
+        
+
         
         slot = &(*this)[dist];
         if(!slot->valid(nextSeq_.value())){

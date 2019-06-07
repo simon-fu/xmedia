@@ -105,6 +105,10 @@ public:
         return startSeq_;
     }
     
+    const NRTPSeq& nextSeq() const{
+        return nextSeq_;
+    }
+    
     bool distance(const NRTPSeq& seq, RTPSeqDistance& dist) const{
         auto& packets_ = *this;
         dist = startSeq_.distance(seq);
